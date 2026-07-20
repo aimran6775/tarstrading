@@ -58,9 +58,12 @@ final class DemoMarket: MarketProviding, @unchecked Sendable {
 
     /// Advance every price one step of geometric Brownian motion. Called by the
     /// store's heartbeat (~1s in demo mode) so the terminal feels live.
+    /// Honesty rule: closed markets don't move — equities freeze outside
+    /// regular hours while crypto keeps trading.
     func tick() {
         lock.lock(); defer { lock.unlock() }
         for asset in Self.universe {
+            guard MarketClock.isOpen(asset.assetClass) else { continue }
             guard var price = currentPrices[asset.symbol] else { continue }
             let dt = 1.0 / (252 * 6.5 * 3600)   // one second of trading year
             let vol = asset.annualVol * (dt).squareRoot()

@@ -114,6 +114,13 @@ struct WatchlistRow: View {
     @Environment(TradingStore.self) private var store
     let symbol: String
 
+    // Fixed-width trailing columns so every row's price and percent land on
+    // the same vertical grid — tabular, terminal-grade. One uniform font for
+    // the numeric columns; scale-to-fit only ever happens inside the fixed
+    // frame as a last resort (TickerText's built-in floor).
+    fileprivate static let priceColumnWidth: CGFloat = 96
+    fileprivate static let percentColumnWidth: CGFloat = 64
+
     var body: some View {
         let quote = store.quote(for: symbol)
         HStack(spacing: TarsTheme.Space.m) {
@@ -122,7 +129,7 @@ struct WatchlistRow: View {
                     .font(TarsTheme.Text.price)
                     .foregroundStyle(TarsTheme.inkPrimary)
                     .lineLimit(1)
-                    .layoutPriority(1)
+                    .truncationMode(.tail)
                 if let quote, quote.age > 300 {
                     // Honest-data rule: show staleness, never fake liveness.
                     Text("as of \(quote.asOf, format: .relative(presentation: .named))")
@@ -130,16 +137,18 @@ struct WatchlistRow: View {
                         .foregroundStyle(TarsTheme.inkTertiary)
                 }
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
             if let quote {
-                VStack(alignment: .trailing, spacing: 2) {
-                    TickerText(value: quote.price,
-                               format: .currency(code: "USD").precision(.fractionLength(2)),
-                               font: TarsTheme.Text.price)
-                    PercentText(value: quote.changePercent)
-                }
+                TickerText(value: quote.price,
+                           format: .currency(code: "USD").precision(.fractionLength(2)),
+                           font: TarsTheme.Text.priceSmall)
+                    .frame(width: Self.priceColumnWidth, alignment: .trailing)
+                PercentText(value: quote.changePercent, font: TarsTheme.Text.priceSmall)
+                    .frame(width: Self.percentColumnWidth, alignment: .trailing)
             } else {
                 SkeletonBlock(width: 90)
+                    .frame(width: Self.priceColumnWidth + TarsTheme.Space.m + Self.percentColumnWidth,
+                           alignment: .trailing)
             }
         }
         .padding(.horizontal, TarsTheme.Space.l)

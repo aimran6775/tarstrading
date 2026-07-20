@@ -35,16 +35,29 @@ final class AgentLab {
         self.runner = runner
         scheduler?.cancel()
         scheduler = Task { [weak self] in
+            var lastDayStamp = MarketClock.dayStamp()
             while !Task.isCancelled {
                 guard let self else { return }
-                if self.agents.contains(where: { $0.status == .running }) {
+                let stamp = MarketClock.dayStamp()
+                if stamp != lastDayStamp {
+                    lastDayStamp = stamp
+                    runner.resetDailyCounters()
+                }
+                // Evaluate only when a market the running agents trade is
+                // actually open — closed markets mean frozen bars, so a pass
+                // would be a no-op that still burns data budget.
+                let running = self.agents.filter { $0.status == .running }
+                let anyOpen = running.contains { agent in
+                    agent.universe.contains { symbol in
+                        MarketClock.isOpen(symbol.contains("/") ? .crypto : .usEquity)
+                    }
+                }
+                if !running.isEmpty && anyOpen {
                     self.isEvaluating = true
                     await runner.evaluateAll()
                     self.isEvaluating = false
                 }
-                // Demo cadence: one pass ≈ one strategy "day" every 30s.
-                // Live paper: this also respects Massive caching upstream.
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .seconds(120))
             }
         }
     }
@@ -97,9 +110,14 @@ final class AgentLab {
 
     @MainActor
     func backtest(_ agent: TradingAgent, marketData: MarketProviding) async -> BacktestResult? {
+        // Backtests run on real bundled daily history (Resources/HistoricalBars)
+        // whenever a symbol ships with it — actual market past, not synthetic
+        // physics. The provider is only a fallback for unbundled symbols.
         var barsBySymbol: [String: [Bar]] = [:]
         for symbol in agent.universe {
-            if let bars = try? await marketData.bars(symbol: symbol, timeframe: .year5) {
+            if let real = HistoricalData.bars(for: symbol) {
+                barsBySymbol[symbol] = Array(real.suffix(1260))   // ~5y of trading days
+            } else if let bars = try? await marketData.bars(symbol: symbol, timeframe: .year5) {
                 barsBySymbol[symbol] = bars
             }
         }

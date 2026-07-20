@@ -14,6 +14,7 @@ struct PortfolioView: View {
     @State private var angleSelection: Double?
     @State private var expandedStat: PortfolioStatKind?
     @State private var spyBars: [Bar] = []
+    @State private var sandbox = OptionsSandbox.shared
 
     var body: some View {
         ScrollView {
@@ -21,18 +22,20 @@ struct PortfolioView: View {
                 loadingSkeleton
                     .padding(TarsTheme.Space.xl)
             } else {
-                VStack(alignment: .leading, spacing: TarsTheme.Space.l) {
+                // Space.xl between section cards gives each heading air above it.
+                VStack(alignment: .leading, spacing: TarsTheme.Space.xl) {
                     heroCard
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .top, spacing: TarsTheme.Space.l) {
                             allocationCard.frame(maxWidth: .infinity)
                             exposureCard.frame(maxWidth: .infinity)
                         }
-                        VStack(spacing: TarsTheme.Space.l) {
+                        VStack(spacing: TarsTheme.Space.xl) {
                             allocationCard
                             exposureCard
                         }
                     }
+                    optionsSandboxCard
                     riskCard
                     journalCard
                 }
@@ -56,9 +59,13 @@ struct PortfolioView: View {
 
     private var equityHistory: [TradingStore.EquityPoint] { store.equityHistory }
 
+    /// Chart tint follows the week's trend: last close vs the first point
+    /// inside the trailing 7 days (or the whole history if it's shorter).
     private var trendIsUp: Bool {
-        guard let first = equityHistory.first, let last = equityHistory.last else { return true }
-        return last.equity >= first.equity
+        guard let last = equityHistory.last else { return true }
+        let weekAgo = last.time.addingTimeInterval(-7 * 86_400)
+        let anchor = equityHistory.first { $0.time >= weekAgo } ?? equityHistory[0]
+        return last.equity >= anchor.equity
     }
 
     private var allocationSlices: [PortfolioAllocationSlice] {
@@ -110,7 +117,10 @@ struct PortfolioView: View {
                     Text("Portfolio equity")
                         .font(TarsTheme.Text.caption)
                         .foregroundStyle(TarsTheme.inkSecondary)
-                    TickerText(value: store.account.equity, font: TarsTheme.Text.priceHero)
+                    // Display numerals: 56pt condensed. At 320pt width the card
+                    // leaves ~224pt of content; a six-figure equity fits at
+                    // ~0.78 scale, comfortably inside the 0.7 floor.
+                    TickerText(value: store.account.equity, font: TarsTheme.Text.display)
                     HStack(spacing: TarsTheme.Space.s) {
                         Text(store.account.dayPnL,
                              format: .currency(code: "USD").sign(strategy: .always()))
@@ -520,6 +530,76 @@ struct PortfolioView: View {
             })
     }
 
+    // MARK: Options sandbox sleeve
+
+    /// Read-only view of the options practice book. Rendered only when legs are
+    /// open — the sandbox lives outside the paper account, so it gets its own
+    /// clearly-badged sleeve instead of blending into equity or exposure.
+    @ViewBuilder
+    private var optionsSandboxCard: some View {
+        if sandbox.hasOpenPositions {
+            let sleeveLegs = sandboxSleeveLegs
+            VStack(alignment: .leading, spacing: TarsTheme.Space.l) {
+                HStack(alignment: .top, spacing: TarsTheme.Space.s) {
+                    PortfolioSectionHeader(
+                        title: "Options \u{2014} sandbox",
+                        subtitle: "Practice book, marked to model")
+                    Spacer()
+                    Text("SANDBOX")
+                        .font(TarsTheme.Text.micro)
+                        .foregroundStyle(TarsTheme.bg0)
+                        .padding(.horizontal, TarsTheme.Space.s)
+                        .padding(.vertical, TarsTheme.Space.xs)
+                        .background(Capsule(style: .continuous).fill(TarsTheme.paperBadge))
+                        .accessibilityLabel("Sandbox positions — practice only")
+                }
+
+                HStack(spacing: TarsTheme.Space.s) {
+                    PortfolioGreekChip(
+                        label: "Net \u{0394}",
+                        value: sleeveLegs.reduce(0) { $0 + $1.netDelta }
+                            .formatted(.number.precision(.fractionLength(0))),
+                        detail: "share-equivalent")
+                    PortfolioGreekChip(
+                        label: "Net \u{0398}/day",
+                        value: sleeveLegs.reduce(0) { $0 + $1.netThetaPerDay }
+                            .formatted(.currency(code: "USD").precision(.fractionLength(2))),
+                        detail: "to time, per day")
+                    Spacer(minLength: 0)
+                }
+
+                VStack(spacing: TarsTheme.Space.s) {
+                    ForEach(sleeveLegs) { sleeve in
+                        PortfolioSandboxLegRow(sleeve: sleeve)
+                    }
+                }
+
+                Text("These positions live outside your paper account \u{2014} model prices from the options sandbox, not market quotes.")
+                    .font(TarsTheme.Text.caption)
+                    .foregroundStyle(TarsTheme.inkTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(TarsTheme.Space.xl)
+            .tarsPanel()
+        }
+    }
+
+    private var sandboxSleeveLegs: [PortfolioSandboxSleeveLeg] {
+        sandbox.legs.map { leg in
+            let underlying = sandboxUnderlying(for: leg)
+            return PortfolioSandboxSleeveLeg(
+                leg: leg,
+                mark: SandboxPricer.markPremium(for: leg, underlying: underlying),
+                greeks: SandboxPricer.greeks(for: leg, underlying: underlying))
+        }
+    }
+
+    private func sandboxUnderlying(for leg: SandboxLeg) -> Double {
+        if let quote = store.quote(for: leg.symbol) { return quote.price }
+        let demo = DemoMarket.shared.price(of: leg.symbol)
+        return demo > 0 ? demo : leg.entryUnderlying
+    }
+
     // MARK: Journal strip
 
     private var journalCard: some View {
@@ -581,6 +661,101 @@ struct PortfolioView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading portfolio")
+    }
+}
+
+// MARK: - Options sandbox sleeve pieces
+
+/// A sandbox leg with its model mark and per-share greeks resolved.
+fileprivate struct PortfolioSandboxSleeveLeg: Identifiable {
+    let leg: SandboxLeg
+    let mark: Double
+    let greeks: SandboxGreeks
+
+    var id: UUID { leg.id }
+    private var direction: Double { leg.isLong ? 1 : -1 }
+    private var size: Double { 100 * Double(leg.contracts) }
+
+    var currentValue: Double { mark * size }
+    var entryValue: Double { leg.entryPremium * size }
+    var pnl: Double { OptionsSandbox.pnl(leg, mark: mark) }
+    /// Position delta in share-equivalents (per-share delta × 100 × contracts, signed).
+    var netDelta: Double { greeks.delta * size * direction }
+    /// Dollars this position gives to time per day, all else equal (signed).
+    var netThetaPerDay: Double { greeks.thetaPerDay * size * direction }
+
+    var descriptor: String {
+        "\(leg.symbol) \(leg.strike.formatted(.number.precision(.fractionLength(0...2)))) \(leg.isCall ? "C" : "P")"
+    }
+    var sideLine: String {
+        "\(leg.isLong ? "Long" : "Short") \(leg.contracts) \u{00D7} \(leg.entryPremium.formatted(.currency(code: "USD")))"
+    }
+}
+
+fileprivate struct PortfolioGreekChip: View {
+    let label: String
+    let value: String
+    let detail: String
+
+    var body: some View {
+        HStack(spacing: TarsTheme.Space.s) {
+            Text(label)
+                .font(TarsTheme.Text.micro)
+                .foregroundStyle(TarsTheme.inkTertiary)
+            Text(value)
+                .font(TarsTheme.Text.priceSmall)
+                .foregroundStyle(TarsTheme.inkPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(detail)
+                .font(TarsTheme.Text.micro)
+                .foregroundStyle(TarsTheme.inkTertiary)
+        }
+        .padding(.horizontal, TarsTheme.Space.m)
+        .padding(.vertical, TarsTheme.Space.s)
+        .background(Capsule(style: .continuous).fill(TarsTheme.bg2))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label), \(value), \(detail)")
+    }
+}
+
+fileprivate struct PortfolioSandboxLegRow: View {
+    let sleeve: PortfolioSandboxSleeveLeg
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: TarsTheme.Space.m) {
+            VStack(alignment: .leading, spacing: TarsTheme.Space.xs) {
+                Text(sleeve.descriptor)
+                    .font(TarsTheme.Text.price)
+                    .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(sleeve.sideLine)
+                    .font(TarsTheme.Text.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(TarsTheme.inkSecondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: TarsTheme.Space.xs) {
+                Text(sleeve.pnl, format: .currency(code: "USD").sign(strategy: .always()))
+                    .font(TarsTheme.Text.price)
+                    .foregroundStyle(TarsTheme.pnl(sleeve.pnl))
+                    .contentTransition(.numericText(value: sleeve.pnl))
+                    .animation(Motion.ticker, value: sleeve.pnl)
+                Text("\(sleeve.currentValue.formatted(.currency(code: "USD"))) now \u{00B7} \(sleeve.entryValue.formatted(.currency(code: "USD"))) at entry")
+                    .font(TarsTheme.Text.priceSmall)
+                    .foregroundStyle(TarsTheme.inkTertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .padding(TarsTheme.Space.m)
+        .background(
+            RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
+                .fill(TarsTheme.bg2))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Sandbox position, \(sleeve.leg.symbol) \(sleeve.leg.isCall ? "call" : "put"), \(sleeve.sideLine)")
+        .accessibilityValue("\(sleeve.pnl.formatted(.currency(code: "USD").sign(strategy: .always()))) against entry, model value \(sleeve.currentValue.formatted(.currency(code: "USD")))")
     }
 }
 

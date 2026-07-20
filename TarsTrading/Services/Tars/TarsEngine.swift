@@ -16,6 +16,12 @@ struct TarsContext {
     var watchlist: [String] = []
     var visibleSymbol: String?
     var recentJournal: [JournalEntry] = []
+    // Academy awareness — nil/zero when the caller has no curriculum store.
+    var academyRank: String?
+    var academyXP: Int = 0
+    var academyStreakDays: Int = 0
+    var currentLessonTitle: String?
+    var weakestQuizArea: String?
 
     var summaryPrompt: String {
         var lines: [String] = []
@@ -31,6 +37,11 @@ struct TarsContext {
             let thesisless = recentJournal.prefix(10).filter { $0.thesis.isEmpty }.count
             if thesisless > 2 { lines.append("Note: \(thesisless) recent trades have no journaled thesis.") }
         }
+        if let academyRank {
+            lines.append("Academy: \(academyRank) rank, \(academyXP) XP, \(academyStreakDays)-day study streak.")
+        }
+        if let currentLessonTitle { lines.append("User is currently in the lesson: \(currentLessonTitle).") }
+        if let weakestQuizArea { lines.append("Weakest curriculum area (started, least finished): \(weakestQuizArea).") }
         return lines.joined(separator: "\n")
     }
 }

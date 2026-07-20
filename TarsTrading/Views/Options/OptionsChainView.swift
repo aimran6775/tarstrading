@@ -14,7 +14,7 @@ public struct OptionsChainView: View {
     @Environment(TradingStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var book = OCSandboxBook.shared
+    @State private var book = OptionsSandbox.shared
     @State private var dte: Int = 30
     @State private var ticket: OCTicketContext?
     @State private var fallbackQuote: Quote?
@@ -54,15 +54,13 @@ public struct OptionsChainView: View {
 
     private var spot: Double? { (store.quote(for: symbol) ?? fallbackQuote)?.price }
 
-    private var baseVol: Double {
-        DemoMarket.universe.first { $0.symbol == symbol }?.annualVol ?? 0.30
-    }
+    private var baseVol: Double { SandboxPricer.baseVol(for: symbol) }
 
     private var yearsToExpiry: Double { Double(dte) / 365.0 }
 
     private var rows: [OCRow] {
         guard let spot, spot > 0 else { return [] }
-        let step = ocStrikeStep(for: spot)
+        let step = SandboxPricer.strikeStep(for: spot)
         var strikes: [Double] = []
         var k = (spot * 0.8 / step).rounded(.up) * step
         while k <= spot * 1.2 + 0.0001 {
@@ -71,10 +69,10 @@ public struct OptionsChainView: View {
         }
         let T = yearsToExpiry
         return strikes.map { strike in
-            let iv = ocSmileIV(base: baseVol, spot: spot, strike: strike)
-            let call = OCBS.price(isCall: true, S: spot, K: strike, T: T, v: iv)
-            let put = OCBS.price(isCall: false, S: spot, K: strike, T: T, v: iv)
-            let cs = ocHalfSpread(call), ps = ocHalfSpread(put)
+            let iv = SandboxPricer.smileIV(base: baseVol, spot: spot, strike: strike)
+            let call = SandboxPricer.price(isCall: true, S: spot, K: strike, T: T, v: iv)
+            let put = SandboxPricer.price(isCall: false, S: spot, K: strike, T: T, v: iv)
+            let cs = SandboxPricer.halfSpread(call), ps = SandboxPricer.halfSpread(put)
             return OCRow(strike: strike, iv: iv,
                          callBid: max(0, call - cs), callAsk: call + cs,
                          putBid: max(0, put - ps), putAsk: put + ps)
@@ -382,7 +380,7 @@ public struct OptionsChainView: View {
     }
 
     private var totalsRow: some View {
-        let unrealized = book.legs.reduce(0.0) { $0 + OCSandboxBook.pnl($1, mark: markPremium(for: $1)) }
+        let unrealized = book.legs.reduce(0.0) { $0 + OptionsSandbox.pnl($1, mark: markPremium(for: $1)) }
         return HStack(spacing: TarsTheme.Space.xl) {
             VStack(alignment: .leading, spacing: TarsTheme.Space.xs) {
                 Text("Open P&L (model)")
@@ -410,9 +408,9 @@ public struct OptionsChainView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func bookRow(_ leg: OCLeg) -> some View {
+    private func bookRow(_ leg: SandboxLeg) -> some View {
         let mark = markPremium(for: leg)
-        let pnl = OCSandboxBook.pnl(leg, mark: mark)
+        let pnl = OptionsSandbox.pnl(leg, mark: mark)
         let expired = leg.expiry <= .now
         let dteLeft = max(0, Int((leg.expiry.timeIntervalSinceNow / 86_400).rounded(.up)))
         return VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
@@ -477,15 +475,11 @@ public struct OptionsChainView: View {
 
     // MARK: - Mark-to-model
 
-    private func markPremium(for leg: OCLeg) -> Double {
-        let underlying = underlyingPrice(for: leg)
-        let T = max(0, leg.expiry.timeIntervalSinceNow) / (365 * 86_400)
-        let vol = DemoMarket.universe.first { $0.symbol == leg.symbol }?.annualVol ?? 0.30
-        let iv = ocSmileIV(base: vol, spot: underlying, strike: leg.strike)
-        return OCBS.price(isCall: leg.isCall, S: underlying, K: leg.strike, T: T, v: iv)
+    private func markPremium(for leg: SandboxLeg) -> Double {
+        SandboxPricer.markPremium(for: leg, underlying: underlyingPrice(for: leg))
     }
 
-    private func underlyingPrice(for leg: OCLeg) -> Double {
+    private func underlyingPrice(for leg: SandboxLeg) -> Double {
         if let q = store.quote(for: leg.symbol) { return q.price }
         if leg.symbol == symbol, let spot { return spot }
         let demo = DemoMarket.shared.price(of: leg.symbol)
@@ -498,7 +492,7 @@ public struct OptionsChainView: View {
 fileprivate struct OCTicketSheet: View {
     let symbol: String
     let context: OCTicketContext
-    let book: OCSandboxBook
+    let book: OptionsSandbox
 
     @Environment(TradingStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -512,27 +506,25 @@ fileprivate struct OCTicketSheet: View {
         let p = DemoMarket.shared.price(of: symbol)
         return p > 0 ? p : nil
     }
-    private var baseVol: Double {
-        DemoMarket.universe.first { $0.symbol == symbol }?.annualVol ?? 0.30
-    }
+    private var baseVol: Double { SandboxPricer.baseVol(for: symbol) }
     private var T: Double { Double(context.dte) / 365.0 }
 
     private var iv: Double {
         guard let spot else { return baseVol }
-        return ocSmileIV(base: baseVol, spot: spot, strike: context.strike)
+        return SandboxPricer.smileIV(base: baseVol, spot: spot, strike: context.strike)
     }
     private var theo: Double {
         guard let spot else { return 0 }
-        return OCBS.price(isCall: context.isCall, S: spot, K: context.strike, T: T, v: iv)
+        return SandboxPricer.price(isCall: context.isCall, S: spot, K: context.strike, T: T, v: iv)
     }
-    private var bid: Double { max(0, theo - ocHalfSpread(theo)) }
-    private var ask: Double { theo + ocHalfSpread(theo) }
+    private var bid: Double { max(0, theo - SandboxPricer.halfSpread(theo)) }
+    private var ask: Double { theo + SandboxPricer.halfSpread(theo) }
     /// Long crosses the spread and pays the ask; short receives the bid.
     private var fillPremium: Double { isLong ? ask : bid }
     private var totalDollars: Double { fillPremium * 100 * Double(contracts) }
-    private var greeks: OCGreeks {
-        guard let spot else { return OCGreeks() }
-        return OCBS.greeks(isCall: context.isCall, S: spot, K: context.strike, T: T, v: iv)
+    private var greeks: SandboxGreeks {
+        guard let spot else { return SandboxGreeks() }
+        return SandboxPricer.greeks(isCall: context.isCall, S: spot, K: context.strike, T: T, v: iv)
     }
 
     var body: some View {
@@ -693,7 +685,7 @@ fileprivate struct OCTicketSheet: View {
     private var confirmButton: some View {
         Button {
             guard let spot else { return }
-            let leg = OCLeg(
+            let leg = SandboxLeg(
                 symbol: symbol,
                 isCall: context.isCall,
                 isLong: isLong,
@@ -748,66 +740,9 @@ fileprivate struct OCGreekCell: View {
     }
 }
 
-// MARK: - Sandbox book store (fileprivate, persisted)
-
-fileprivate struct OCLeg: Identifiable, Codable, Equatable {
-    var id = UUID()
-    var symbol: String
-    var isCall: Bool
-    var isLong: Bool
-    var strike: Double
-    var contracts: Int
-    var entryPremium: Double
-    var entryUnderlying: Double
-    var expiry: Date
-    var openedAt: Date
-}
-
-fileprivate struct OCBookFile: Codable {
-    var legs: [OCLeg]
-    var realized: Double
-}
-
-/// The sandbox book: options practice positions marked to model. Deliberately
-/// NOT routed through TradingStore — this book never touches the paper account.
-@Observable
-fileprivate final class OCSandboxBook {
-    static let shared = OCSandboxBook()
-
-    var legs: [OCLeg] = []
-    var realized: Double = 0
-
-    @ObservationIgnored private let persistence = Persistence()
-
-    init() {
-        if let file = persistence.load(OCBookFile.self, "optionsSandboxBook") {
-            legs = file.legs
-            realized = file.realized
-        }
-    }
-
-    func open(_ leg: OCLeg) {
-        legs.insert(leg, at: 0)
-        save()
-    }
-
-    func close(_ leg: OCLeg, mark: Double) {
-        realized += Self.pnl(leg, mark: mark)
-        legs.removeAll { $0.id == leg.id }
-        save()
-    }
-
-    /// Signed P&L in dollars: (mark − entry) × 100 × contracts, flipped for shorts.
-    static func pnl(_ leg: OCLeg, mark: Double) -> Double {
-        (mark - leg.entryPremium) * 100 * Double(leg.contracts) * (leg.isLong ? 1 : -1)
-    }
-
-    private func save() {
-        persistence.save(OCBookFile(legs: legs, realized: realized), "optionsSandboxBook")
-    }
-}
-
 // MARK: - Chain row & ticket context (fileprivate)
+// The sandbox book itself (OptionsSandbox), the leg model (SandboxLeg), and the
+// Black-Scholes pricer (SandboxPricer) live in OptionsSandbox.swift.
 
 fileprivate struct OCRow: Identifiable {
     var id: Double { strike }
@@ -824,90 +759,6 @@ fileprivate struct OCTicketContext: Identifiable {
     let isCall: Bool
     let strike: Double
     let dte: Int
-}
-
-// MARK: - Black-Scholes (fileprivate; OptionsWidgets.swift has its own copy)
-
-fileprivate struct OCGreeks {
-    var delta = 0.0
-    var gamma = 0.0
-    var thetaPerDay = 0.0
-    var vegaPerPoint = 0.0
-}
-
-fileprivate enum OCBS {
-    /// Sandbox risk-free rate: a flat 4%.
-    static let r = 0.04
-
-    static func pdf(_ x: Double) -> Double {
-        exp(-x * x / 2) / (2 * Double.pi).squareRoot()
-    }
-
-    /// Standard normal CDF, Abramowitz–Stegun polynomial approximation.
-    static func cdf(_ x: Double) -> Double {
-        let k = 1 / (1 + 0.2316419 * abs(x))
-        let poly = k * (0.319381530 + k * (-0.356563782 + k * (1.781477937 + k * (-1.821255978 + k * 1.330274429))))
-        let c = 1 - pdf(x) * poly
-        return x >= 0 ? c : 1 - c
-    }
-
-    static func price(isCall: Bool, S: Double, K: Double, T: Double, v: Double) -> Double {
-        guard S > 0, K > 0 else { return 0 }
-        guard T > 1e-6, v > 1e-6 else {
-            return isCall ? max(0, S - K) : max(0, K - S)   // intrinsic at/after expiry
-        }
-        let sqrtT = T.squareRoot()
-        let d1 = (Foundation.log(S / K) + (r + v * v / 2) * T) / (v * sqrtT)
-        let d2 = d1 - v * sqrtT
-        if isCall {
-            return S * cdf(d1) - K * exp(-r * T) * cdf(d2)
-        } else {
-            return K * exp(-r * T) * cdf(-d2) - S * cdf(-d1)
-        }
-    }
-
-    static func greeks(isCall: Bool, S: Double, K: Double, T: Double, v: Double) -> OCGreeks {
-        guard S > 0, K > 0, T > 1e-6, v > 1e-6 else { return OCGreeks() }
-        let sqrtT = T.squareRoot()
-        let d1 = (Foundation.log(S / K) + (r + v * v / 2) * T) / (v * sqrtT)
-        let d2 = d1 - v * sqrtT
-        let delta = isCall ? cdf(d1) : cdf(d1) - 1
-        let gamma = pdf(d1) / (S * v * sqrtT)
-        let annualTheta: Double = isCall
-            ? -S * pdf(d1) * v / (2 * sqrtT) - r * K * exp(-r * T) * cdf(d2)
-            : -S * pdf(d1) * v / (2 * sqrtT) + r * K * exp(-r * T) * cdf(-d2)
-        let vega = S * pdf(d1) * sqrtT / 100   // per 1 vol point
-        return OCGreeks(delta: delta, gamma: gamma, thetaPerDay: annualTheta / 365, vegaPerPoint: vega)
-    }
-}
-
-// MARK: - Chain math helpers (fileprivate)
-
-/// Synthesized volatility smile: downside strikes charge more IV, with a mild
-/// smile at both wings. Deliberately simplified for teaching.
-fileprivate func ocSmileIV(base: Double, spot: Double, strike: Double) -> Double {
-    guard spot > 0 else { return base }
-    let m = strike / spot - 1
-    let iv = base * (1 - 0.35 * m + 1.9 * m * m)
-    return min(max(iv, base * 0.55), base * 1.9)
-}
-
-/// Synthetic half-spread around the theoretical value.
-fileprivate func ocHalfSpread(_ theo: Double) -> Double {
-    max(0.01, theo * 0.02)
-}
-
-/// Sensible strike increments by underlying price.
-fileprivate func ocStrikeStep(for spot: Double) -> Double {
-    switch spot {
-    case ..<25: 0.5
-    case ..<50: 1
-    case ..<100: 2.5
-    case ..<250: 5
-    case ..<500: 10
-    case ..<1000: 25
-    default: 50
-    }
 }
 
 fileprivate let ocPremiumFormat = FloatingPointFormatStyle<Double>.Currency

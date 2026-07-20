@@ -1,6 +1,8 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// Settings: appearance, mode honesty, Tars engine, danger zone, disclosures.
+/// Settings: appearance, mode honesty, journal prompts, Tars engine,
+/// backup, danger zone, disclosures.
 /// Calm and legible — the one screen where nothing should ever surprise you.
 public struct SettingsView: View {
     @Environment(PreferencesStore.self) private var prefs
@@ -11,6 +13,11 @@ public struct SettingsView: View {
     @State private var confirmClearJournal = false
     @State private var confirmClearAcademy = false
     @State private var confirmClearTars = false
+    @State private var showImporter = false
+    @State private var restoreMessage: String?
+
+    @AppStorage("thesisPromptMode")
+    private var thesisPromptModeRaw = TradingStore.ThesisPromptMode.closesOnly.rawValue
 
     public init() {}
 
@@ -19,7 +26,9 @@ public struct SettingsView: View {
             VStack(spacing: TarsTheme.Space.l) {
                 appearanceCard
                 modeCard
+                journalCard
                 tarsCard
+                backupCard
                 dangerCard
                 aboutCard
             }
@@ -33,6 +42,20 @@ public struct SettingsView: View {
         .onChange(of: prefs.soundOn) { _, on in
             Sound.enabled = on
             if on { Sound.orderStaged.play() }
+        }
+        .fileImporter(isPresented: $showImporter,
+                      allowedContentTypes: [.json]) { result in
+            switch result {
+            case .success(let url): restoreBackup(from: url)
+            case .failure: restoreMessage = "Couldn't open that file. Nothing was changed."
+            }
+        }
+        .alert("Import backup",
+               isPresented: Binding(get: { restoreMessage != nil },
+                                    set: { if !$0 { restoreMessage = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(restoreMessage ?? "")
         }
     }
 
@@ -63,9 +86,27 @@ public struct SettingsView: View {
 
                 Divider().overlay(TarsTheme.hairline)
 
-                SettingsToggleRow(icon: "moon.fill", title: "Always dark",
-                                  subtitle: "Tars Trading is designed dark-first. Off follows the system.",
-                                  isOn: $prefs.forceDark)
+                HStack(alignment: .top, spacing: TarsTheme.Space.m) {
+                    Image(systemName: "moon.fill")
+                        .font(TarsTheme.Text.body)
+                        .foregroundStyle(TarsTheme.inkSecondary)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Appearance")
+                            .font(TarsTheme.Text.body)
+                            .foregroundStyle(TarsTheme.inkPrimary)
+                        Text("Light mode ships the day it can be shipped proudly. That day is not today.")
+                            .font(TarsTheme.Text.caption)
+                            .foregroundStyle(TarsTheme.inkTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Text("Dark, by design")
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(TarsTheme.inkSecondary)
+                }
+                .accessibilityElement(children: .combine)
+
                 SettingsToggleRow(icon: "speaker.wave.2.fill", title: "Sound",
                                   subtitle: "Short cues for fills, alerts, and achievements.",
                                   isOn: $prefs.soundOn)
@@ -142,6 +183,47 @@ public struct SettingsView: View {
         }
     }
 
+    // MARK: - Journal prompts
+
+    private var thesisPromptMode: Binding<TradingStore.ThesisPromptMode> {
+        Binding(get: { TradingStore.ThesisPromptMode(rawValue: thesisPromptModeRaw) ?? .closesOnly },
+                set: { thesisPromptModeRaw = $0.rawValue })
+    }
+
+    private var journalCard: some View {
+        SettingsCard(title: "Journal", icon: "square.and.pencil") {
+            VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
+                Text("Thesis prompts")
+                    .font(TarsTheme.Text.caption)
+                    .foregroundStyle(TarsTheme.inkSecondary)
+                Picker("Thesis prompts", selection: thesisPromptMode.animation(Motion.snappy)) {
+                    ForEach(TradingStore.ThesisPromptMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: thesisPromptModeRaw) { _, _ in Haptics.tick() }
+
+                Text(thesisPromptFootnote)
+                    .font(TarsTheme.Text.caption)
+                    .foregroundStyle(TarsTheme.inkTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .animation(Motion.snappy, value: thesisPromptModeRaw)
+            }
+        }
+    }
+
+    private var thesisPromptFootnote: String {
+        switch thesisPromptMode.wrappedValue {
+        case .always:
+            return "Every fill asks for a thesis — entries and exits alike. Maximum discipline, maximum interruptions."
+        case .closesOnly:
+            return "You're asked to write only when a position closes — the moment the result is in and the lesson is freshest. Entries still land in the journal; the thesis field just waits for you."
+        case .never:
+            return "No prompts, ever. Trades still record themselves in the journal; whether any thinking gets written down is entirely on you."
+        }
+    }
+
     // MARK: - Tars
 
     private var tarsCard: some View {
@@ -194,6 +276,97 @@ public struct SettingsView: View {
                     Text("Tars won't take it personally. He doesn't take anything personally.")
                 }
             }
+        }
+    }
+
+    // MARK: - Backup & export
+
+    private var backupCard: some View {
+        SettingsCard(title: "Backup & Export", icon: "externaldrive.fill") {
+            VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
+                Text("Everything in this app — journal, agents, backtests, Academy progress, watchlist, and every word Tars has said — lives on this iPad and nowhere else. Nothing syncs. Delete the app and it all goes with it, unless you've exported it first.")
+                    .font(TarsTheme.Text.body)
+                    .foregroundStyle(TarsTheme.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Divider().overlay(TarsTheme.hairline)
+
+                ShareLink(item: TarsBackupFile(),
+                          preview: SharePreview("Tars Trading backup")) {
+                    HStack(alignment: .top, spacing: TarsTheme.Space.m) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(TarsTheme.Text.body)
+                            .foregroundStyle(TarsTheme.accent)
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Export everything")
+                                .font(TarsTheme.Text.body)
+                                .foregroundStyle(TarsTheme.inkPrimary)
+                            Text("One JSON file with all of it. Keep it somewhere sensible.")
+                                .font(TarsTheme.Text.caption)
+                                .foregroundStyle(TarsTheme.inkTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableStyle())
+
+                Divider().overlay(TarsTheme.hairline)
+
+                Button {
+                    showImporter = true
+                } label: {
+                    HStack(alignment: .top, spacing: TarsTheme.Space.m) {
+                        Image(systemName: "square.and.arrow.down")
+                            .font(TarsTheme.Text.body)
+                            .foregroundStyle(TarsTheme.accent)
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Import backup")
+                                .font(TarsTheme.Text.body)
+                                .foregroundStyle(TarsTheme.inkPrimary)
+                            Text("Restores a previous export, overwriting what's here now. A restart afterwards loads everything.")
+                                .font(TarsTheme.Text.caption)
+                                .foregroundStyle(TarsTheme.inkTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableStyle())
+            }
+        }
+    }
+
+    private func restoreBackup(from url: URL) {
+        let secured = url.startAccessingSecurityScopedResource()
+        defer { if secured { url.stopAccessingSecurityScopedResource() } }
+
+        guard let data = try? Data(contentsOf: url),
+              let combined = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              !combined.isEmpty else {
+            restoreMessage = "That doesn't look like a Tars Trading backup. Nothing was changed."
+            return
+        }
+
+        var restored = 0
+        for (key, value) in combined {
+            // Filenames come from the backup — accept plain alphanumeric keys only.
+            guard !key.isEmpty, key.allSatisfy({ $0.isLetter || $0.isNumber }),
+                  let entry = try? JSONSerialization.data(withJSONObject: value,
+                                                          options: [.fragmentsAllowed]) else { continue }
+            let dest = Persistence.directory.appending(path: "\(key).json")
+            if (try? entry.write(to: dest, options: .atomic)) != nil { restored += 1 }
+        }
+
+        if restored > 0 {
+            Haptics.tick()
+            restoreMessage = "Restored — restart the app to load everything."
+        } else {
+            restoreMessage = "That backup had nothing this app could restore. Nothing was changed."
         }
     }
 
@@ -288,6 +461,38 @@ public struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+}
+
+// MARK: - Backup file (Transferable)
+
+/// Lazily bundles every JSON file in the persistence directory into one
+/// combined object `{filename: contents}` the moment the share actually
+/// happens — so the export is always current, never a stale snapshot.
+fileprivate struct TarsBackupFile: Transferable {
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .json) { _ in
+            SentTransferredFile(try makeBackup(), allowAccessingOriginalFile: false)
+        }
+    }
+
+    static func makeBackup() throws -> URL {
+        let fm = FileManager.default
+        var combined: [String: Any] = [:]
+        let files = (try? fm.contentsOfDirectory(at: Persistence.directory,
+                                                 includingPropertiesForKeys: nil)) ?? []
+        for file in files where file.pathExtension == "json" {
+            guard let data = try? Data(contentsOf: file),
+                  let object = try? JSONSerialization.jsonObject(with: data,
+                                                                 options: [.fragmentsAllowed])
+            else { continue }  // skip missing or unreadable — export what exists
+            combined[file.deletingPathExtension().lastPathComponent] = object
+        }
+        let payload = try JSONSerialization.data(withJSONObject: combined,
+                                                 options: [.prettyPrinted, .sortedKeys])
+        let dest = fm.temporaryDirectory.appending(path: "tars-trading-backup.json")
+        try payload.write(to: dest, options: .atomic)
+        return dest
     }
 }
 

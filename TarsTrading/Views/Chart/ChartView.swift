@@ -4,9 +4,10 @@ import Charts
 // MARK: - ChartView — the flagship price chart
 //
 // Candlestick / line chart with volume pane, crosshair inspection, indicator
-// overlays (SMA/EMA/VWAP/Bollinger) and an optional RSI subpane. All indicator
-// math lives at the bottom of this file as fileprivate helpers so nothing
-// leaks into other modules.
+// overlays (SMA/EMA/VWAP/Bollinger), an optional RSI subpane, a live last-price
+// tag, and pencil tools (levels + trendlines, persisted per symbol — see
+// ChartDrawings.swift). All indicator math lives at the bottom of this file as
+// fileprivate helpers so nothing leaks into other modules.
 
 struct ChartView: View {
     let symbol: String
@@ -28,6 +29,12 @@ struct ChartView: View {
     @State private var crossX: CGFloat = 0
     @State private var crossPrice: Double?
 
+    @State private var drawingMode = false
+    @State private var drawingTool: ChartDrawingKind = .level
+    @State private var drawings: [ChartDrawing] = []
+    @State private var selectedDrawingID: UUID?
+    @State private var draft: ChartDrawing?
+
     @Namespace private var timeframePill
 
     private enum Phase {
@@ -46,12 +53,16 @@ struct ChartView: View {
     }
 
     private var loadKey: String { "\(symbol)|\(timeframe.rawValue)|\(attempt)" }
-    private var priceHeight: CGFloat { height * 0.78 }
-    private var volumeHeight: CGFloat { height * 0.22 - TarsTheme.Space.s }
+    private var priceHeight: CGFloat { height * 0.82 }
+    private var volumeHeight: CGFloat { height * 0.18 - TarsTheme.Space.s }
 
     var body: some View {
         VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
             controls
+            if marketIsClosed {
+                closedChip
+                    .transition(.opacity)
+            }
             switch phase {
             case .loading:
                 skeleton
@@ -64,11 +75,15 @@ struct ChartView: View {
             }
         }
         .task(id: loadKey) { await load() }
-        .onChange(of: symbol) { _, _ in
+        .onAppear { drawings = ChartDrawingStore.load(symbol: symbol) }
+        .onChange(of: symbol) { _, newSymbol in
             cache = [:]
             loadFailure = nil
             crossIndex = nil
             crossPrice = nil
+            drawings = ChartDrawingStore.load(symbol: newSymbol)
+            selectedDrawingID = nil
+            draft = nil
         }
     }
 
@@ -109,9 +124,136 @@ struct ChartView: View {
         HStack(spacing: TarsTheme.Space.m) {
             timeframeSwitcher
             Spacer(minLength: TarsTheme.Space.s)
+            if selectedDrawingID != nil {
+                deleteDrawingButton
+            }
+            if drawingMode {
+                drawingToolPicker
+            }
+            pencilToggle
             styleToggle
             indicatorMenu
         }
+    }
+
+    // MARK: - Session honesty
+
+    private var marketIsClosed: Bool {
+        !symbol.contains("/") && !MarketClock.isOpen(.usEquity)
+    }
+
+    private var closedChip: some View {
+        HStack(spacing: TarsTheme.Space.xs) {
+            Image(systemName: "moon.zzz.fill")
+                .font(TarsTheme.Text.micro)
+                .foregroundStyle(TarsTheme.warning)
+            Text(MarketClock.closedMessage())
+                .font(TarsTheme.Text.micro)
+                .foregroundStyle(TarsTheme.inkSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.horizontal, TarsTheme.Space.m)
+        .padding(.vertical, TarsTheme.Space.xs + 1)
+        .background(
+            Capsule(style: .continuous)
+                .fill(TarsTheme.bg1)
+                .overlay(Capsule(style: .continuous).strokeBorder(TarsTheme.hairline, lineWidth: 1))
+        )
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Drawing controls
+
+    private var pencilToggle: some View {
+        Button {
+            Haptics.tap()
+            withAnimation(reduceMotion ? nil : Motion.fluid) {
+                drawingMode.toggle()
+                if drawingMode {
+                    crossIndex = nil
+                    crossPrice = nil
+                } else {
+                    draft = nil
+                    selectedDrawingID = nil
+                }
+            }
+        } label: {
+            Image(systemName: "pencil.line")
+                .font(TarsTheme.Text.body)
+                .foregroundStyle(drawingMode ? TarsTheme.accent : TarsTheme.inkSecondary)
+                .frame(width: 34, height: 30)
+                .background(
+                    RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
+                        .fill(drawingMode ? TarsTheme.accent.opacity(0.16) : TarsTheme.bg1)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
+                                .strokeBorder(drawingMode ? TarsTheme.accent.opacity(0.5) : TarsTheme.hairline, lineWidth: 1)
+                        )
+                )
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel(drawingMode ? "Exit drawing mode" : "Draw on chart")
+        .accessibilityAddTraits(drawingMode ? .isSelected : [])
+    }
+
+    private var drawingToolPicker: some View {
+        HStack(spacing: 2) {
+            ForEach(ChartDrawingKind.allCases) { tool in
+                Button {
+                    guard tool != drawingTool else { return }
+                    Haptics.tap()
+                    withAnimation(reduceMotion ? nil : Motion.snappy) { drawingTool = tool }
+                } label: {
+                    Image(systemName: tool.symbolName)
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(tool == drawingTool ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
+                        .frame(width: 30, height: 26)
+                        .background {
+                            if tool == drawingTool {
+                                RoundedRectangle(cornerRadius: TarsTheme.Radius.s - 2, style: .continuous)
+                                    .fill(TarsTheme.bg3)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityLabel(tool.title)
+                .accessibilityAddTraits(tool == drawingTool ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(
+            RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
+                .fill(TarsTheme.bg1)
+                .overlay(
+                    RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
+                        .strokeBorder(TarsTheme.hairline, lineWidth: 1)
+                )
+        )
+        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+    }
+
+    private var deleteDrawingButton: some View {
+        Button {
+            deleteSelectedDrawing()
+        } label: {
+            Image(systemName: "trash")
+                .font(TarsTheme.Text.body)
+                .foregroundStyle(TarsTheme.loss)
+                .frame(width: 34, height: 30)
+                .background(
+                    RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
+                        .fill(TarsTheme.loss.opacity(0.12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
+                                .strokeBorder(TarsTheme.loss.opacity(0.4), lineWidth: 1)
+                        )
+                )
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("Delete selected drawing")
+        .transition(.opacity.combined(with: .scale(scale: 0.9)))
     }
 
     private var timeframeSwitcher: some View {
@@ -261,6 +403,8 @@ struct ChartView: View {
                 lineMarks(bars, gaining: period >= 0, baseline: domain.lowerBound)
             }
             overlayMarks(bars)
+            lastPriceMarks(bars)
+            drawingMarks
             crosshairMarks(bars)
         }
         .chartXScale(domain: xDomain(bars))
@@ -285,18 +429,10 @@ struct ChartView: View {
                 Rectangle()
                     .fill(Color.clear)
                     .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 4)
-                            .onChanged { drag in
-                                updateCrosshair(at: drag.location, proxy: proxy, geo: geo, bars: bars)
-                            }
-                            .onEnded { _ in
-                                withAnimation(reduceMotion ? nil : Motion.snappy) {
-                                    crossIndex = nil
-                                    crossPrice = nil
-                                }
-                            }
-                    )
+                    .onTapGesture { location in
+                        selectDrawing(at: location, proxy: proxy, geo: geo)
+                    }
+                    .gesture(chartDragGesture(proxy: proxy, geo: geo, bars: bars))
                 if let index = crossIndex, bars.indices.contains(index) {
                     callout(bars: bars, index: index)
                         .position(
@@ -310,13 +446,18 @@ struct ChartView: View {
         }
         .accessibilityLabel("\(style == .candles ? "Candlestick" : "Line") chart for \(symbol), \(timeframe.rawValue) range\(dateRangeLabel(bars))")
         .accessibilityValue(accessibilitySummary(bars))
-        .accessibilityHint("Drag across the chart to inspect individual bars.")
+        .accessibilityHint(
+            drawingMode
+                ? "Drawing mode active. Drag to place a \(drawingTool.title.lowercased()). Tap a drawing to select it."
+                : "Drag across the chart to inspect individual bars."
+        )
     }
 
     @ChartContentBuilder
     private func candleMarks(_ bars: [Bar]) -> some ChartContent {
+        let latestTime = bars.last?.time
         ForEach(bars) { bar in
-            let up = bar.isUp
+            let tint = bar.isUp ? TarsTheme.gain : TarsTheme.loss
             let bodyTop = max(bar.open, bar.close)
             let bodyBottom = min(bar.open, bar.close)
             let epsilon = max(bar.close.magnitude, 1) * 0.0004
@@ -327,16 +468,27 @@ struct ChartView: View {
                 yEnd: .value("High", bar.high)
             )
             .lineStyle(StrokeStyle(lineWidth: 1))
-            .foregroundStyle((up ? TarsTheme.gain : TarsTheme.loss).opacity(0.7))
-            // Body
+            .foregroundStyle(tint.opacity(0.7))
+            // Body — ratio-based so candles stay ~70% of their slot at any density
             RectangleMark(
                 x: .value("Time", bar.time),
                 yStart: .value("Open", bodyBottom - (bodyTop == bodyBottom ? epsilon : 0)),
                 yEnd: .value("Close", bodyTop + (bodyTop == bodyBottom ? epsilon : 0)),
-                width: .ratio(0.55)
+                width: .ratio(0.7)
             )
-            .foregroundStyle(up ? TarsTheme.gain : TarsTheme.loss)
+            .foregroundStyle(candleBodyStyle(tint: tint, latest: bar.time == latestTime))
         }
+    }
+
+    /// The newest candle earns a 1pt rim light and a soft direction-tinted
+    /// glow; every other candle stays flat so the eye lands on now.
+    private func candleBodyStyle(tint: Color, latest: Bool) -> AnyShapeStyle {
+        guard latest else { return AnyShapeStyle(tint) }
+        return AnyShapeStyle(
+            tint
+                .shadow(.inner(color: TarsTheme.inkPrimary.opacity(0.55), radius: 1))
+                .shadow(.drop(color: tint.opacity(0.45), radius: 6))
+        )
     }
 
     @ChartContentBuilder
@@ -350,6 +502,7 @@ struct ChartView: View {
             .interpolationMethod(.monotone)
             .foregroundStyle(gaining ? TarsTheme.chartGain : TarsTheme.chartLoss)
         }
+        let tint = gaining ? TarsTheme.gain : TarsTheme.loss
         ForEach(bars) { bar in
             LineMark(
                 x: .value("Time", bar.time),
@@ -358,7 +511,73 @@ struct ChartView: View {
             )
             .interpolationMethod(.monotone)
             .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-            .foregroundStyle(gaining ? TarsTheme.gain : TarsTheme.loss)
+            .foregroundStyle(tint.shadow(.drop(color: tint.opacity(0.35), radius: 4)))
+        }
+    }
+
+    // MARK: Last price
+
+    @ChartContentBuilder
+    private func lastPriceMarks(_ bars: [Bar]) -> some ChartContent {
+        if let last = bars.last {
+            // Day direction: intraday compares to the session open; longer
+            // ranges compare the newest close to the bar before it.
+            let reference = timeframe == .day1
+                ? (bars.first?.open ?? last.open)
+                : (bars.count > 1 ? bars[bars.count - 2].close : last.open)
+            let tint = last.close >= reference ? TarsTheme.gain : TarsTheme.loss
+            RuleMark(y: .value("Last price", last.close))
+                .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                .foregroundStyle(tint.opacity(0.45))
+                .annotation(
+                    position: .trailing,
+                    spacing: TarsTheme.Space.xs,
+                    overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))
+                ) {
+                    LastPricePill(text: priceLabel(last.close), tint: tint, animated: !reduceMotion)
+                }
+        }
+    }
+
+    // MARK: Drawings
+
+    @ChartContentBuilder
+    private var drawingMarks: some ChartContent {
+        ForEach(drawings) { drawing in
+            drawingMark(
+                drawing,
+                tint: drawing.id == selectedDrawingID ? TarsTheme.warning : TarsTheme.accent,
+                emphasized: drawing.id == selectedDrawingID,
+                faded: false
+            )
+        }
+        if let draft {
+            drawingMark(draft, tint: TarsTheme.accent, emphasized: false, faded: true)
+        }
+    }
+
+    @ChartContentBuilder
+    private func drawingMark(_ drawing: ChartDrawing, tint: Color, emphasized: Bool, faded: Bool) -> some ChartContent {
+        let opacity = faded ? 0.55 : 0.9
+        if drawing.kind == .level {
+            RuleMark(y: .value("Level", drawing.priceA))
+                .lineStyle(StrokeStyle(lineWidth: emphasized ? 2 : 1, dash: [6, 4]))
+                .foregroundStyle(tint.opacity(opacity))
+        } else {
+            LineMark(
+                x: .value("Time", drawing.timeA),
+                y: .value("Price", drawing.priceA),
+                series: .value("Series", "drawing-\(drawing.id.uuidString)")
+            )
+            .lineStyle(StrokeStyle(lineWidth: emphasized ? 2.5 : 1.5, lineCap: .round))
+            .foregroundStyle(tint.opacity(opacity))
+            LineMark(
+                x: .value("Time", drawing.timeB),
+                y: .value("Price", drawing.priceB),
+                series: .value("Series", "drawing-\(drawing.id.uuidString)")
+            )
+            .lineStyle(StrokeStyle(lineWidth: emphasized ? 2.5 : 1.5, lineCap: .round))
+            .foregroundStyle(tint.opacity(opacity))
         }
     }
 
@@ -452,15 +671,20 @@ struct ChartView: View {
     // MARK: Volume pane
 
     private func volumeChart(_ bars: [Bar]) -> some View {
-        Chart {
+        let maxVolume = bars.map(\.volume).max() ?? 0
+        return Chart {
             ForEach(bars) { bar in
                 BarMark(
                     x: .value("Time", bar.time),
                     y: .value("Volume", bar.volume),
-                    width: .ratio(0.5)
+                    width: .ratio(0.6)
                 )
                 .foregroundStyle((bar.isUp ? TarsTheme.gain : TarsTheme.loss).opacity(0.35))
             }
+            // Hairline baseline anchoring the pane.
+            RuleMark(y: .value("Baseline", 0))
+                .lineStyle(StrokeStyle(lineWidth: 1))
+                .foregroundStyle(TarsTheme.hairline)
             if let index = crossIndex, bars.indices.contains(index) {
                 RuleMark(x: .value("Time", bars[index].time))
                     .lineStyle(StrokeStyle(lineWidth: 1))
@@ -468,8 +692,10 @@ struct ChartView: View {
             }
         }
         .chartXScale(domain: xDomain(bars))
+        .chartYScale(domain: 0...(max(maxVolume, 1) * 1.05))
         .chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 2)) { value in
+            // A single max label — the pane reads as texture, not a second chart.
+            AxisMarks(position: .trailing, values: [maxVolume]) { value in
                 AxisValueLabel {
                     if let volume = value.as(Double.self) {
                         Text(volumeLabel(volume))
@@ -559,6 +785,114 @@ struct ChartView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Active indicators: \(overlays.map(\.title).joined(separator: ", "))")
+    }
+
+    // MARK: - Gestures (crosshair + drawing share one drag)
+
+    /// Pencil mode routes the drag to drawing creation; otherwise it drives
+    /// the crosshair. One gesture, so the two never fight over touches.
+    private func chartDragGesture(proxy: ChartProxy, geo: GeometryProxy, bars: [Bar]) -> some Gesture {
+        DragGesture(minimumDistance: drawingMode ? 2 : 4)
+            .onChanged { drag in
+                if drawingMode {
+                    updateDraft(with: drag, proxy: proxy, geo: geo, bars: bars)
+                } else {
+                    updateCrosshair(at: drag.location, proxy: proxy, geo: geo, bars: bars)
+                }
+            }
+            .onEnded { _ in
+                if drawingMode {
+                    commitDraft()
+                } else {
+                    withAnimation(reduceMotion ? nil : Motion.snappy) {
+                        crossIndex = nil
+                        crossPrice = nil
+                    }
+                }
+            }
+    }
+
+    // MARK: - Drawing interaction
+
+    private func updateDraft(with drag: DragGesture.Value, proxy: ChartProxy, geo: GeometryProxy, bars: [Bar]) {
+        guard let plotAnchor = proxy.plotFrame else { return }
+        let plot = geo[plotAnchor]
+        let current = CGPoint(x: drag.location.x - plot.minX, y: drag.location.y - plot.minY)
+        let id = draft?.id ?? UUID()
+        switch drawingTool {
+        case .level:
+            guard let price: Double = proxy.value(atY: current.y) else { return }
+            let time: Date = proxy.value(atX: current.x) ?? bars.last?.time ?? .now
+            draft = ChartDrawing(id: id, kind: .level, timeA: time, priceA: price, timeB: time, priceB: price)
+        case .trendline:
+            let start = CGPoint(x: drag.startLocation.x - plot.minX, y: drag.startLocation.y - plot.minY)
+            guard let a = drawingAnchor(at: start, proxy: proxy, bars: bars),
+                  let b = drawingAnchor(at: current, proxy: proxy, bars: bars) else { return }
+            draft = ChartDrawing(id: id, kind: .trendline, timeA: a.time, priceA: a.price, timeB: b.time, priceB: b.price)
+        }
+    }
+
+    /// Chart-space anchor for a plot point, with a slight snap to the nearest
+    /// bar's close when within 8pt vertically.
+    private func drawingAnchor(at point: CGPoint, proxy: ChartProxy, bars: [Bar]) -> (time: Date, price: Double)? {
+        guard let date: Date = proxy.value(atX: point.x),
+              let price: Double = proxy.value(atY: point.y) else { return nil }
+        if let nearest = bars.min(by: {
+            abs($0.time.timeIntervalSince(date)) < abs($1.time.timeIntervalSince(date))
+        }),
+           let closeY = proxy.position(forY: nearest.close),
+           abs(point.y - closeY) <= 8 {
+            return (nearest.time, nearest.close)
+        }
+        return (date, price)
+    }
+
+    private func commitDraft() {
+        guard let committed = draft else { return }
+        draft = nil
+        withAnimation(reduceMotion ? nil : Motion.snappy) {
+            drawings.append(committed)
+        }
+        ChartDrawingStore.save(drawings, symbol: symbol)
+        Haptics.confirm()
+    }
+
+    private func selectDrawing(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy) {
+        guard !drawings.isEmpty || selectedDrawingID != nil,
+              let plotAnchor = proxy.plotFrame else { return }
+        let plot = geo[plotAnchor]
+        let point = CGPoint(x: location.x - plot.minX, y: location.y - plot.minY)
+        let hit = drawings.last { drawing in
+            switch drawing.kind {
+            case .level:
+                guard let y = proxy.position(forY: drawing.priceA) else { return false }
+                return abs(point.y - y) <= 12
+            case .trendline:
+                guard let ax = proxy.position(forX: drawing.timeA),
+                      let ay = proxy.position(forY: drawing.priceA),
+                      let bx = proxy.position(forX: drawing.timeB),
+                      let by = proxy.position(forY: drawing.priceB) else { return false }
+                return ChartDrawingGeometry.distance(
+                    from: point,
+                    toSegment: CGPoint(x: ax, y: ay), CGPoint(x: bx, y: by)
+                ) <= 12
+            }
+        }
+        guard hit != nil || selectedDrawingID != nil else { return }
+        if hit != nil { Haptics.tick() }
+        withAnimation(reduceMotion ? nil : Motion.snappy) {
+            selectedDrawingID = hit?.id == selectedDrawingID ? nil : hit?.id
+        }
+    }
+
+    private func deleteSelectedDrawing() {
+        guard let id = selectedDrawingID else { return }
+        Haptics.tap()
+        withAnimation(reduceMotion ? nil : Motion.snappy) {
+            drawings.removeAll { $0.id == id }
+            selectedDrawingID = nil
+        }
+        ChartDrawingStore.save(drawings, symbol: symbol)
     }
 
     // MARK: - Crosshair
@@ -843,6 +1177,35 @@ fileprivate struct TarsBandPoint: Identifiable {
     let upper: Double
     let lower: Double
     var id: Date { time }
+}
+
+/// Right-edge price tag riding the last-price rule. Gently breathes so the
+/// live price reads as alive; stands still under Reduce Motion.
+fileprivate struct LastPricePill: View {
+    let text: String
+    let tint: Color
+    let animated: Bool
+
+    @State private var pulsing = false
+
+    var body: some View {
+        Text(text)
+            .font(TarsTheme.Text.micro)
+            .monospacedDigit()
+            .foregroundStyle(TarsTheme.bg0)
+            .padding(.horizontal, TarsTheme.Space.s)
+            .padding(.vertical, TarsTheme.Space.xs)
+            .background(Capsule(style: .continuous).fill(tint))
+            .shadow(color: tint.opacity(pulsing ? 0.55 : 0.18), radius: pulsing ? 7 : 3)
+            .scaleEffect(pulsing ? 1.02 : 1)
+            .onAppear {
+                guard animated else { return }
+                withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
+                    pulsing = true
+                }
+            }
+            .accessibilityLabel("Last price \(text)")
+    }
 }
 
 /// Shimmer that can be switched off for Reduce Motion — the stock `Shimmer`

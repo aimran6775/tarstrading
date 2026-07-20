@@ -18,12 +18,14 @@ final class PreferencesStore {
     var hapticsOn: Bool {
         didSet { UserDefaults.standard.set(hapticsOn, forKey: "hapticsOn") }
     }
-    /// Dark-first product; light is supported but opt-in.
+    /// Deliberately dark-only: a light palette was never designed, and a
+    /// broken light mode is worse than an honest dark one. (Kept as a stored
+    /// pref in case v2 designs light properly.)
     var forceDark: Bool {
         didSet { UserDefaults.standard.set(forceDark, forKey: "forceDark") }
     }
 
-    var colorScheme: ColorScheme? { forceDark ? .dark : nil }
+    var colorScheme: ColorScheme? { .dark }
 
     init() {
         let d = UserDefaults.standard

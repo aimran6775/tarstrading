@@ -4,8 +4,14 @@ import SwiftUI
 /// Builds an `OrderDraft` and submits through the store; every state (idle,
 /// submitting, filled, error) is designed.
 struct OrderTicketView: View {
+    /// `.sheet` is the full ticket (all order types, TIF, bracket).
+    /// `.inline` is a tightened essentials-only column for workspace panels —
+    /// market/limit only, with a "More…" escape hatch into the full sheet.
+    enum TicketStyle { case sheet, inline }
+
     let symbol: String
     var side: OrderSide = .buy
+    var style: TicketStyle = .sheet
 
     @Environment(TradingStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -22,6 +28,7 @@ struct OrderTicketView: View {
     @State private var takeProfit: Double = 0
     @State private var stopLoss: Double = 0
     @State private var phase: TicketPhase = .idle
+    @State private var showingFullTicket = false
 
     private var assetClass: AssetClass { symbol.contains("/") ? .crypto : .usEquity }
     private var currentPrice: Double { store.quote(for: symbol)?.price ?? 0 }
@@ -60,6 +67,15 @@ struct OrderTicketView: View {
     private var canSubmit: Bool { fieldsValid && !blockedByBuyingPower }
 
     var body: some View {
+        switch style {
+        case .sheet: sheetBody
+        case .inline: inlineBody
+        }
+    }
+
+    // MARK: Sheet (full ticket)
+
+    private var sheetBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TarsTheme.Space.xl) {
                 header
@@ -88,6 +104,133 @@ struct OrderTicketView: View {
         .onChange(of: orderType) { seedPrices() }
         .animation(Motion.snappy, value: orderType)
         .animation(Motion.snappy, value: chosenSide)
+    }
+
+    // MARK: Inline (essentials-only workspace panel)
+
+    /// Tight single-column ticket that stays comfortable down to 320pt wide.
+    /// Everything beyond market/limit essentials lives behind "More…", which
+    /// presents the full sheet.
+    private var inlineBody: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: TarsTheme.Space.l) {
+                inlineHeader
+                TicketSideToggle(side: $chosenSide)
+                inlineTypeRow
+                if orderType == .limit {
+                    TicketPriceField(label: "Limit price", value: $limitPrice)
+                        .transition(fieldTransition)
+                }
+                quantitySection
+                costSection
+                confirmArea
+            }
+            .padding(TarsTheme.Space.l)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.interactively)
+        .onAppear {
+            if !didSeedSide { chosenSide = side; didSeedSide = true }
+            // Inline offers market/limit only; anything exotic belongs to the sheet.
+            if orderType != .market && orderType != .limit { orderType = .market }
+            seedPrices()
+        }
+        .onChange(of: orderType) { seedPrices() }
+        .animation(Motion.snappy, value: orderType)
+        .animation(Motion.snappy, value: chosenSide)
+        .tarsPanel()
+        .sheet(isPresented: $showingFullTicket) {
+            OrderTicketView(symbol: symbol, side: chosenSide, style: .sheet)
+                .id(symbol)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(TarsTheme.bg1)
+        }
+    }
+
+    private var inlineHeader: some View {
+        HStack(alignment: .firstTextBaseline, spacing: TarsTheme.Space.m) {
+            VStack(alignment: .leading, spacing: 2) {
+                TicketSectionLabel("Ticket")
+                Text(symbol)
+                    .font(TarsTheme.Text.heading)
+                    .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: TarsTheme.Space.s)
+            if let quote = store.quote(for: symbol) {
+                VStack(alignment: .trailing, spacing: 2) {
+                    TickerText(value: quote.price, font: TarsTheme.Text.price)
+                    PercentText(value: quote.changePercent)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(symbol) price \(quote.price, format: .currency(code: "USD"))")
+            } else {
+                SkeletonBlock(width: 80, height: 16)
+                    .accessibilityLabel("Loading \(symbol) price")
+            }
+        }
+    }
+
+    /// Market / Limit segments plus the "More…" escape hatch. `ViewThatFits`
+    /// drops to two lines rather than clipping on very narrow panels.
+    private var inlineTypeRow: some View {
+        VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
+            TicketSectionLabel("Order type")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: TarsTheme.Space.s) {
+                    inlineTypeChips
+                    Spacer(minLength: TarsTheme.Space.s)
+                    moreTypesButton
+                }
+                VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
+                    HStack(spacing: TarsTheme.Space.s) { inlineTypeChips }
+                    moreTypesButton
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var inlineTypeChips: some View {
+        ForEach([OrderType.market, .limit]) { type in
+            TicketChip(
+                title: type.label,
+                isSelected: orderType == type,
+                tint: TarsTheme.accent
+            ) {
+                Haptics.tick()
+                withAnimation(Motion.snappy) { orderType = type }
+            }
+            .accessibilityLabel("\(type.label) order type")
+            .accessibilityAddTraits(orderType == type ? .isSelected : [])
+        }
+    }
+
+    private var moreTypesButton: some View {
+        Button {
+            Haptics.tap()
+            showingFullTicket = true
+        } label: {
+            HStack(spacing: TarsTheme.Space.xs) {
+                Text("More…")
+                    .font(TarsTheme.Text.caption)
+                Image(systemName: "slider.horizontal.3")
+                    .font(TarsTheme.Text.micro)
+            }
+            .foregroundStyle(TarsTheme.accent)
+            .padding(.horizontal, TarsTheme.Space.m)
+            .padding(.vertical, TarsTheme.Space.s)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(TarsTheme.bg3)
+                    .overlay(Capsule(style: .continuous).strokeBorder(TarsTheme.hairline, lineWidth: 1))
+            )
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("More order types and settings")
+        .accessibilityHint("Opens the full order ticket.")
     }
 
     // MARK: Header

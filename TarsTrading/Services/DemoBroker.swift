@@ -28,8 +28,15 @@ final class DemoBroker: TradingProviding, @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         for i in allOrders.indices where allOrders[i].status.isOpen {
             let order = allOrders[i]
+            // Closed market: everything rests until the bell, like real life.
+            guard MarketClock.isOpen(order.assetClass) else { continue }
             let price = market.price(of: order.symbol)
             guard price > 0 else { continue }
+            // Queued market orders fill on the first open tick.
+            if order.type == .market {
+                fill(&allOrders[i], at: slipped(price, side: order.side))
+                continue
+            }
             switch order.type {
             case .market:
                 fill(&allOrders[i], at: slipped(price, side: order.side))
@@ -174,7 +181,7 @@ final class DemoBroker: TradingProviding, @unchecked Sendable {
                           bracket: draft.bracket, status: .accepted,
                           submittedAt: .now, agentID: draft.agentID,
                           agentRationale: draft.agentRationale)
-        if draft.type == .market {
+        if draft.type == .market, MarketClock.isOpen(draft.assetClass) {
             fill(&order, at: slipped(price, side: draft.side))
         }
         allOrders.append(order)

@@ -17,8 +17,9 @@ enum TarsTheme {
     static let hairline = Color.white.opacity(0.07)
 
     // MARK: Meaning colors — color is reserved for meaning
-    static let gain = Color(red: 0.20, green: 0.84, blue: 0.51)      // P&L up
-    static let loss = Color(red: 0.98, green: 0.34, blue: 0.38)      // P&L down
+    // Luminance-tuned so red/green don't vibrate against the near-black field.
+    static let gain = Color(red: 0.24, green: 0.80, blue: 0.52)      // P&L up
+    static let loss = Color(red: 0.94, green: 0.40, blue: 0.44)      // P&L down
     static let accent = Color(red: 0.42, green: 0.62, blue: 1.0)     // interactive / Tars
     static let paperBadge = Color(red: 1.0, green: 0.72, blue: 0.20) // mode amber
     static let warning = Color(red: 1.0, green: 0.62, blue: 0.26)
@@ -40,8 +41,21 @@ enum TarsTheme {
         colors: [accent.opacity(0.25), agentPurple.opacity(0.12), .clear],
         startPoint: .topLeading, endPoint: .bottomTrailing)
 
+    /// The whole-workspace mood light: a barely-there wash that leans gain or
+    /// loss with the day's P&L. 2-3% opacity — felt, never seen.
+    static func aurora(for dayPnL: Double) -> RadialGradient {
+        let tint: Color = dayPnL >= 0 ? gain : loss
+        let strength = min(abs(dayPnL) / 2_000, 1.0) * 0.05 + 0.015
+        return RadialGradient(
+            colors: [tint.opacity(strength), .clear],
+            center: .top, startRadius: 0, endRadius: 900)
+    }
+
     // MARK: Type scale (monospaced digits for anything numeric)
     enum Text {
+        /// Display numerals — equity, hero prices. Big enough to feel.
+        static let display = Font.system(size: 56, weight: .bold).width(.condensed).monospacedDigit()
+        static let displayMedium = Font.system(size: 44, weight: .bold).width(.condensed).monospacedDigit()
         static let hero = Font.system(size: 40, weight: .bold, design: .rounded)
         static let title = Font.system(size: 26, weight: .bold, design: .rounded)
         static let heading = Font.system(size: 19, weight: .semibold)

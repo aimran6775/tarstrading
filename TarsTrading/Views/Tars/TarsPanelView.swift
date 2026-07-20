@@ -4,7 +4,9 @@ import SwiftUI
 struct TarsPanelView: View {
     @Environment(TarsStore.self) private var tars
     @Environment(TradingStore.self) private var trading
+    @Environment(AcademyProgress.self) private var academy
     @State private var draft = ""
+    @State private var showLetter = false
     @FocusState private var inputFocused: Bool
 
     var body: some View {
@@ -21,6 +23,7 @@ struct TarsPanelView: View {
             }
             .ignoresSafeArea()
         )
+        .sheet(isPresented: $showLetter) { TarsLetterView() }
     }
 
     private var header: some View {
@@ -36,6 +39,12 @@ struct TarsPanelView: View {
                     .contentTransition(.opacity)
             }
             Spacer()
+            Button { showLetter = true } label: {
+                Image(systemName: "envelope")
+                    .foregroundStyle(TarsTheme.inkSecondary)
+            }
+            .buttonStyle(PressableStyle())
+            .accessibilityLabel("The Sunday letter, your weekly review")
             if !tars.messages.isEmpty {
                 Menu {
                     Button(role: .destructive) { tars.clearHistory() } label: {
@@ -83,7 +92,7 @@ struct TarsPanelView: View {
                 .foregroundStyle(TarsTheme.inkSecondary)
                 .multilineTextAlignment(.center)
             FlowChips(options: TarsStore.openers) { option in
-                Task { await tars.send(option, trading: trading) }
+                Task { await tars.send(option, trading: trading, academy: academy) }
             }
         }
         .frame(maxWidth: .infinity)
@@ -125,7 +134,7 @@ struct TarsPanelView: View {
         guard !text.isEmpty, !tars.isStreaming else { return }
         draft = ""
         Haptics.tap()
-        Task { await tars.send(text, trading: trading) }
+        Task { await tars.send(text, trading: trading, academy: academy) }
     }
 }
 

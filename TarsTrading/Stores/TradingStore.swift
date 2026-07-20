@@ -62,6 +62,7 @@ final class TradingStore {
             var beat = 0
             while !Task.isCancelled {
                 guard let self else { return }
+                self.rollDayIfNeeded()
                 if demo {
                     DemoMarket.shared.tick()
                     DemoBroker.shared.processOpenOrders()
@@ -79,6 +80,17 @@ final class TradingStore {
         }
     }
 
+    /// Day P&L integrity: at the first heartbeat of a new ET trading day the
+    /// demo broker rolls "previous close" forward. Without this, "today"
+    /// slowly becomes fiction.
+    private func rollDayIfNeeded() {
+        let stamp = MarketClock.dayStamp()
+        let key = "lastDayRollStamp"
+        guard UserDefaults.standard.string(forKey: key) != stamp else { return }
+        UserDefaults.standard.set(stamp, forKey: key)
+        if mode == .demo { DemoBroker.shared.rollDay() }
+    }
+
     // MARK: - Refresh
 
     func refreshAll() async {
@@ -92,7 +104,17 @@ final class TradingStore {
         guard !symbols.isEmpty else { return }
         do {
             let fresh = try await marketData.quotes(for: Array(symbols))
-            for q in fresh { quotes[q.symbol] = q }
+            for q in fresh {
+                // Materiality filter: skip sub-basis-point moves so hundreds
+                // of observers aren't invalidated by noise every second.
+                if let old = quotes[q.symbol],
+                   old.price != 0,
+                   abs(q.price - old.price) / old.price < 0.0001,
+                   q.previousClose == old.previousClose {
+                    continue
+                }
+                quotes[q.symbol] = q
+            }
         } catch let error as TarsError {
             lastError = error
         } catch { lastError = .network(error.localizedDescription) }
@@ -164,9 +186,23 @@ final class TradingStore {
         }
     }
 
+    /// When to interrupt with the thesis-capture sheet. Modal on every fill
+    /// gets old by trade five; closes are where the lesson lives.
+    enum ThesisPromptMode: String, CaseIterable, Identifiable {
+        case always = "Every fill"
+        case closesOnly = "Closes only"
+        case never = "Never"
+        var id: String { rawValue }
+        static var current: ThesisPromptMode {
+            ThesisPromptMode(rawValue: UserDefaults.standard.string(forKey: "thesisPromptMode") ?? "")
+                ?? .closesOnly
+        }
+    }
+
     private func handleFill(_ order: Order, closing: Position? = nil) {
         Haptics.fill()
         let price = order.filledAvgPrice ?? 0
+        let promptMode = ThesisPromptMode.current
         if let closing {
             var entry = JournalEntry(symbol: order.symbol, side: closing.side,
                                      qty: abs(closing.qty), entryPrice: closing.avgEntryPrice,
@@ -174,14 +210,14 @@ final class TradingStore {
                                      agentID: order.agentID)
             entry.thesis = order.agentRationale ?? ""
             journal.insert(entry, at: 0)
-            if order.agentID == nil { pendingThesisCapture = entry }
+            if order.agentID == nil, promptMode != .never { pendingThesisCapture = entry }
         } else {
             let entry = JournalEntry(symbol: order.symbol, side: order.side,
                                      qty: order.qty, entryPrice: price, exitPrice: nil,
                                      openedAt: order.filledAt ?? .now, closedAt: nil,
                                      thesis: order.agentRationale ?? "", agentID: order.agentID)
             journal.insert(entry, at: 0)
-            if order.agentID == nil { pendingThesisCapture = entry }
+            if order.agentID == nil, promptMode == .always { pendingThesisCapture = entry }
         }
         persistence.save(journal, "journal")
     }
@@ -211,25 +247,49 @@ final class TradingStore {
 }
 
 // MARK: - Disk persistence (JSON in Application Support)
+// Writes are debounced per key and encoded off the main thread — a burst of
+// journal events costs one disk write, not ten synchronous ones.
 
 struct Persistence {
-    private let dir: URL = {
+    static let directory: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let dir = base.appending(path: "TarsTrading", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }()
 
-    func save<T: Encodable>(_ value: T, _ key: String) {
-        let url = dir.appending(path: "\(key).json")
+    func save<T: Encodable & Sendable>(_ value: T, _ key: String) {
+        Task { await PersistenceWriter.shared.schedule(value, key: key) }
+    }
+
+    /// Immediate synchronous write — use only for small values or at teardown.
+    func saveNow<T: Encodable>(_ value: T, _ key: String) {
+        let url = Self.directory.appending(path: "\(key).json")
         if let data = try? JSONEncoder.tars.encode(value) {
             try? data.write(to: url, options: .atomic)
         }
     }
 
     func load<T: Decodable>(_ type: T.Type, _ key: String) -> T? {
-        let url = dir.appending(path: "\(key).json")
+        let url = Self.directory.appending(path: "\(key).json")
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder.tars.decode(type, from: data)
+    }
+}
+
+private actor PersistenceWriter {
+    static let shared = PersistenceWriter()
+    private var pending: [String: Task<Void, Never>] = [:]
+
+    func schedule<T: Encodable & Sendable>(_ value: T, key: String) {
+        pending[key]?.cancel()
+        pending[key] = Task {
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            let url = Persistence.directory.appending(path: "\(key).json")
+            if let data = try? JSONEncoder.tars.encode(value) {
+                try? data.write(to: url, options: .atomic)
+            }
+        }
     }
 }

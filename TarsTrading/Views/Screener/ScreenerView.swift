@@ -78,11 +78,32 @@ public struct ScreenerView: View {
         .animation(reduceMotion ? nil : Motion.fluid, value: results.map(\.symbol))
     }
 
+    private enum ResultsMode: Hashable { case list, heatmap }
+    @State private var resultsMode: ResultsMode = .list
+
     private var resultsList: some View {
-        List { resultsSection }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .animation(reduceMotion ? nil : Motion.fluid, value: results.map(\.symbol))
+        VStack(spacing: 0) {
+            Picker("View", selection: $resultsMode) {
+                Text("List").tag(ResultsMode.list)
+                Text("Heatmap").tag(ResultsMode.heatmap)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, TarsTheme.Space.xl)
+            .padding(.top, TarsTheme.Space.m)
+
+            switch resultsMode {
+            case .list:
+                List { resultsSection }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .animation(reduceMotion ? nil : Motion.fluid, value: results.map(\.symbol))
+            case .heatmap:
+                ScrollView {
+                    MarketHeatmapView()
+                        .padding(TarsTheme.Space.xl)
+                }
+            }
+        }
     }
 
     // MARK: - Presets

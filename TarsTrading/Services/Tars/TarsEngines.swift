@@ -33,6 +33,14 @@ struct DemoTarsEngine: TarsEngine {
             return TarsGuardrail.refusal
         }
 
+        // Curriculum coaching — recommend from rank and progress, before the
+        // glossary can shadow it ("learn about options" still hits glossary).
+        if ["what should i learn", "what to learn", "what should i study",
+            "what do i learn", "learn next", "next lesson", "where do i start",
+            "where should i start", "what's next in the academy"].contains(where: q.contains) {
+            return curriculumPlan(context)
+        }
+
         // Glossary hit?
         if let hit = glossary.first(where: { q.contains($0.key) }) {
             return hit.value
@@ -46,7 +54,11 @@ struct DemoTarsEngine: TarsEngine {
             let posLine = context.positions.isEmpty
                 ? "You're all cash right now, which is a position too — it's called patience."
                 : "You hold \(context.positions.count) position\(context.positions.count == 1 ? "" : "s"); the one worth interrogating is your biggest: what would make you exit it?"
-            return "\(tone) \(posLine)"
+            var critique = "\(tone) \(posLine)"
+            if context.academyStreakDays >= 2 {
+                critique += " Meanwhile your \(context.academyStreakDays)-day study streak is quietly the best number on this screen."
+            }
+            return critique
         }
         if q.contains("what am i looking at"), let s = context.visibleSymbol {
             return "That's \(s). Before I explain the chart: what timeframe are you judging it on? A chart without a timeframe conviction is just modern art. Scrub the crosshair across a selloff and ask what the volume did — that's where the story usually is."
@@ -60,6 +72,27 @@ struct DemoTarsEngine: TarsEngine {
 
         // Default: honest fallback with a nudge.
         return "Good question, and I'd rather teach it properly than improvise — in this offline mode I stick to what I know cold: order types, risk, the Greeks, portfolio math, market mechanics. Try me on any concept on screen (tap it), or ask 'how am I doing?' for a portfolio critique."
+    }
+
+    /// Study recommendations from actual standing — rank, open lesson, and the
+    /// least-finished started track — never from vibes.
+    private static func curriculumPlan(_ context: TarsContext) -> String {
+        if let lesson = context.currentLessonTitle {
+            return "Finish what's open: '\(lesson)'. Half-studied ideas are worse than unstudied ones — they feel like knowledge without behaving like it. When it's done, ask me again and I'll point at the next gap."
+        }
+        if let weak = context.weakestQuizArea {
+            return "The honest answer is \(weak) — you started that track and stalled, which usually means it got uncomfortable, and uncomfortable is where the learning was about to happen. You're at \(context.academyXP) XP; go back in and keep the streak boring and daily."
+        }
+        switch context.academyRank {
+        case nil, "Observer":
+            return "Start with Foundations — order types, spreads, what a candle actually says. It looks basic; it's load-bearing, and everything else in this app quietly assumes it. One lesson today beats three on Saturday."
+        case "Apprentice":
+            return "At \(context.academyXP) XP the highest-value move is the Risk track: position sizing and drawdown math. Entries are the fun part; sizing is the surviving part. Learn it before your habits calcify."
+        case "Practitioner":
+            return "You've got the fundamentals down. Next is Options — Greeks before payoffs — or Macro, if you want to understand the tide your positions swim in. Pick the one you'd rather avoid; that's usually where the gap is."
+        default:
+            return "At \(context.academyRank ?? "your") rank the frontier is Funds and the Agent Lab: turning judgment into rules and testing them against history. Backtest something you actually believe — watching a favorite idea fail out-of-sample is the fastest education there is."
+        }
     }
 
     /// Plain-English teaching notes, Tars-voiced. Keyed by trigger substring.
