@@ -1,0 +1,39 @@
+import SwiftUI
+
+/// Hard safety requirement: trading mode is visually unmistakable, always.
+/// Amber capsule, gentle breathing glow, pinned to the top of every screen.
+struct ModeBanner: View {
+    @Environment(TradingStore.self) private var store
+    @State private var breathing = false
+
+    var body: some View {
+        HStack(spacing: TarsTheme.Space.s) {
+            Circle()
+                .fill(TarsTheme.paperBadge)
+                .frame(width: 7, height: 7)
+                .opacity(breathing ? 1 : 0.45)
+            Text(store.mode.badgeText)
+                .font(TarsTheme.Text.micro)
+                .kerning(2)
+            Text(store.mode == .demo ? "Simulated market — no real money" : "Paper account — no real money")
+                .font(TarsTheme.Text.caption)
+                .foregroundStyle(TarsTheme.inkSecondary)
+        }
+        .foregroundStyle(TarsTheme.paperBadge)
+        .padding(.horizontal, TarsTheme.Space.l)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(TarsTheme.paperBadge.opacity(0.12))
+                .overlay(Capsule().strokeBorder(TarsTheme.paperBadge.opacity(0.35), lineWidth: 1))
+                .shadow(color: TarsTheme.paperBadge.opacity(breathing ? 0.35 : 0.1), radius: 8)
+        )
+        .padding(.top, TarsTheme.Space.s)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
+                breathing = true
+            }
+        }
+        .accessibilityLabel("\(store.mode.badgeText) mode. No real money.")
+    }
+}

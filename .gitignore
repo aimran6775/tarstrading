@@ -1,0 +1,14 @@
+# Secrets — hard rule in CLAUDE.md, never commit
+KEYS.md
+Secrets.swift
+.env*
+
+# macOS / ExFAT junk
+.DS_Store
+._*
+
+# Xcode
+DerivedData/
+xcuserdata/
+*.xcuserstate
+build/
