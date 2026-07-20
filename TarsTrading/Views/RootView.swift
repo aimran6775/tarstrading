@@ -14,6 +14,9 @@ struct RootView: View {
         case academy = "Academy"
         case agents = "Agent Lab"
         case journal = "Journal"
+        case screener = "Screener"
+        case alerts = "Alerts"
+        case settings = "Settings"
         var id: String { rawValue }
         var icon: String {
             switch self {
@@ -22,6 +25,9 @@ struct RootView: View {
             case .academy: "graduationcap.fill"
             case .agents: "brain.head.profile"
             case .journal: "book.closed.fill"
+            case .screener: "line.3.horizontal.decrease.circle.fill"
+            case .alerts: "bell.badge.fill"
+            case .settings: "gearshape.fill"
             }
         }
     }
@@ -29,6 +35,7 @@ struct RootView: View {
     @State private var section: Section = .terminal
     @State private var showLaunch = true
     @State private var showTars = false
+    @State private var alertEngine = AlertEngine()
 
     var body: some View {
         @Bindable var store = store
@@ -64,7 +71,11 @@ struct RootView: View {
                 .presentationDetents([.medium])
                 .presentationBackground(TarsTheme.bg1)
         }
-        .onAppear { agentLab.connect(trading: store) }
+        .onAppear {
+            agentLab.connect(trading: store)
+            alertEngine.start(store: store)
+            Sound.enabled = prefs.soundOn
+        }
     }
 
     private var sidebar: some View {
@@ -76,10 +87,10 @@ struct RootView: View {
         .listStyle(.sidebar)
     }
 
-    /// Simple mode hides the Agent Lab until the user grows into it.
+    /// Simple mode hides the pro surfaces until the user grows into them.
     private var visibleSections: [Section] {
         prefs.complexity == .simple
-            ? [.terminal, .portfolio, .academy, .journal]
+            ? [.terminal, .portfolio, .academy, .journal, .settings]
             : Section.allCases
     }
 
@@ -91,6 +102,9 @@ struct RootView: View {
         case .academy: AcademyHomeView()
         case .agents: AgentLabView()
         case .journal: JournalView()
+        case .screener: ScreenerView()
+        case .alerts: AlertsView(engine: alertEngine)
+        case .settings: SettingsView()
         }
     }
 

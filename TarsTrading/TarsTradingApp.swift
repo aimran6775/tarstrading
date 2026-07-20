@@ -8,6 +8,10 @@ struct TarsTradingApp: App {
     @State private var tars = TarsStore()
     @State private var prefs = PreferencesStore()
 
+    init() {
+        CurriculumRegistry.install()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

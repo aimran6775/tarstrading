@@ -48,6 +48,8 @@ struct TickerText: View {
     var body: some View {
         Text(value, format: format)
             .font(font)
+            .lineLimit(1)
+            .minimumScaleFactor(0.55)
             .foregroundStyle(flash ?? TarsTheme.inkPrimary)
             .contentTransition(.numericText(value: value))
             .animation(Motion.ticker, value: value)
@@ -73,6 +75,8 @@ struct PercentText: View {
     var body: some View {
         Text(value, format: .percent.precision(.fractionLength(2)).sign(strategy: .always()))
             .font(font)
+            .lineLimit(1)
+            .minimumScaleFactor(0.55)
             .foregroundStyle(TarsTheme.pnl(value))
             .contentTransition(.numericText(value: value))
             .animation(Motion.ticker, value: value)

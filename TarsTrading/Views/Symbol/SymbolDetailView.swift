@@ -28,6 +28,7 @@ struct SymbolDetailView: View {
                 header
                 ChartView(symbol: symbol)
                 tradeButtons
+                if !isCrypto { optionsChainChip }
                 statsSection
                 learnSection
             }
@@ -107,6 +108,40 @@ struct SymbolDetailView: View {
         }
         .buttonStyle(PressableStyle())
         .accessibilityLabel("\(side.label) \(symbol). Opens the order ticket.")
+    }
+
+    // MARK: - Options sandbox entry (non-crypto only)
+
+    private var isCrypto: Bool {
+        symbol.contains("/") ||
+        DemoMarket.universe.first { $0.symbol == symbol }?.assetClass == .crypto
+    }
+
+    private var optionsChainChip: some View {
+        NavigationLink {
+            OptionsChainView(symbol: symbol)
+        } label: {
+            HStack(spacing: TarsTheme.Space.s) {
+                Image(systemName: "tablecells")
+                    .font(TarsTheme.Text.caption)
+                    .foregroundStyle(TarsTheme.accent)
+                Text("Options chain")
+                    .font(TarsTheme.Text.caption)
+                    .foregroundStyle(TarsTheme.inkPrimary)
+                Text("SANDBOX")
+                    .font(TarsTheme.Text.micro)
+                    .foregroundStyle(TarsTheme.paperBadge)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(TarsTheme.Text.micro)
+                    .foregroundStyle(TarsTheme.inkTertiary)
+            }
+            .padding(.horizontal, TarsTheme.Space.l)
+            .padding(.vertical, TarsTheme.Space.m)
+            .tarsPanel()
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("Options chain for \(symbol). Opens the options sandbox, a practice book separate from your paper account.")
     }
 
     // MARK: - Watchlist star

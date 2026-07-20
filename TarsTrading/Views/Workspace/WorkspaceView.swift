@@ -192,11 +192,14 @@ struct WorkspaceView: View {
             .padding(TarsTheme.Space.l)
             .animation(Motion.snappy, value: selectedSymbol)
 
-            ChartView(symbol: selectedSymbol)
-                .id(selectedSymbol)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.horizontal, TarsTheme.Space.s)
-                .padding(.bottom, TarsTheme.Space.s)
+            GeometryReader { geo in
+                ChartView(symbol: selectedSymbol,
+                          height: max(280, geo.size.height - 64))
+                    .id(selectedSymbol)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, TarsTheme.Space.s)
+            .padding(.bottom, TarsTheme.Space.s)
         }
         .tarsPanel()
     }
