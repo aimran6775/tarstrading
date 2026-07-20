@@ -88,6 +88,7 @@ fileprivate struct MWChip: View {
                 )
         }
         .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(active ? [.isSelected] : [])
     }
 }
 
@@ -374,12 +375,13 @@ struct TermStructureWidget: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Futures curve, eight contract months")
+        .accessibilityLabel("Futures curve, eight contract months, currently in \(isContango ? "contango" : "backwardation")")
         .accessibilityValue(
             (0..<monthCount)
                 .map { "M\($0 + 1) \(String(format: "%.0f", prices[$0])) dollars" }
                 .joined(separator: ", ")
         )
+        .accessibilityHint("Drag a point on the chart to reshape the curve")
     }
 
     private func dragGesture(proxy: ChartProxy, geo: GeometryProxy) -> some Gesture {
@@ -633,12 +635,13 @@ struct YieldCurveSculptorWidget: View {
         }
         .animation(Motion.snappy, value: dragIndex)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Yield curve, six tenors from three months to thirty years")
+        .accessibilityLabel("Yield curve, six tenors from three months to thirty years, shape \(shape.label.lowercased())")
         .accessibilityValue(
             (0..<tenors.count)
                 .map { "\(tenors[$0]) \(String(format: "%.2f", yields[$0])) percent" }
                 .joined(separator: ", ")
         )
+        .accessibilityHint("Drag a node on the chart to reshape the curve")
     }
 
     private func dragGesture(proxy: ChartProxy, geo: GeometryProxy) -> some Gesture {

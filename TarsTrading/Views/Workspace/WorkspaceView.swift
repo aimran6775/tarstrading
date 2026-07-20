@@ -6,6 +6,7 @@ import SwiftUI
 /// symbol persist across launches.
 struct WorkspaceView: View {
     @Environment(TradingStore.self) private var store
+    @Environment(TarsStore.self) private var tars
     @Environment(\.horizontalSizeClass) private var hSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -30,7 +31,9 @@ struct WorkspaceView: View {
         }
         .onChange(of: selectedSymbol) { _, newValue in
             UserDefaults.standard.set(newValue, forKey: WorkspaceDefaults.symbolKey)
+            tars.visibleSymbol = newValue
         }
+        .onAppear { tars.visibleSymbol = selectedSymbol }
         .sheet(isPresented: $showingTicket) {
             OrderTicketView(symbol: selectedSymbol, side: .buy)
                 .id(selectedSymbol)
@@ -145,6 +148,7 @@ struct WorkspaceView: View {
                 } label: {
                     Label("New Order", systemImage: "plus")
                         .font(TarsTheme.Text.caption)
+                        .lineLimit(1)
                         .foregroundStyle(TarsTheme.accent)
                         .padding(.horizontal, TarsTheme.Space.m)
                         .padding(.vertical, TarsTheme.Space.s)
@@ -173,6 +177,8 @@ struct WorkspaceView: View {
                     Text(selectedSymbol)
                         .font(TarsTheme.Text.heading)
                         .foregroundStyle(TarsTheme.inkPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .contentTransition(.opacity)
                 }
                 Spacer()
@@ -184,7 +190,9 @@ struct WorkspaceView: View {
                         PercentText(value: quote.changePercent)
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(selectedSymbol) quote")
+                    .accessibilityLabel(
+                        "\(selectedSymbol) \(quote.price.formatted(.currency(code: "USD").precision(.fractionLength(2)))), \(quote.changePercent.formatted(.percent.precision(.fractionLength(2)))) today"
+                    )
                 } else if store.isBootstrapping {
                     SkeletonBlock(width: 90, height: 18)
                 }
@@ -353,6 +361,7 @@ fileprivate struct WorkspaceWatchlist: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(TarsTheme.Space.xl)
+                .accessibilityElement(children: .combine)
             } else {
                 ScrollView {
                     LazyVStack(spacing: TarsTheme.Space.xs) {
@@ -390,6 +399,8 @@ fileprivate struct WorkspaceWatchlistRow: View {
                 Text(symbol)
                     .font(TarsTheme.Text.priceSmall)
                     .foregroundStyle(isSelected ? TarsTheme.inkPrimary : TarsTheme.inkSecondary)
+                    .lineLimit(1)
+                    .layoutPriority(1)
                 Spacer(minLength: TarsTheme.Space.s)
                 if let quote {
                     TickerText(value: quote.price,

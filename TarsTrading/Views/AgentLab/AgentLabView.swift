@@ -223,6 +223,7 @@ fileprivate struct LabEmptyState: View {
                 .background(
                     Circle().fill(TarsTheme.agentPurple.opacity(0.10))
                 )
+                .accessibilityHidden(true)
 
             Text("Your stable is empty")
                 .font(TarsTheme.Text.title)
@@ -390,6 +391,8 @@ fileprivate struct LabAgentCard: View {
                      format: .currency(code: "USD").precision(.fractionLength(0)))
                     .font(TarsTheme.Text.price)
                     .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
 
             Spacer(minLength: 0)
@@ -455,6 +458,7 @@ fileprivate struct LabAgentCard: View {
                                  tint: TarsTheme.warning)
                 }
                 .buttonStyle(PressableStyle())
+                .accessibilityLabel("Pause \(agent.name)")
 
             case .paused:
                 runButton
@@ -467,6 +471,7 @@ fileprivate struct LabAgentCard: View {
                                  tint: TarsTheme.inkPrimary)
                 }
                 .buttonStyle(PressableStyle())
+                .accessibilityLabel("Revive \(agent.name) as draft")
             }
 
             Spacer(minLength: 0)
@@ -479,6 +484,7 @@ fileprivate struct LabAgentCard: View {
                                  tint: TarsTheme.accent)
                 }
                 .buttonStyle(PressableStyle())
+                .accessibilityLabel("Backtest results for \(agent.name)")
             }
         }
     }
@@ -490,6 +496,7 @@ fileprivate struct LabAgentCard: View {
         .buttonStyle(PressableStyle())
         .disabled(backtest == nil)
         .opacity(backtest == nil ? 0.4 : 1)
+        .accessibilityLabel("Run \(agent.name)")
     }
 
     private var backtestButton: some View {
@@ -503,6 +510,7 @@ fileprivate struct LabAgentCard: View {
         }
         .buttonStyle(PressableStyle())
         .disabled(isBacktesting)
+        .accessibilityLabel(isBacktesting ? "Backtesting \(agent.name)" : "Backtest \(agent.name)")
     }
 
     private var editButton: some View {
@@ -511,6 +519,7 @@ fileprivate struct LabAgentCard: View {
                          tint: TarsTheme.inkPrimary)
         }
         .buttonStyle(PressableStyle())
+        .accessibilityLabel("Edit \(agent.name)")
     }
 }
 
@@ -566,6 +575,7 @@ fileprivate struct LabPulsingDot: View {
                     pulsing = true
                 }
             }
+            .accessibilityHidden(true)
     }
 }
 
@@ -579,6 +589,15 @@ fileprivate struct LabSparkline: View {
             return TarsTheme.inkSecondary
         }
         return TarsTheme.pnl(last - first)
+    }
+
+    private var summaryLabel: String {
+        guard let first = equity.first, let last = equity.last, equity.count > 1 else {
+            return "Out-of-sample equity sparkline, no data yet"
+        }
+        let from = first.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        let to = last.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        return "Out-of-sample equity, from \(from) to \(to)"
     }
 
     var body: some View {
@@ -598,7 +617,7 @@ fileprivate struct LabSparkline: View {
             }
         }
         .frame(width: 84, height: 26)
-        .accessibilityLabel("Out-of-sample equity sparkline")
+        .accessibilityLabel(summaryLabel)
     }
 }
 

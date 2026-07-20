@@ -7,6 +7,7 @@ struct SymbolDetailView: View {
     let symbol: String
 
     @Environment(TradingStore.self) private var store
+    @Environment(TarsStore.self) private var tars
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var ticketSide: OrderSide?
@@ -27,6 +28,7 @@ struct SymbolDetailView: View {
             VStack(alignment: .leading, spacing: TarsTheme.Space.xl) {
                 header
                 ChartView(symbol: symbol)
+                    .onAppear { tars.visibleSymbol = symbol }
                 tradeButtons
                 if !isCrypto { optionsChainChip }
                 statsSection
@@ -54,6 +56,8 @@ struct SymbolDetailView: View {
                 Text(symbol)
                     .font(TarsTheme.Text.title)
                     .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 if let companyName {
                     Text(companyName)
                         .font(TarsTheme.Text.body)
@@ -107,7 +111,8 @@ struct SymbolDetailView: View {
                 )
         }
         .buttonStyle(PressableStyle())
-        .accessibilityLabel("\(side.label) \(symbol). Opens the order ticket.")
+        .accessibilityLabel("\(side.label) \(symbol)")
+        .accessibilityHint("Opens the order ticket.")
     }
 
     // MARK: - Options sandbox entry (non-crypto only)
@@ -141,7 +146,8 @@ struct SymbolDetailView: View {
             .tarsPanel()
         }
         .buttonStyle(PressableStyle())
-        .accessibilityLabel("Options chain for \(symbol). Opens the options sandbox, a practice book separate from your paper account.")
+        .accessibilityLabel("Options chain for \(symbol)")
+        .accessibilityHint("Opens the options sandbox, a practice book separate from your paper account.")
     }
 
     // MARK: - Watchlist star
@@ -324,7 +330,8 @@ fileprivate struct TarsSymbolStatCell: View {
             .presentationBackground(TarsTheme.bg2)
             .presentationCompactAdaptation(.popover)
         }
-        .accessibilityLabel("\(stat.title): \(stat.value ?? "not available"). Double-tap to learn what this stat means.")
+        .accessibilityLabel("\(stat.title): \(stat.value ?? "not available")")
+        .accessibilityHint("Explains what this stat means.")
     }
 }
 
@@ -383,6 +390,7 @@ fileprivate struct TarsLearnChipView: View {
             .presentationBackground(TarsTheme.bg2)
             .presentationCompactAdaptation(.popover)
         }
-        .accessibilityLabel("Academy lesson: \(chip.title). Opens a preview.")
+        .accessibilityLabel("Academy lesson: \(chip.title)")
+        .accessibilityHint("Opens a preview.")
     }
 }

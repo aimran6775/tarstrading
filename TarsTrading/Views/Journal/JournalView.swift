@@ -112,6 +112,7 @@ struct JournalView: View {
                             Image(systemName: "flame.fill")
                                 .font(TarsTheme.Text.caption)
                                 .foregroundStyle(TarsTheme.accent)
+                                .accessibilityHidden(true)
                         }
                     }
                 }
@@ -298,6 +299,8 @@ struct ThesisCaptureSheet: View {
             Text(entry.symbol)
                 .font(TarsTheme.Text.hero)
                 .foregroundStyle(TarsTheme.inkPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .accessibilityAddTraits(.isHeader)
             Text(journalFillSummary(entry))
                 .font(TarsTheme.Text.priceSmall)
@@ -470,6 +473,9 @@ fileprivate struct JournalEntryCard: View {
                 Text(entry.symbol)
                     .font(TarsTheme.Text.heading)
                     .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
 
                 sideBadge
 
@@ -603,6 +609,8 @@ fileprivate struct JournalStatTile<Value: View>: View {
         VStack(alignment: .leading, spacing: TarsTheme.Space.xs) {
             value
                 .font(TarsTheme.Text.price)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
             Text(label)
                 .font(TarsTheme.Text.caption)
                 .foregroundStyle(TarsTheme.inkTertiary)
@@ -647,7 +655,11 @@ fileprivate struct JournalEmptyState: View {
         }
         .padding(TarsTheme.Space.xxl)
         .onAppear {
-            withAnimation(Motion.molasses) { appeared = true }
+            if reduceMotion {
+                appeared = true
+            } else {
+                withAnimation(Motion.molasses) { appeared = true }
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Journal is empty. Your trading story starts with trade one. Close a position and Tars will ask you why you took it.")

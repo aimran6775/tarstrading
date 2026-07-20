@@ -172,6 +172,7 @@ fileprivate struct RiskChip: View {
                 )
         }
         .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(active ? [.isSelected] : [])
     }
 }
 
@@ -190,8 +191,11 @@ fileprivate struct RiskStat: View {
                 .font(TarsTheme.Text.price)
                 .foregroundStyle(color)
                 .contentTransition(.numericText())
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -363,6 +367,7 @@ struct PositionSizerWidget: View {
         .animation(Motion.ticker, value: winRate)
         .animation(Motion.ticker, value: winLossRatio)
         .animation(Motion.ticker, value: riskPct)
+        .accessibilityLabel("Equity curve over 100 simulated trades, starting at $10,000 and ending at \(riskCompactUSD(main.last ?? startingEquity)), with five fainter alternate runs and a ruin line at $2,000")
     }
 
     private var controls: some View {
@@ -643,6 +648,7 @@ struct LeverageSimulatorWidget: View {
             .tint(TarsTheme.accent)
             .disabled(marginCalled)
             .accessibilityLabel("Scrub timeline")
+            .accessibilityValue("Day \(shownIndex) of \(steps)")
 
             Button {
                 resetRun(newSeed: false)
@@ -903,6 +909,7 @@ struct CompoundingCurveWidget: View {
         .animation(Motion.fluid, value: missBestMonths)
         .animation(Motion.ticker, value: monthlyContribution)
         .animation(Motion.ticker, value: annualReturnPct)
+        .accessibilityLabel("Thirty-year balance chart, ending at \(riskCompactUSD(active.last ?? 0))\(missBestMonths ? ", with a dashed fully-invested line ending at \(riskCompactUSD(ghost.last ?? 0))" : "")")
     }
 
     private func activePointsSampled(_ series: [Double], stride: Int) -> [(Double, Double)] {

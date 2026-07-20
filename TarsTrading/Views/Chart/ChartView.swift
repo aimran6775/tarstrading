@@ -95,6 +95,17 @@ struct ChartView: View {
     // MARK: - Controls row
 
     private var controls: some View {
+        // On narrow widths (compact workspace column) the full row can't fit;
+        // fall back to a horizontal scroll rather than clipping the pills.
+        ViewThatFits(in: .horizontal) {
+            controlsRow
+            ScrollView(.horizontal, showsIndicators: false) {
+                controlsRow
+            }
+        }
+    }
+
+    private var controlsRow: some View {
         HStack(spacing: TarsTheme.Space.m) {
             timeframeSwitcher
             Spacer(minLength: TarsTheme.Space.s)
@@ -297,8 +308,9 @@ struct ChartView: View {
                 }
             }
         }
-        .accessibilityLabel("\(style == .candles ? "Candlestick" : "Line") chart for \(symbol), \(timeframe.rawValue) range")
+        .accessibilityLabel("\(style == .candles ? "Candlestick" : "Line") chart for \(symbol), \(timeframe.rawValue) range\(dateRangeLabel(bars))")
         .accessibilityValue(accessibilitySummary(bars))
+        .accessibilityHint("Drag across the chart to inspect individual bars.")
     }
 
     @ChartContentBuilder
@@ -527,21 +539,23 @@ struct ChartView: View {
     // MARK: Legend
 
     private func legend(_ overlays: Set<ChartIndicator>) -> some View {
-        HStack(spacing: TarsTheme.Space.s) {
-            ForEach(ChartIndicator.allCases.filter { overlays.contains($0) }) { indicator in
-                HStack(spacing: TarsTheme.Space.xs) {
-                    Circle()
-                        .fill(indicator.color)
-                        .frame(width: 6, height: 6)
-                    Text(indicator.title)
-                        .font(TarsTheme.Text.micro)
-                        .foregroundStyle(TarsTheme.inkSecondary)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: TarsTheme.Space.s) {
+                ForEach(ChartIndicator.allCases.filter { overlays.contains($0) }) { indicator in
+                    HStack(spacing: TarsTheme.Space.xs) {
+                        Circle()
+                            .fill(indicator.color)
+                            .frame(width: 6, height: 6)
+                        Text(indicator.title)
+                            .font(TarsTheme.Text.micro)
+                            .foregroundStyle(TarsTheme.inkSecondary)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, TarsTheme.Space.s)
+                    .padding(.vertical, TarsTheme.Space.xs)
+                    .background(Capsule(style: .continuous).fill(TarsTheme.bg2))
                 }
-                .padding(.horizontal, TarsTheme.Space.s)
-                .padding(.vertical, TarsTheme.Space.xs)
-                .background(Capsule(style: .continuous).fill(TarsTheme.bg2))
             }
-            Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Active indicators: \(overlays.map(\.title).joined(separator: ", "))")
@@ -609,6 +623,8 @@ struct ChartView: View {
             Text(value)
                 .font(TarsTheme.Text.priceSmall)
                 .foregroundStyle(TarsTheme.inkPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
     }
 
@@ -751,6 +767,15 @@ struct ChartView: View {
         case .year1: .dateTime.month(.abbreviated)
         case .year5: .dateTime.year()
         }
+    }
+
+    /// ", from Jan 2 to Apr 2, 2026" — appended to the chart's accessibility label.
+    private func dateRangeLabel(_ bars: [Bar]) -> String {
+        guard let first = bars.first?.time, let last = bars.last?.time else { return "" }
+        let from = first.formatted(date: .abbreviated, time: .omitted)
+        let to = last.formatted(date: .abbreviated, time: .omitted)
+        guard from != to else { return "" }
+        return ", from \(from) to \(to)"
     }
 
     private func accessibilitySummary(_ bars: [Bar]) -> String {

@@ -215,7 +215,7 @@ public struct SettingsView: View {
                 .opacity(trading.journal.isEmpty ? 0.4 : 1)
                 .confirmationDialog("Delete all journal entries?",
                                     isPresented: $confirmClearJournal, titleVisibility: .visible) {
-                    Button("Delete \(trading.journal.count) entries", role: .destructive) {
+                    Button("Delete \(trading.journal.count) \(trading.journal.count == 1 ? "entry" : "entries")", role: .destructive) {
                         withAnimation(Motion.fluid) { trading.journal.removeAll() }
                         Persistence().save([JournalEntry](), "journal")
                         Haptics.warning()

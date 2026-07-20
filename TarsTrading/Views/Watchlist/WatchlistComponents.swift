@@ -157,6 +157,8 @@ struct SymbolSearchSheet: View {
                         .font(TarsTheme.Text.micro)
                         .foregroundStyle(TarsTheme.inkTertiary)
                         .kerning(1.2)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityLabel("Recent searches")
                     Spacer()
                     Button {
                         Haptics.tap()
@@ -282,6 +284,8 @@ fileprivate struct SearchResultRow: View {
             Text(asset.symbol)
                 .font(TarsTheme.Text.price)
                 .foregroundStyle(TarsTheme.inkPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 .frame(minWidth: 64, alignment: .leading)
 
             VStack(alignment: .leading, spacing: TarsTheme.Space.xs) {
@@ -476,13 +480,19 @@ struct Sparkline: View {
     }
 
     private var accessibilityText: String {
-        if case .loaded(let bars) = state,
-           let first = bars.first?.close, let last = bars.last?.close, first != 0 {
-            let pct = (last - first) / first * 100
-            let dir = pct >= 0 ? "up" : "down"
-            return "\(symbol) one month trend, \(dir) \(String(format: "%.1f", abs(pct))) percent"
+        switch state {
+        case .loaded(let bars):
+            if let first = bars.first?.close, let last = bars.last?.close, first != 0 {
+                let pct = (last - first) / first * 100
+                let dir = pct >= 0 ? "up" : "down"
+                return "\(symbol) one month trend, \(dir) \(String(format: "%.1f", abs(pct))) percent"
+            }
+            return "\(symbol) one month trend"
+        case .failed:
+            return "\(symbol) one month trend unavailable"
+        case .loading:
+            return "\(symbol) one month trend, loading"
         }
-        return "\(symbol) one month trend"
     }
 
     private func load() async {

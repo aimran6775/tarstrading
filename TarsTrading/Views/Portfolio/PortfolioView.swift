@@ -145,7 +145,7 @@ struct PortfolioView: View {
     private var heroAccessibilityValue: String {
         let equity = store.account.equity.formatted(.currency(code: "USD"))
         let pnl = store.account.dayPnL.formatted(.currency(code: "USD").sign(strategy: .always()))
-        return "\(equity), \(pnl) today"
+        return "\(equity), \(pnl) today, \(store.mode.badgeText) mode — simulated money"
     }
 
     @ViewBuilder
@@ -185,11 +185,20 @@ struct PortfolioView: View {
                     Rectangle().frame(width: geo.size.width * drawProgress)
                 }
             }
-            .accessibilityLabel("Equity curve")
-            .accessibilityValue("\(equityHistory.count) recorded points, trending \(trendIsUp ? "up" : "down")")
+            .accessibilityLabel("Equity curve chart")
+            .accessibilityValue(equityChartAccessibilityValue)
         } else {
             PortfolioEmptyChart()
         }
+    }
+
+    private var equityChartAccessibilityValue: String {
+        guard let first = equityHistory.first, let last = equityHistory.last else {
+            return "No data yet"
+        }
+        let from = first.equity.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        let to = last.equity.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        return "From \(from) to \(to) over \(equityHistory.count) points, trending \(trendIsUp ? "up" : "down")"
     }
 
     private var equityDomain: ClosedRange<Double> {
@@ -241,7 +250,7 @@ struct PortfolioView: View {
         .frame(height: 220)
         .overlay { donutCenter }
         .accessibilityLabel("Allocation donut chart")
-        .accessibilityValue(isAllCash ? "All cash" : "\(allocationSlices.count) slices")
+        .accessibilityValue(donutAccessibilityValue)
     }
 
     @ViewBuilder
@@ -317,6 +326,15 @@ struct PortfolioView: View {
         }
     }
 
+    private var donutAccessibilityValue: String {
+        if isAllCash { return "All cash" }
+        guard allocationTotal > 0, let largest = allocationSlices.max(by: { $0.value < $1.value }) else {
+            return "\(allocationSlices.count) slices"
+        }
+        let share = (largest.value / allocationTotal).formatted(.percent.precision(.fractionLength(0)))
+        return "\(allocationSlices.count) slices, largest is \(largest.label) at \(share)"
+    }
+
     private func handleAngleSelection(_ raw: Double?) {
         guard let raw else { return }
         var cumulative = 0.0
@@ -358,6 +376,8 @@ struct PortfolioView: View {
                                 Text(row.value, format: .currency(code: "USD"))
                                     .font(TarsTheme.Text.priceSmall)
                                     .foregroundStyle(TarsTheme.inkTertiary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
                             }
                             PortfolioProportionBar(fraction: row.fraction, tint: row.tint)
                         }
@@ -540,15 +560,26 @@ struct PortfolioView: View {
             .padding(TarsTheme.Space.xl)
             .tarsPanel(elevation: 2)
 
-            HStack(spacing: TarsTheme.Space.l) {
-                PortfolioSkeleton(height: 240, reduceMotion: reduceMotion)
-                    .padding(TarsTheme.Space.xl)
-                    .tarsPanel()
-                PortfolioSkeleton(height: 240, reduceMotion: reduceMotion)
-                    .padding(TarsTheme.Space.xl)
-                    .tarsPanel()
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: TarsTheme.Space.l) {
+                    PortfolioSkeleton(height: 240, reduceMotion: reduceMotion)
+                        .padding(TarsTheme.Space.xl)
+                        .tarsPanel()
+                    PortfolioSkeleton(height: 240, reduceMotion: reduceMotion)
+                        .padding(TarsTheme.Space.xl)
+                        .tarsPanel()
+                }
+                VStack(spacing: TarsTheme.Space.l) {
+                    PortfolioSkeleton(height: 240, reduceMotion: reduceMotion)
+                        .padding(TarsTheme.Space.xl)
+                        .tarsPanel()
+                    PortfolioSkeleton(height: 240, reduceMotion: reduceMotion)
+                        .padding(TarsTheme.Space.xl)
+                        .tarsPanel()
+                }
             }
         }
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading portfolio")
     }
 }
@@ -748,7 +779,7 @@ fileprivate struct PortfolioStatExplainer: View {
             }
         }
         .padding(TarsTheme.Space.xl)
-        .frame(width: 320, alignment: .leading)
+        .frame(minWidth: 260, idealWidth: 320, maxWidth: 320, alignment: .leading)
         .background(TarsTheme.bg2)
     }
 }
@@ -885,11 +916,14 @@ fileprivate struct PortfolioJournalRow: View {
                     Text(entry.symbol)
                         .font(TarsTheme.Text.body.weight(.semibold))
                         .foregroundStyle(TarsTheme.inkPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .layoutPriority(1)
                     Text(entry.side.label)
                         .font(TarsTheme.Text.micro)
                         .foregroundStyle(TarsTheme.inkSecondary)
                         .padding(.horizontal, TarsTheme.Space.s)
-                        .padding(.vertical, 2)
+                        .padding(.vertical, TarsTheme.Space.xs)
                         .background(Capsule().fill(TarsTheme.bg3))
                 }
                 Text(entry.thesis.isEmpty ? "No thesis captured" : entry.thesis)

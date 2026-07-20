@@ -4,6 +4,7 @@ import SwiftUI
 /// Amber capsule, gentle breathing glow, pinned to the top of every screen.
 struct ModeBanner: View {
     @Environment(TradingStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var breathing = false
 
     var body: some View {
@@ -18,6 +19,8 @@ struct ModeBanner: View {
             Text(store.mode == .demo ? "Simulated market — no real money" : "Paper account — no real money")
                 .font(TarsTheme.Text.caption)
                 .foregroundStyle(TarsTheme.inkSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
         .foregroundStyle(TarsTheme.paperBadge)
         .padding(.horizontal, TarsTheme.Space.l)
@@ -30,10 +33,17 @@ struct ModeBanner: View {
         )
         .padding(.top, TarsTheme.Space.s)
         .onAppear {
-            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
+            // The breathing glow is decorative; with Reduce Motion on, hold the
+            // fully-lit steady state instead of pulsing forever.
+            if reduceMotion {
                 breathing = true
+            } else {
+                withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
+                    breathing = true
+                }
             }
         }
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(store.mode.badgeText) mode. No real money.")
     }
 }

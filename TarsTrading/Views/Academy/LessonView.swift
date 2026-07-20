@@ -380,6 +380,16 @@ fileprivate struct QuizCard: View {
             answered && !answeredCorrectly && index == selection ? shakePhase : 0))
         .animation(Motion.snappy, value: selection)
         .accessibilityHint(answered ? "" : "Selects this answer")
+        .accessibilityValue(answerA11yValue(index))
+    }
+
+    private func answerA11yValue(_ index: Int) -> String {
+        guard answered else { return "" }
+        if index == quiz.correctIndex {
+            return index == selection ? "Your answer, correct" : "Correct answer"
+        }
+        if index == selection { return "Your answer, incorrect" }
+        return ""
     }
 
     private func answer(_ index: Int) {
@@ -471,6 +481,7 @@ fileprivate struct QuizCard: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
                         .strokeBorder(TarsTheme.hairline, lineWidth: 1)))
+        .accessibilityElement(children: .combine)
     }
 }
 

@@ -176,6 +176,8 @@ fileprivate struct BTVerdictCard: View {
                     Text(benchmarkAnnualized, format: .percent.precision(.fractionLength(2)).sign(strategy: .always()))
                         .font(TarsTheme.Text.priceHero)
                         .foregroundStyle(TarsTheme.inkSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                     Text("buy & hold / yr, annualized equivalent")
                         .font(TarsTheme.Text.caption)
                         .foregroundStyle(TarsTheme.inkSecondary)
@@ -256,6 +258,7 @@ fileprivate struct BTSegmentPanel: View {
             if segment.equity.count > 1 {
                 chart
                     .frame(height: 140)
+                    .accessibilityLabel(chartSummary)
                     .mask(
                         GeometryReader { geo in
                             Rectangle().frame(width: geo.size.width * drawn)
@@ -280,6 +283,14 @@ fileprivate struct BTSegmentPanel: View {
         .padding(TarsTheme.Space.l)
         .frame(maxWidth: .infinity, alignment: .leading)
         .tarsPanel()
+    }
+
+    private var chartSummary: String {
+        let from = (segment.equity.first ?? 0)
+            .formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        let to = (segment.equity.last ?? 0)
+            .formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        return "\(segment.label) equity curve, from \(from) to \(to) over \(segment.equity.count) bars"
     }
 
     private var chart: some View {
@@ -399,6 +410,7 @@ fileprivate struct BTPlaybackPanel: View {
                 if curve.count > 1 {
                     playbackChart
                         .frame(height: 220)
+                        .accessibilityLabel(playbackSummary)
                 } else {
                     Text("Nothing to replay — the curve is a single point.")
                         .font(TarsTheme.Text.caption)
@@ -429,6 +441,8 @@ fileprivate struct BTPlaybackPanel: View {
                             }),
                         in: 0...1)
                     .tint(TarsTheme.accent)
+                    .accessibilityLabel("Playback position")
+                    .accessibilityValue("Bar \(playIndex + 1) of \(max(curve.count, 1))")
                 }
 
                 Text("Amber zone is out-of-sample. Everything left of the honesty line was rehearsed; everything right of it was not.")
@@ -440,6 +454,12 @@ fileprivate struct BTPlaybackPanel: View {
             .tarsPanel()
         }
         .onDisappear { playTask?.cancel() }
+    }
+
+    private var playbackSummary: String {
+        let from = (curve.first ?? 0).formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        let to = (curve.last ?? 0).formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        return "Equity curve playback, from \(from) to \(to) over \(curve.count) bars, with \(trades.count) trades marked"
     }
 
     private var playbackChart: some View {
@@ -662,6 +682,8 @@ fileprivate struct BTTradeRow: View {
                 Text(trade.symbol)
                     .font(TarsTheme.Text.price)
                     .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Text(trade.reason)
                     .font(TarsTheme.Text.caption)
                     .foregroundStyle(TarsTheme.inkTertiary)
@@ -716,6 +738,7 @@ fileprivate struct BTEmptyState: View {
             }
             .scaleEffect(appeared ? 1 : 0.85)
             .opacity(appeared ? 1 : 0)
+            .accessibilityHidden(true)
 
             VStack(spacing: TarsTheme.Space.s) {
                 Text("No backtest yet")

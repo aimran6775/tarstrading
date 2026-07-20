@@ -134,6 +134,9 @@ public struct ScreenerView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(PressableStyle())
+            .accessibilityLabel("Filters")
+            .accessibilityValue(showFiltersCompact ? "Expanded" : "Collapsed")
+            .accessibilityHint("Shows or hides the filter controls.")
             .padding(.horizontal, TarsTheme.Space.l)
             .padding(.vertical, TarsTheme.Space.m)
 
@@ -890,6 +893,9 @@ fileprivate struct ScreenerRow: View {
                     Text(asset.symbol)
                         .font(TarsTheme.Text.body.weight(.semibold))
                         .foregroundStyle(TarsTheme.inkPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .layoutPriority(1)
                     if isWatched {
                         Image(systemName: "star.fill")
                             .font(TarsTheme.Text.micro)

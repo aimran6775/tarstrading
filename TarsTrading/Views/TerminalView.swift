@@ -43,6 +43,8 @@ struct AccountHeader: View {
                         Text(store.account.buyingPower, format: .currency(code: "USD"))
                             .font(TarsTheme.Text.priceSmall)
                             .foregroundStyle(TarsTheme.inkSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                     }
                 }
             }
@@ -50,6 +52,7 @@ struct AccountHeader: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(TarsTheme.Space.l)
         .tarsPanel()
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -78,6 +81,22 @@ struct WatchlistPanel: View {
                 }
                 .padding(.horizontal, TarsTheme.Space.l)
                 .padding(.bottom, TarsTheme.Space.l)
+            } else if store.watchlist.isEmpty {
+                VStack(spacing: TarsTheme.Space.s) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(TarsTheme.Text.title)
+                        .foregroundStyle(TarsTheme.inkTertiary)
+                    Text("Nothing on watch")
+                        .font(TarsTheme.Text.body)
+                        .foregroundStyle(TarsTheme.inkSecondary)
+                    Text("Symbols you add to your watchlist appear here.")
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(TarsTheme.inkTertiary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(TarsTheme.Space.xl)
+                .accessibilityElement(children: .combine)
             } else {
                 ForEach(store.watchlist, id: \.self) { symbol in
                     WatchlistRow(symbol: symbol)
@@ -102,6 +121,8 @@ struct WatchlistRow: View {
                 Text(symbol)
                     .font(TarsTheme.Text.price)
                     .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .layoutPriority(1)
                 if let quote, quote.age > 300 {
                     // Honest-data rule: show staleness, never fake liveness.
                     Text("as of \(quote.asOf, format: .relative(presentation: .named))")
@@ -130,6 +151,10 @@ struct WatchlistRow: View {
             } label: {
                 Label("Remove from watchlist", systemImage: "minus.circle")
             }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAction(named: "Remove from watchlist") {
+            store.removeFromWatchlist(symbol)
         }
     }
 }

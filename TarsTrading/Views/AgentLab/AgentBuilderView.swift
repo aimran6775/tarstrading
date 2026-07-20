@@ -106,12 +106,17 @@ public struct AgentBuilderView: View {
                     Text(draft.allocation, format: .currency(code: "USD").precision(.fractionLength(0)))
                         .font(TarsTheme.Text.price)
                         .foregroundStyle(TarsTheme.inkPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                         .contentTransition(.numericText(value: draft.allocation))
                         .animation(Motion.ticker, value: draft.allocation)
                 }
                 Slider(value: $draft.allocation, in: 1_000...50_000, step: 1_000)
                     .tint(TarsTheme.accent)
                     .onChange(of: draft.allocation) { _, _ in Haptics.tick() }
+                    .accessibilityLabel("Allocation")
+                    .accessibilityValue(
+                        draft.allocation.formatted(.currency(code: "USD").precision(.fractionLength(0))))
                 Text("Paper capital only. It spends this, not your rent.")
                     .font(TarsTheme.Text.micro)
                     .foregroundStyle(TarsTheme.inkTertiary)
@@ -144,6 +149,9 @@ public struct AgentBuilderView: View {
                         Text(asset.symbol)
                             .font(TarsTheme.Text.priceSmall)
                             .foregroundStyle(selected ? TarsTheme.accent : TarsTheme.inkSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .padding(.horizontal, TarsTheme.Space.xs)
                             .padding(.vertical, TarsTheme.Space.s)
                             .frame(maxWidth: .infinity)
                             .background(
@@ -498,6 +506,7 @@ fileprivate struct IndicatorPicker: View {
                 .padding(.vertical, TarsTheme.Space.s)
                 .background(Capsule().fill(TarsTheme.bg3))
             }
+            .accessibilityLabel("Indicator, \(kind.label)")
 
             if kind.hasPeriod {
                 Stepper(value: Binding(
@@ -512,6 +521,8 @@ fileprivate struct IndicatorPicker: View {
                 }
                 .fixedSize()
                 .tint(TarsTheme.accent)
+                .accessibilityLabel("Lookback period")
+                .accessibilityValue("\(period) days")
             }
         }
     }
@@ -599,6 +610,7 @@ fileprivate struct RuleEditorRow: View {
                     TextField("Value", value: rhsConstant,
                               format: .number.precision(.fractionLength(0...2)))
                         .keyboardType(.decimalPad)
+                        .accessibilityLabel("Comparison value")
                         .font(TarsTheme.Text.price)
                         .foregroundStyle(TarsTheme.inkPrimary)
                         .multilineTextAlignment(.trailing)

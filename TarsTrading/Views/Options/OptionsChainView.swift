@@ -114,6 +114,9 @@ public struct OptionsChainView: View {
             Text(symbol)
                 .font(TarsTheme.Text.title)
                 .foregroundStyle(TarsTheme.inkPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .layoutPriority(1)
             if let spot {
                 TickerText(value: spot, font: TarsTheme.Text.price)
                 Text("underlying")
@@ -298,6 +301,8 @@ public struct OptionsChainView: View {
                 if !alignTrailing { Spacer(minLength: 0) }
             }
             .font(TarsTheme.Text.priceSmall)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
             .contentTransition(.numericText())
             .animation(reduceMotion ? nil : Motion.ticker, value: bid)
             .padding(.horizontal, TarsTheme.Space.m)
@@ -309,13 +314,16 @@ public struct OptionsChainView: View {
             )
         }
         .buttonStyle(PressableStyle())
-        .accessibilityLabel("\(isCall ? "Call" : "Put") at strike \(row.strike.formatted(.number.precision(.fractionLength(0...2)))), bid \(bid.formatted(.currency(code: "USD"))), ask \(ask.formatted(.currency(code: "USD"))). Opens the sandbox ticket.")
+        .accessibilityLabel("\(isCall ? "Call" : "Put") at strike \(row.strike.formatted(.number.precision(.fractionLength(0...2)))), bid \(bid.formatted(.currency(code: "USD"))), ask \(ask.formatted(.currency(code: "USD")))")
+        .accessibilityHint("Opens a practice ticket for this contract.")
     }
 
     private func strikeCell(_ strike: Double, isATM: Bool) -> some View {
         Text(strike, format: .number.precision(.fractionLength(strike < 100 ? 1 : 0)))
             .font(TarsTheme.Text.priceSmall)
             .foregroundStyle(isATM ? TarsTheme.accent : TarsTheme.inkSecondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
             .frame(width: 84)
             .padding(.vertical, TarsTheme.Space.s)
             .background(

@@ -348,10 +348,13 @@ fileprivate struct FMSleeveCard: View {
                 Text(agent.allocation, format: .currency(code: "USD").precision(.fractionLength(0)))
                     .font(TarsTheme.Text.price)
                     .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 Spacer()
                 Text(share, format: .percent.precision(.fractionLength(1)))
                     .font(TarsTheme.Text.priceSmall)
                     .foregroundStyle(TarsTheme.inkSecondary)
+                    .lineLimit(1)
             }
 
             GeometryReader { geo in
@@ -494,6 +497,8 @@ fileprivate struct FMCorrelationGrid: View {
                 .monospacedDigit()
                 .foregroundStyle(TarsTheme.loss)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Color scale from minus one, diversifying, to plus one, herding")
     }
 }
 
@@ -540,6 +545,7 @@ fileprivate struct FMEmptyState: View {
             }
             .scaleEffect(appeared ? 1 : 0.85)
             .opacity(appeared ? 1 : 0)
+            .accessibilityHidden(true)
 
             VStack(spacing: TarsTheme.Space.s) {
                 Text("No fund yet")

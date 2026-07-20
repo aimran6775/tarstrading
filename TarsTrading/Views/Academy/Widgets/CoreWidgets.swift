@@ -89,6 +89,7 @@ fileprivate struct CWChip: View {
                 )
         }
         .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(active ? [.isSelected] : [])
     }
 }
 
@@ -107,8 +108,11 @@ fileprivate struct CWStat: View {
                 .font(TarsTheme.Text.priceSmall)
                 .foregroundStyle(color)
                 .contentTransition(.numericText())
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -300,6 +304,8 @@ struct OrderBookSimWidget: View {
                 .buttonStyle(PressableStyle())
                 .disabled(busy)
                 .opacity(busy ? 0.5 : 1)
+                .accessibilityLabel("Buy \(Int(qty)) shares")
+                .accessibilityHint("Sends a simulated \(kind.rawValue.lowercased()) order into the book")
                 Button {
                     Haptics.tap()
                     reset()
@@ -552,6 +558,7 @@ struct CandleAnatomyWidget: View {
             )
             .accessibilityLabel("\(label) price handle")
             .accessibilityValue(cwUSD(value))
+            .accessibilityHint("Drag up or down to change the \(label.lowercased()) price")
     }
 
     private func set(_ part: CWCandlePart, to raw: Double) {
@@ -580,7 +587,7 @@ struct CandleAnatomyWidget: View {
         }
         if body / range > 0.75 {
             return bullish
-                ? "Nearly all body, barely any wick: \(bullish ? "buyers" : "sellers") controlled the session from open to close. Conviction — at least for one candle."
+                ? "Nearly all body, barely any wick: buyers controlled the session from open to close. Conviction — at least for one candle."
                 : "A thick red body with tiny wicks: sellers held the wheel the entire session. One candle of conviction, not a forecast."
         }
         return bullish
@@ -654,6 +661,7 @@ struct OrderTypePlaygroundWidget: View {
                         CWChip(title: s == 0.5 ? "½×" : "\(Int(s))×", active: speed == s) {
                             speed = s
                         }
+                        .accessibilityLabel(s == 0.5 ? "Half speed" : "\(Int(s)) times speed")
                     }
                 }
                 .animation(Motion.snappy, value: filled)
@@ -740,6 +748,7 @@ struct OrderTypePlaygroundWidget: View {
             )
             .accessibilityLabel("Order price handle")
             .accessibilityValue(cwUSD(armedPrice))
+            .accessibilityHint("Drag up or down to move the order price into the market's path")
         }
     }
 
@@ -980,6 +989,7 @@ struct DividendTimelineWidget: View {
                 )
                 .accessibilityLabel("Buy date marker")
                 .accessibilityValue("Day \(buyDay), \(eligible ? "eligible" : "not eligible") for the dividend")
+                .accessibilityHint("Drag left or right to change the day you buy")
             }
         }
         .frame(height: 64)

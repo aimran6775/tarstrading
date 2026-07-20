@@ -10,15 +10,56 @@ struct PositionsScreen: View {
     var body: some View {
         ScrollView {
             VStack(spacing: TarsTheme.Space.l) {
+                if let error = store.lastError {
+                    RefreshErrorStrip(error: error) { store.lastError = nil }
+                        .transition(.opacity)
+                }
                 AccountSummaryStrip()
                 PositionsPanel()
                 OpenOrdersPanel()
             }
             .padding(TarsTheme.Space.l)
+            .animation(Motion.snappy, value: store.lastError == nil)
         }
         .background(TarsTheme.bg0)
         .refreshable { await store.refreshAll() }
         .navigationTitle("Portfolio")
+    }
+}
+
+// MARK: - Refresh error strip
+
+fileprivate struct RefreshErrorStrip: View {
+    let error: TarsError
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: TarsTheme.Space.m) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(TarsTheme.Text.heading)
+                .foregroundStyle(TarsTheme.loss)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: TarsTheme.Space.xs) {
+                Text("Couldn't refresh")
+                    .font(TarsTheme.Text.body)
+                    .foregroundStyle(TarsTheme.inkPrimary)
+                Text(error.errorDescription ?? "Something went wrong. Pull down to try again.")
+                    .font(TarsTheme.Text.caption)
+                    .foregroundStyle(TarsTheme.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: TarsTheme.Space.s)
+            Button(action: onDismiss) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(TarsTheme.Text.heading)
+                    .foregroundStyle(TarsTheme.inkTertiary)
+            }
+            .buttonStyle(PressableStyle())
+            .accessibilityLabel("Dismiss error message")
+        }
+        .padding(TarsTheme.Space.l)
+        .tarsPanel(elevation: 2)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -58,6 +99,8 @@ fileprivate struct AccountSummaryStrip: View {
                                 .sign(strategy: .always(showZero: false)))
                             .font(TarsTheme.Text.price)
                             .foregroundStyle(TarsTheme.pnl(store.account.dayPnL))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                             .contentTransition(.numericText(value: store.account.dayPnL))
                             .animation(Motion.ticker, value: store.account.dayPnL)
                         PercentText(value: store.account.dayPnLPercent)
@@ -145,7 +188,7 @@ struct PositionsPanel: View {
 
     private func positionAccessibilityLabel(_ p: Position) -> String {
         let direction = p.unrealizedPnL >= 0 ? "up" : "down"
-        return "\(p.symbol), \(p.qty.formatted()) shares, market value \(p.marketValue.formatted(.currency(code: "USD"))), \(direction) \(abs(p.unrealizedPnL).formatted(.currency(code: "USD")))"
+        return "\(p.symbol), quantity \(p.qty.formatted()), market value \(p.marketValue.formatted(.currency(code: "USD"))), \(direction) \(abs(p.unrealizedPnL).formatted(.currency(code: "USD")))"
     }
 }
 
@@ -165,6 +208,9 @@ fileprivate struct PositionRow: View {
                 Text(position.symbol)
                     .font(TarsTheme.Text.heading)
                     .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
                 HStack(spacing: TarsTheme.Space.xs) {
                     Text(position.qty, format: .number.precision(.fractionLength(0...4)))
                         .font(TarsTheme.Text.priceSmall)
@@ -185,6 +231,8 @@ fileprivate struct PositionRow: View {
                          format: .currency(code: "USD").sign(strategy: .always(showZero: false)))
                         .font(TarsTheme.Text.priceSmall)
                         .foregroundStyle(TarsTheme.pnl(position.unrealizedPnL))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                         .contentTransition(.numericText(value: position.unrealizedPnL))
                         .animation(Motion.ticker, value: position.unrealizedPnL)
                     PercentText(value: position.unrealizedPnLPercent)
@@ -358,6 +406,9 @@ fileprivate struct OrderRow: View {
                             Text(order.symbol)
                                 .font(TarsTheme.Text.heading)
                                 .foregroundStyle(TarsTheme.inkPrimary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .layoutPriority(1)
                             Text(order.side.label.uppercased())
                                 .font(TarsTheme.Text.micro)
                                 .foregroundStyle(order.side == .buy ? TarsTheme.gain : TarsTheme.loss)
@@ -365,6 +416,8 @@ fileprivate struct OrderRow: View {
                         Text(orderSummary)
                             .font(TarsTheme.Text.priceSmall)
                             .foregroundStyle(TarsTheme.inkSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     Spacer(minLength: TarsTheme.Space.s)
                     OrderStatusPill(status: order.status)

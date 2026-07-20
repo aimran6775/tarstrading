@@ -106,18 +106,23 @@ struct TarsPanelView: View {
             Button(action: sendDraft) {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 32))
-                    .foregroundStyle(draft.isEmpty ? TarsTheme.inkTertiary : TarsTheme.accent)
+                    .foregroundStyle(trimmedDraft.isEmpty ? TarsTheme.inkTertiary : TarsTheme.accent)
                     .symbolEffect(.bounce, value: tars.isStreaming)
             }
             .buttonStyle(PressableStyle())
-            .disabled(draft.isEmpty || tars.isStreaming)
+            .disabled(trimmedDraft.isEmpty || tars.isStreaming)
             .accessibilityLabel("Send message")
         }
         .padding(TarsTheme.Space.l)
     }
 
+    private var trimmedDraft: String {
+        draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func sendDraft() {
-        let text = draft
+        let text = trimmedDraft
+        guard !text.isEmpty, !tars.isStreaming else { return }
         draft = ""
         Haptics.tap()
         Task { await tars.send(text, trading: trading) }
@@ -148,6 +153,7 @@ private struct MessageBubble: View {
                             RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
                                 .strokeBorder(TarsTheme.hairline, lineWidth: 1)))
                 .contentTransition(.numericText())
+                .accessibilityLabel("\(message.role == .user ? "You" : "Tars"): \(message.text.isEmpty ? "typing" : message.text)")
             if message.role == .tars { Spacer(minLength: 40) }
         }
         .animation(Motion.ticker, value: message.text)

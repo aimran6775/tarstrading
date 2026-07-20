@@ -98,6 +98,9 @@ struct OrderTicketView: View {
                 Text(symbol)
                     .font(TarsTheme.Text.title)
                     .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
                 Text(assetClass.label)
                     .font(TarsTheme.Text.caption)
                     .foregroundStyle(TarsTheme.inkTertiary)
@@ -115,6 +118,8 @@ struct OrderTicketView: View {
                     SkeletonBlock(width: 140, height: 32)
                     SkeletonBlock(width: 70, height: 12)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Loading \(symbol) price")
             }
         }
     }
@@ -228,6 +233,8 @@ struct OrderTicketView: View {
                 Text(estimatedCost, format: .currency(code: "USD"))
                     .font(TarsTheme.Text.price)
                     .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .contentTransition(.numericText(value: estimatedCost))
                     .animation(Motion.ticker, value: estimatedCost)
             }
@@ -241,6 +248,8 @@ struct OrderTicketView: View {
                     Text(store.account.buyingPower, format: .currency(code: "USD"))
                         .font(TarsTheme.Text.priceSmall)
                         .foregroundStyle(TarsTheme.inkSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                 }
                 if blockedByBuyingPower {
                     Label {
@@ -582,7 +591,8 @@ fileprivate struct TicketDetentSlider: View {
         .padding(.horizontal, TarsTheme.Space.m)
         .accessibilityElement()
         .accessibilityLabel("Quantity presets")
-        .accessibilityValue("\(qty, format: .number) shares")
+        .accessibilityValue("\(qty, format: .number)")
+        .accessibilityHint("Swipe up or down to move between preset quantities.")
         .accessibilityAdjustableAction { direction in
             let i = fillIndex
             switch direction {
@@ -765,12 +775,14 @@ fileprivate struct TicketSlideToConfirm: View {
                         Text("Slide to \(side.label.lowercased()) \(symbol)")
                             .font(TarsTheme.Text.body)
                             .foregroundStyle(enabled ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                         Text(badgeText)
                             .font(TarsTheme.Text.micro)
                             .kerning(1.2)
                             .foregroundStyle(TarsTheme.bg0)
                             .padding(.horizontal, TarsTheme.Space.s)
-                            .padding(.vertical, 3)
+                            .padding(.vertical, TarsTheme.Space.xs)
                             .background(Capsule(style: .continuous).fill(TarsTheme.paperBadge))
                         Spacer()
                     }
@@ -884,6 +896,7 @@ fileprivate struct TicketFilledView: View {
                     .scaleEffect(burst ? 1 : 0.2)
             }
             .frame(height: 80)
+            .accessibilityHidden(true)
 
             if isFilled, let price = order.filledAvgPrice {
                 VStack(spacing: TarsTheme.Space.xs) {

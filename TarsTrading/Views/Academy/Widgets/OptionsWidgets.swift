@@ -326,6 +326,14 @@ fileprivate struct OWPayoffChart: View {
     let underlying: Double
     let isFlat: Bool
 
+    private var a11ySummary: String {
+        guard !isFlat else { return "Payoff chart, flat line: no legs, no payoff" }
+        let beText = breakevens.isEmpty
+            ? "no breakeven in view"
+            : "breakeven at " + breakevens.map { String(format: "%.1f", $0) }.joined(separator: " and ") + " dollars"
+        return "Payoff at expiry chart, underlying prices 60 to 140 dollars, \(beText)"
+    }
+
     private var yDomain: ClosedRange<Double> {
         let ys = points.map(\.y)
         let hi = max(ys.max() ?? 0, 3)
@@ -404,6 +412,7 @@ fileprivate struct OWPayoffChart: View {
                     .foregroundStyle(TarsTheme.inkTertiary)
             }
         }
+        .accessibilityLabel(a11ySummary)
         .overlay {
             if isFlat {
                 VStack(spacing: TarsTheme.Space.s) {
@@ -454,6 +463,7 @@ fileprivate struct OWLegRow: View {
                         .foregroundStyle(TarsTheme.inkTertiary)
                 }
                 .buttonStyle(PressableStyle())
+                .accessibilityLabel("Remove \(leg.label) leg")
             }
             HStack(spacing: TarsTheme.Space.m) {
                 Text("K \(leg.strike, format: .number.precision(.fractionLength(0)))")
@@ -465,6 +475,8 @@ fileprivate struct OWLegRow: View {
                 Slider(value: $leg.strike, in: 70...130, step: 1)
                     .tint(TarsTheme.accent)
                     .onChange(of: leg.strike) { _, _ in Haptics.tick() }
+                    .accessibilityLabel("Strike price")
+                    .accessibilityValue("\(Int(leg.strike)) dollars")
             }
         }
         .padding(TarsTheme.Space.m)
@@ -495,6 +507,7 @@ fileprivate struct OWStockRow: View {
                     .foregroundStyle(TarsTheme.inkTertiary)
             }
             .buttonStyle(PressableStyle())
+            .accessibilityLabel("Remove stock position")
         }
         .padding(TarsTheme.Space.m)
         .background(
@@ -554,6 +567,7 @@ fileprivate struct OWPresetButton: View {
                 )
         }
         .buttonStyle(PressableStyle())
+        .accessibilityHint("Replaces the current legs with this preset strategy")
     }
 }
 
@@ -571,8 +585,11 @@ fileprivate struct OWStatChip: View {
                 .font(TarsTheme.Text.priceSmall)
                 .foregroundStyle(color)
                 .contentTransition(.opacity)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
         .padding(TarsTheme.Space.m)
         .background(
             RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
@@ -784,6 +801,8 @@ fileprivate struct OWGreekTile: View {
                 .foregroundStyle(TarsTheme.inkPrimary)
                 .contentTransition(.numericText(value: value))
                 .animation(Motion.ticker, value: value)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
             Text(blurb)
                 .font(TarsTheme.Text.micro)
                 .foregroundStyle(TarsTheme.inkTertiary)
@@ -795,6 +814,8 @@ fileprivate struct OWGreekTile: View {
             RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
                 .fill(TarsTheme.bg3.opacity(0.5))
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(name), \(String(format: "%+.\(fractionDigits)f", value)). \(blurb)")
     }
 }
 
@@ -867,6 +888,8 @@ fileprivate struct OWDeltaSlopeViz: View {
         .animation(Motion.fluid, value: vol)
         .animation(Motion.fluid, value: days)
         .animation(Motion.fluid, value: isCall)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Option price curve versus stock price, with a tangent line at spot whose slope is delta, \(String(format: "%.2f", delta))")
     }
 }
 
@@ -906,6 +929,8 @@ fileprivate struct OWThetaMeltViz: View {
             }
             Spacer(minLength: 0)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Time value melt gauge: \(Int(days)) days left, \(Int(timeValueFraction * 100)) percent of time value remaining")
     }
 }
 
@@ -947,6 +972,8 @@ fileprivate struct OWVegaWidthViz: View {
         .animation(Motion.fluid, value: vol)
         .animation(Motion.fluid, value: days)
         .animation(Motion.fluid, value: spot)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Bell curve of possible expiry prices — it widens as volatility or time increases. Volatility is currently \(Int(vol * 100)) percent")
     }
 }
 
@@ -967,6 +994,8 @@ fileprivate struct OWLabSlider: View {
             Slider(value: $value, in: range, step: step)
                 .tint(TarsTheme.accent)
                 .onChange(of: value) { _, _ in onChanged() }
+                .accessibilityLabel(label)
+                .accessibilityValue(valueText)
             Text(valueText)
                 .font(TarsTheme.Text.priceSmall)
                 .foregroundStyle(TarsTheme.inkPrimary)
@@ -987,6 +1016,7 @@ fileprivate struct OWTarsCaption: View {
                 .font(TarsTheme.Text.caption)
                 .foregroundStyle(TarsTheme.accent)
                 .padding(.top, 2)
+                .accessibilityHidden(true)
             Text(text)
                 .font(TarsTheme.Text.caption)
                 .foregroundStyle(TarsTheme.inkSecondary)

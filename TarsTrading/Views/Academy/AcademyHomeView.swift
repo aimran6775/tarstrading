@@ -64,6 +64,8 @@ struct AcademyHomeView: View {
                             .font(TarsTheme.Text.micro)
                             .foregroundStyle(TarsTheme.inkTertiary)
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(progress.state.xp) experience points")
 
                     HStack(spacing: TarsTheme.Space.xs) {
                         Image(systemName: "flame.fill")
@@ -74,10 +76,12 @@ struct AcademyHomeView: View {
                             .font(TarsTheme.Text.priceSmall)
                             .foregroundStyle(TarsTheme.inkPrimary)
                             .contentTransition(.numericText(value: Double(progress.state.streakDays)))
-                        Text(progress.state.streakDays == 1 ? "day streak" : "day streak")
+                        Text("day streak")
                             .font(TarsTheme.Text.micro)
                             .foregroundStyle(TarsTheme.inkTertiary)
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(progress.state.streakDays) day streak")
                 }
 
                 Text("Learn the mechanics. The market grades the exam.")
@@ -147,6 +151,7 @@ struct AcademyHomeView: View {
             Image(systemName: "graduationcap")
                 .font(.system(size: 44))
                 .foregroundStyle(TarsTheme.inkTertiary)
+                .accessibilityHidden(true)
             Text("No lessons registered yet")
                 .font(TarsTheme.Text.heading)
                 .foregroundStyle(TarsTheme.inkPrimary)
@@ -179,6 +184,8 @@ fileprivate struct OverallRing: View {
                 .font(TarsTheme.Text.priceSmall)
                 .foregroundStyle(TarsTheme.inkPrimary)
                 .contentTransition(.numericText(value: fraction))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
         .onAppear {
             withAnimation(Motion.molasses.delay(0.25)) { shown = fraction }
@@ -239,6 +246,8 @@ fileprivate struct AudienceChooser: View {
                                                             lineWidth: 1)))
             }
             .buttonStyle(PressableStyle())
+            .accessibilityLabel("Start as \(audience.rawValue)")
+            .accessibilityHint("Reorders the tracks to fit where you're starting from")
         }
     }
 }
@@ -284,6 +293,7 @@ fileprivate struct TrackCard: View {
                     }
                 }
                 .frame(height: 5)
+                .accessibilityHidden(true)
 
                 HStack {
                     Text("\(track.lessons.count) \(track.lessons.count == 1 ? "lesson" : "lessons")")
@@ -300,6 +310,8 @@ fileprivate struct TrackCard: View {
         .padding(TarsTheme.Space.l)
         .frame(maxWidth: .infinity, alignment: .leading)
         .tarsPanel(elevation: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(track.title). \(track.tagline). \(track.lessons.count) \(track.lessons.count == 1 ? "lesson" : "lessons"), \(Int(fraction * 100)) percent complete")
     }
 }
 
@@ -399,6 +411,8 @@ fileprivate struct LessonRow: View {
         .padding(TarsTheme.Space.l)
         .frame(maxWidth: .infinity, alignment: .leading)
         .tarsPanel(elevation: 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(lesson.title), \(lesson.minutes) minutes, \(lesson.xp) XP\(lesson.mission != nil ? ", includes a mission" : "")\(done ? ", completed" : "")")
     }
 
     private func chip(icon: String, text: String, tint: Color) -> some View {

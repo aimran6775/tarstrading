@@ -204,6 +204,8 @@ fileprivate struct ArmedAlertRow: View {
                 Text(alert.symbol)
                     .font(TarsTheme.Text.price)
                     .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 HStack(spacing: TarsTheme.Space.xs) {
                     Image(systemName: alert.kind.iconName)
                         .font(TarsTheme.Text.micro)
@@ -253,6 +255,8 @@ fileprivate struct DisarmedAlertRow: View {
                 Text(alert.symbol)
                     .font(TarsTheme.Text.price)
                     .foregroundStyle(TarsTheme.inkSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Text("\(alert.kind.label) \(alert.threshold, format: .currency(code: "USD")) · disarmed")
                     .font(TarsTheme.Text.priceSmall)
                     .foregroundStyle(TarsTheme.inkTertiary)
@@ -280,6 +284,8 @@ fileprivate struct FiredAlertRow: View {
                 Text(alert.symbol)
                     .font(TarsTheme.Text.price)
                     .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Text("\(alert.kind.label) \(alert.threshold, format: .currency(code: "USD"))")
                     .font(TarsTheme.Text.priceSmall)
                     .foregroundStyle(TarsTheme.inkSecondary)
@@ -303,6 +309,7 @@ fileprivate struct FiredAlertRow: View {
                     )
             }
             .buttonStyle(PressableStyle())
+            .accessibilityLabel("Re-arm alert for \(alert.symbol)")
         }
         .padding(.vertical, TarsTheme.Space.s)
     }
@@ -449,6 +456,20 @@ fileprivate struct AlertComposerSheet: View {
     }
 
     var body: some View {
+        ScrollView {
+            composerContent
+        }
+        .background(TarsTheme.bg1)
+        .onAppear {
+            if symbol.isEmpty {
+                symbol = symbols.first ?? "AAPL"
+                prefillPrice()
+            }
+        }
+        .onChange(of: symbol) { _, _ in prefillPrice() }
+    }
+
+    private var composerContent: some View {
         VStack(alignment: .leading, spacing: TarsTheme.Space.l) {
             HStack {
                 Text("New Tripwire")
@@ -505,6 +526,7 @@ fileprivate struct AlertComposerSheet: View {
                         .font(TarsTheme.Text.price)
                         .foregroundStyle(TarsTheme.inkPrimary)
                         .keyboardType(.decimalPad)
+                        .accessibilityLabel("Threshold price in dollars")
                 }
                 .padding(TarsTheme.Space.m)
                 .tarsPanel(elevation: 2)
@@ -548,14 +570,6 @@ fileprivate struct AlertComposerSheet: View {
             .disabled(!canSave)
         }
         .padding(TarsTheme.Space.xl)
-        .background(TarsTheme.bg1)
-        .onAppear {
-            if symbol.isEmpty {
-                symbol = symbols.first ?? "AAPL"
-                prefillPrice()
-            }
-        }
-        .onChange(of: symbol) { _, _ in prefillPrice() }
     }
 
     private func prefillPrice() {
