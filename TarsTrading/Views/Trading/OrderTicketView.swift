@@ -644,25 +644,56 @@ fileprivate struct TicketPercentField: View {
 
 // MARK: - Stepper button
 
+/// Stepper with press-and-hold acceleration: single tap steps once; holding
+/// repeats at 5×/s after 0.6s and sprints at 25×/s after 1.6s — big quantities
+/// without big thumb work.
 fileprivate struct TicketStepButton: View {
     let systemName: String
     let enabled: Bool
     let action: () -> Void
 
+    @State private var pressed = false
+    @State private var repeatTask: Task<Void, Never>?
+
     var body: some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(TarsTheme.Text.heading)
-                .foregroundStyle(enabled ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
-                .frame(width: 44, height: 44)
-                .background(
-                    Circle()
-                        .fill(TarsTheme.bg3)
-                        .overlay(Circle().strokeBorder(TarsTheme.hairline, lineWidth: 1))
-                )
-        }
-        .buttonStyle(PressableStyle())
-        .disabled(!enabled)
+        Image(systemName: systemName)
+            .font(TarsTheme.Text.heading)
+            .foregroundStyle(enabled ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
+            .frame(width: TarsTheme.Metrics.minTarget, height: TarsTheme.Metrics.minTarget)
+            .background(
+                Circle()
+                    .fill(TarsTheme.bg3)
+                    .overlay(Circle().strokeBorder(TarsTheme.hairline, lineWidth: 1))
+            )
+            .scaleEffect(pressed ? 0.94 : 1)
+            .brightness(pressed ? -0.06 : 0)
+            .animation(Motion.instant, value: pressed)
+            .contentShape(Circle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard enabled, !pressed else { return }
+                        pressed = true
+                        action()
+                        repeatTask = Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(600))
+                            var interval: UInt64 = 200
+                            let sprintAt = ContinuousClock.now.advanced(by: .seconds(1))
+                            while !Task.isCancelled {
+                                action()
+                                if ContinuousClock.now > sprintAt { interval = 40 }
+                                try? await Task.sleep(for: .milliseconds(interval))
+                            }
+                        }
+                    }
+                    .onEnded { _ in
+                        pressed = false
+                        repeatTask?.cancel()
+                        repeatTask = nil
+                    }
+            )
+            .opacity(enabled ? 1 : 0.6)
+            .accessibilityAddTraits(.isButton)
     }
 }
 
