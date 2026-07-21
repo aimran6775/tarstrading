@@ -83,11 +83,13 @@ public struct ScreenerView: View {
 
     private var resultsList: some View {
         VStack(spacing: 0) {
-            Picker("View", selection: $resultsMode) {
-                Text("List").tag(ResultsMode.list)
-                Text("Heatmap").tag(ResultsMode.heatmap)
+            SlidingCapsulePicker(options: [ResultsMode.list, .heatmap],
+                                 selection: $resultsMode) { mode, selected in
+                Text(mode == .list ? "List" : "Heatmap")
+                    .font(TarsTheme.Text.caption)
+                    .foregroundStyle(selected ? TarsTheme.inkPrimary : TarsTheme.inkSecondary)
             }
-            .pickerStyle(.segmented)
+            .accessibilityLabel("Results view")
             .padding(.horizontal, TarsTheme.Space.xl)
             .padding(.top, TarsTheme.Space.m)
 

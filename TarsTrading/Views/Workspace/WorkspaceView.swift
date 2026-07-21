@@ -200,6 +200,9 @@ struct WorkspaceView: View {
         HStack(spacing: TarsTheme.Space.m) {
             WorkspacePresetPicker(selection: $preset, reduceMotion: reduceMotion)
             Spacer(minLength: TarsTheme.Space.s)
+            if !MarketClock.isOpen(.usEquity) {
+                MarketClosedChip()
+            }
             WorkspaceModeStamp(text: store.mode.badgeText)
             if preset != .trade {
                 Button {
@@ -270,6 +273,17 @@ struct WorkspaceView: View {
                                format: .currency(code: "USD").precision(.fractionLength(2)),
                                font: TarsTheme.Text.price)
                     PercentText(value: quote.changePercent)
+                    // The flagship price owes the same honesty as everywhere
+                    // else: say so when the quote has gone stale.
+                    if quote.age > 300 {
+                        Label {
+                            Text("as of \(quote.asOf.formatted(.relative(presentation: .named)))")
+                        } icon: {
+                            Image(systemName: "clock")
+                        }
+                        .font(TarsTheme.Text.micro)
+                        .foregroundStyle(TarsTheme.inkTertiary)
+                    }
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(

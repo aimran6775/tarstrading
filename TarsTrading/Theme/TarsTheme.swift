@@ -149,6 +149,22 @@ enum TarsTheme {
 
 // MARK: - Reusable chrome
 
+/// Quiet session marker: prices look live at 3am unless we say otherwise.
+/// Shown wherever equity prices headline while the US session is closed.
+struct MarketClosedChip: View {
+    var body: some View {
+        Label("Market closed", systemImage: "moon.zzz.fill")
+            .font(TarsTheme.Text.micro)
+            .foregroundStyle(TarsTheme.inkTertiary)
+            .padding(.horizontal, TarsTheme.Space.s)
+            .padding(.vertical, TarsTheme.Space.xs)
+            .background(
+                Capsule(style: .continuous).fill(TarsTheme.bg2)
+                    .overlay(Capsule(style: .continuous).strokeBorder(TarsTheme.hairline, lineWidth: 1)))
+            .accessibilityLabel("US equity market is closed. Prices are from the last session.")
+    }
+}
+
 /// THE paper-mode stamp. One treatment everywhere the honesty marker appears
 /// (Law 9: restyle it endlessly, never dilute it — and never fork it).
 struct PaperBadge: View {

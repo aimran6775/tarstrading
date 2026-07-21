@@ -762,7 +762,7 @@ fileprivate struct LabActivityRow: View {
                 .padding(.horizontal, TarsTheme.Space.s)
                 .padding(.vertical, TarsTheme.Space.xs)
                 .background(Capsule().fill(TarsTheme.agentPurple.opacity(0.14)))
-                .frame(width: 128, alignment: .leading)
+                .frame(minWidth: 72, maxWidth: 168, alignment: .leading)
 
             Text(item.text)
                 .font(TarsTheme.Text.body)

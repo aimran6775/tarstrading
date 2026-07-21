@@ -127,6 +127,7 @@ struct RootView: View {
             agentLab.connect(trading: store)
             alertEngine.start(store: store)
             Sound.enabled = prefs.soundOn
+            Haptics.enabled = prefs.hapticsOn
         }
         .environment(\.alertEngine, alertEngine)
     }

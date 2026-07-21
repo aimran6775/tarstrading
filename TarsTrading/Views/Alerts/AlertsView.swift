@@ -37,6 +37,9 @@ public struct AlertsView: View {
         .animation(Motion.spatial, value: engine.permission == .denied)
     }
 
+    @State private var pendingDelete: AlertEngine.PriceAlert?
+
+    // Destructive weight: an ARMED alert is a promise; deleting it confirms.
     private var alertList: some View {
         List {
             if !engine.armed.isEmpty {
@@ -47,7 +50,7 @@ public struct AlertsView: View {
                             .listRowSeparatorTint(TarsTheme.hairline)
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
-                                    engine.remove(alert)
+                                    pendingDelete = alert
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -71,7 +74,7 @@ public struct AlertsView: View {
                             .listRowSeparatorTint(TarsTheme.hairline)
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
-                                    engine.remove(alert)
+                                    pendingDelete = alert
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -113,6 +116,23 @@ public struct AlertsView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .animation(Motion.spatial, value: engine.alerts)
+        .confirmationDialog(
+            "Delete this armed alert?",
+            isPresented: .init(get: { pendingDelete != nil },
+                               set: { if !$0 { pendingDelete = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Delete alert", role: .destructive) {
+                if let alert = pendingDelete {
+                    Haptics.warning()
+                    engine.remove(alert)
+                }
+                pendingDelete = nil
+            }
+            Button("Keep watching", role: .cancel) { pendingDelete = nil }
+        } message: {
+            Text("It's armed and watching the market. Deleting stops it silently.")
+        }
     }
 
     /// Manually disarmed but never fired — parked, not history.
@@ -507,12 +527,13 @@ fileprivate struct AlertComposerSheet: View {
             // Direction
             VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
                 fieldLabel("Fires when price crosses")
-                Picker("Direction", selection: $kind) {
-                    ForEach(AlertEngine.PriceAlert.Kind.allCases) { k in
-                        Text(k.label).tag(k)
-                    }
+                SlidingCapsulePicker(options: Array(AlertEngine.PriceAlert.Kind.allCases),
+                                     selection: $kind) { k, selected in
+                    Text(k.label)
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(selected ? TarsTheme.inkPrimary : TarsTheme.inkSecondary)
                 }
-                .pickerStyle(.segmented)
+                .accessibilityLabel("Direction")
             }
 
             // Threshold

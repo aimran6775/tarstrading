@@ -89,6 +89,8 @@ struct JournalView: View {
                     if let winRate {
                         Text(winRate, format: .percent.precision(.fractionLength(0)))
                             .foregroundStyle(TarsTheme.inkPrimary)
+                            .contentTransition(.numericText(value: winRate))
+                            .animation(Motion.ticker, value: winRate)
                     } else {
                         Text("—").foregroundStyle(TarsTheme.inkTertiary)
                     }

@@ -63,23 +63,28 @@ enum Motion {
 /// Law: no haptic answers *incoming* data — haptics respond to the user's own
 /// actions, plus fills and alerts they explicitly armed.
 enum Haptics {
+    /// Master gate, wired to the user's Settings preference. When off, every
+    /// call is a no-op (the toggle used to be decorative — never again).
+    static var enabled = true
+
     private static let light = UIImpactFeedbackGenerator(style: .light)
     private static let medium = UIImpactFeedbackGenerator(style: .medium)
     private static let heavy = UIImpactFeedbackGenerator(style: .heavy)
     private static let notify = UINotificationFeedbackGenerator()
     private static let select = UISelectionFeedbackGenerator()
 
-    static func tick() { select.selectionChanged() }          // crosshair detents, steppers
-    static func tap() { light.impactOccurred() }              // generic touch response
-    static func confirm() { medium.impactOccurred() }         // order staged
-    static func success() { notify.notificationOccurred(.success) }
-    static func warning() { notify.notificationOccurred(.warning) }
-    static func failure() { notify.notificationOccurred(.error) }
+    static func tick() { guard enabled else { return }; select.selectionChanged() }   // crosshair detents, steppers
+    static func tap() { guard enabled else { return }; light.impactOccurred() }        // generic touch response
+    static func confirm() { guard enabled else { return }; medium.impactOccurred() }   // order staged
+    static func success() { guard enabled else { return }; notify.notificationOccurred(.success) }
+    static func warning() { guard enabled else { return }; notify.notificationOccurred(.warning) }
+    static func failure() { guard enabled else { return }; notify.notificationOccurred(.error) }
 
     // MARK: Signature patterns
 
     /// Order filled: a heartbeat — strong tap then an echo, 80ms apart.
     static func fill() {
+        guard enabled else { return }
         guard let engine = engine else { heavy.impactOccurred(); return }
         play(engine: engine, events: [
             transient(at: 0, intensity: 0.9, sharpness: 0.55),
@@ -89,6 +94,7 @@ enum Haptics {
 
     /// Stop-loss / protective trigger: three descending transients — a falling feeling.
     static func stopTriggered() {
+        guard enabled else { return }
         guard let engine = engine else { notify.notificationOccurred(.warning); return }
         play(engine: engine, events: [
             transient(at: 0, intensity: 0.8, sharpness: 0.6),
@@ -99,6 +105,7 @@ enum Haptics {
 
     /// Agent kill switch: a continuous rumble ramping down — powering off.
     static func killSwitch() {
+        guard enabled else { return }
         guard let engine = engine else { heavy.impactOccurred(); return }
         let curve = CHHapticParameterCurve(
             parameterID: .hapticIntensityControl,

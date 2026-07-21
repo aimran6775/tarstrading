@@ -258,6 +258,9 @@ fileprivate struct TrackCard: View {
     let track: Track
     let fraction: Double
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var barShown: CGFloat = 0
+
     var body: some View {
         VStack(alignment: .leading, spacing: TarsTheme.Space.l) {
             HStack(spacing: TarsTheme.Space.m) {
@@ -288,12 +291,18 @@ fileprivate struct TrackCard: View {
                         Capsule().fill(TarsTheme.bg3)
                         Capsule()
                             .fill(track.accent)
-                            .frame(width: max(geo.size.width * fraction, fraction > 0 ? 6 : 0))
+                            .frame(width: max(geo.size.width * fraction * barShown, fraction > 0 ? 6 : 0))
                             .animation(Motion.spatial, value: fraction)
                     }
                 }
                 .frame(height: 5)
                 .accessibilityHidden(true)
+                .onAppear {
+                    guard barShown == 0 else { return }
+                    if reduceMotion { barShown = 1 } else {
+                        withAnimation(Motion.grand.delay(0.1)) { barShown = 1 }
+                    }
+                }
 
                 HStack {
                     Text("\(track.lessons.count) \(track.lessons.count == 1 ? "lesson" : "lessons")")

@@ -625,29 +625,15 @@ fileprivate struct BTTradeSection: View {
         VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
             BTSectionHeader(text: "Trade log")
 
-            HStack(spacing: TarsTheme.Space.s) {
-                ForEach(BTTradeFilter.allCases) { f in
-                    Button {
-                        Haptics.tick()
-                        withAnimation(Motion.snappy) { filter = f }
-                    } label: {
-                        Text("\(f.rawValue) · \(count(f))")
-                            .font(TarsTheme.Text.caption)
-                            .monospacedDigit()
-                            .foregroundStyle(filter == f ? TarsTheme.inkPrimary : TarsTheme.inkSecondary)
-                            .padding(.horizontal, TarsTheme.Space.m)
-                            .padding(.vertical, TarsTheme.Space.s)
-                            .background(
-                                Capsule().fill(filter == f ? TarsTheme.accent.opacity(0.18) : TarsTheme.bg3)
-                                    .overlay(
-                                        Capsule().strokeBorder(
-                                            filter == f ? TarsTheme.accent.opacity(0.6) : TarsTheme.hairline,
-                                            lineWidth: 1)
-                                    )
-                            )
-                    }
-                    .buttonStyle(PressableStyle())
+            HStack {
+                SlidingCapsulePicker(options: Array(BTTradeFilter.allCases),
+                                     selection: $filter) { f, selected in
+                    Text("\(f.rawValue) · \(count(f))")
+                        .font(TarsTheme.Text.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(selected ? TarsTheme.inkPrimary : TarsTheme.inkSecondary)
                 }
+                .accessibilityLabel("Trade filter")
                 Spacer()
             }
 

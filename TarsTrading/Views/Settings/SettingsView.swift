@@ -38,7 +38,14 @@ public struct SettingsView: View {
         }
         .background(TarsTheme.bg0)
         .navigationTitle("Settings")
-        .onAppear { Sound.enabled = prefs.soundOn }
+        .onAppear {
+            Sound.enabled = prefs.soundOn
+            Haptics.enabled = prefs.hapticsOn
+        }
+        .onChange(of: prefs.hapticsOn) { _, on in
+            Haptics.enabled = on
+            if on { Haptics.confirm() }   // let the toggle answer in kind
+        }
         .onChange(of: prefs.soundOn) { _, on in
             Sound.enabled = on
             if on { Sound.orderStaged.play() }
@@ -68,12 +75,13 @@ public struct SettingsView: View {
                 Text("Complexity")
                     .font(TarsTheme.Text.caption)
                     .foregroundStyle(TarsTheme.inkSecondary)
-                Picker("Complexity", selection: $prefs.complexity.animation(Motion.snappy)) {
-                    ForEach(PreferencesStore.ComplexityMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
+                SlidingCapsulePicker(options: Array(PreferencesStore.ComplexityMode.allCases),
+                                     selection: $prefs.complexity) { mode, selected in
+                    Text(mode.rawValue)
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(selected ? TarsTheme.inkPrimary : TarsTheme.inkSecondary)
                 }
-                .pickerStyle(.segmented)
+                .accessibilityLabel("Complexity")
                 .onChange(of: prefs.complexity) { _, _ in Haptics.tick() }
 
                 Text(prefs.complexity == .simple
@@ -196,12 +204,13 @@ public struct SettingsView: View {
                 Text("Thesis prompts")
                     .font(TarsTheme.Text.caption)
                     .foregroundStyle(TarsTheme.inkSecondary)
-                Picker("Thesis prompts", selection: thesisPromptMode.animation(Motion.snappy)) {
-                    ForEach(TradingStore.ThesisPromptMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
+                SlidingCapsulePicker(options: Array(TradingStore.ThesisPromptMode.allCases),
+                                     selection: thesisPromptMode) { mode, selected in
+                    Text(mode.rawValue)
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(selected ? TarsTheme.inkPrimary : TarsTheme.inkSecondary)
                 }
-                .pickerStyle(.segmented)
+                .accessibilityLabel("Thesis prompts")
                 .onChange(of: thesisPromptModeRaw) { _, _ in Haptics.tick() }
 
                 Text(thesisPromptFootnote)

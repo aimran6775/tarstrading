@@ -200,7 +200,9 @@ final class TradingStore {
     }
 
     private func handleFill(_ order: Order, closing: Position? = nil) {
-        Haptics.fill()
+        // Haptic law: fills answer the user's own orders. Agent fills are
+        // incoming data — they log and glow, but never buzz the wrist.
+        if order.agentID == nil { Haptics.fill() }
         let price = order.filledAvgPrice ?? 0
         let promptMode = ThesisPromptMode.current
         if let closing {

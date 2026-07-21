@@ -135,7 +135,12 @@ struct PortfolioView: View {
                     }
                 }
                 Spacer()
-                PortfolioModeStamp(text: store.mode.badgeText)
+                VStack(alignment: .trailing, spacing: TarsTheme.Space.xs) {
+                    PortfolioModeStamp(text: store.mode.badgeText)
+                    if !MarketClock.isOpen(.usEquity) {
+                        MarketClosedChip()
+                    }
+                }
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Portfolio equity")

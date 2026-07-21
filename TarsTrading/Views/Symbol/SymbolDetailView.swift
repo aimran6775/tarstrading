@@ -14,6 +14,8 @@ struct SymbolDetailView: View {
     @State private var dayBars: [Bar] = []
     @State private var yearBars: [Bar] = []
     @State private var isLoadingBars = true
+    @State private var barLoadError: String?
+    @State private var reloadAttempt = 0
     @State private var fallbackQuote: Quote?
     @State private var starBounce = 0
 
@@ -45,7 +47,7 @@ struct SymbolDetailView: View {
         .sheet(item: $ticketSide) { side in
             OrderTicketView(symbol: symbol, side: side)
         }
-        .task(id: symbol) { await loadData() }
+        .task(id: "\(symbol)#\(reloadAttempt)") { await loadData() }
     }
 
     // MARK: - Header
@@ -181,6 +183,31 @@ struct SymbolDetailView: View {
             Text("Tap any stat to learn what it means.")
                 .font(TarsTheme.Text.caption)
                 .foregroundStyle(TarsTheme.inkTertiary)
+            if let barLoadError {
+                HStack(spacing: TarsTheme.Space.s) {
+                    Image(systemName: "wifi.exclamationmark")
+                        .foregroundStyle(TarsTheme.warning)
+                    Text(barLoadError)
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(TarsTheme.inkSecondary)
+                    Spacer()
+                    Button {
+                        Haptics.tap()
+                        reloadAttempt += 1
+                    } label: {
+                        Text("Retry")
+                            .font(TarsTheme.Text.caption)
+                            .foregroundStyle(TarsTheme.accent)
+                            .frame(minHeight: TarsTheme.Metrics.minTarget)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressableStyle())
+                    .accessibilityLabel("Retry loading history")
+                }
+                .padding(.horizontal, TarsTheme.Space.l)
+                .tarsPanel()
+                .transition(.opacity)
+            }
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: 170), spacing: TarsTheme.Space.m)],
                 spacing: TarsTheme.Space.m
@@ -189,6 +216,7 @@ struct SymbolDetailView: View {
                     TarsSymbolStatCell(stat: stat)
                 }
             }
+            .animation(Motion.snappy, value: isLoadingBars)
         }
     }
 
@@ -255,6 +283,7 @@ struct SymbolDetailView: View {
 
     private func loadData() async {
         isLoadingBars = true
+        barLoadError = nil
         dayBars = []
         yearBars = []
         if store.quote(for: symbol) == nil {
@@ -262,9 +291,18 @@ struct SymbolDetailView: View {
         }
         async let day = store.marketData.bars(symbol: symbol, timeframe: .day1)
         async let year = store.marketData.bars(symbol: symbol, timeframe: .year1)
-        dayBars = (try? await day) ?? []
-        yearBars = (try? await year) ?? []
-        isLoadingBars = false
+        // A network failure must not masquerade as "no data": capture it,
+        // show it, and offer a retry.
+        do {
+            dayBars = try await day
+            yearBars = try await year
+        } catch is CancellationError {
+        } catch let error as TarsError {
+            barLoadError = error.errorDescription ?? "Couldn't load history."
+        } catch {
+            barLoadError = "Couldn't load history — check the connection."
+        }
+        withAnimation(Motion.snappy) { isLoadingBars = false }
     }
 }
 

@@ -18,7 +18,9 @@ struct ChartView: View {
 
     @State private var timeframe: Timeframe = .month3
     @State private var cache: [Timeframe: [Bar]] = [:]
-    @State private var loadFailure: String?
+    // Failures are keyed per timeframe so switching to an uncached
+    // timeframe never flashes another timeframe's stale error.
+    @State private var loadFailures: [Timeframe: String] = [:]
     @State private var attempt = 0
 
     @State private var style: PriceStyle = .candles
@@ -48,7 +50,7 @@ struct ChartView: View {
         if let bars = cache[timeframe] {
             return bars.count > 1 ? .ready(bars) : .empty
         }
-        if let loadFailure { return .failed(loadFailure) }
+        if let failure = loadFailures[timeframe] { return .failed(failure) }
         return .loading
     }
 
@@ -78,7 +80,7 @@ struct ChartView: View {
         .onAppear { drawings = ChartDrawingStore.load(symbol: symbol) }
         .onChange(of: symbol) { _, newSymbol in
             cache = [:]
-            loadFailure = nil
+            loadFailures = [:]
             crossIndex = nil
             crossPrice = nil
             drawings = ChartDrawingStore.load(symbol: newSymbol)
@@ -90,7 +92,7 @@ struct ChartView: View {
     // MARK: - Loading
 
     private func load() async {
-        loadFailure = nil
+        loadFailures[timeframe] = nil
         guard cache[timeframe] == nil else { return }
         do {
             let bars = try await store.marketData.bars(symbol: symbol, timeframe: timeframe)
@@ -101,9 +103,9 @@ struct ChartView: View {
         } catch is CancellationError {
             // superseded by a newer request — nothing to surface
         } catch let error as TarsError {
-            loadFailure = error.errorDescription ?? "Something went wrong."
+            loadFailures[timeframe] = error.errorDescription ?? "Something went wrong."
         } catch {
-            loadFailure = error.localizedDescription
+            loadFailures[timeframe] = error.localizedDescription
         }
     }
 
