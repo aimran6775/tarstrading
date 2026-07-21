@@ -34,7 +34,7 @@ public struct AlertsView: View {
                 .presentationBackground(TarsTheme.bg1)
                 .presentationDragIndicator(.visible)
         }
-        .animation(Motion.fluid, value: engine.permission == .denied)
+        .animation(Motion.spatial, value: engine.permission == .denied)
     }
 
     private var alertList: some View {
@@ -112,7 +112,7 @@ public struct AlertsView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .animation(Motion.fluid, value: engine.alerts)
+        .animation(Motion.spatial, value: engine.alerts)
     }
 
     /// Manually disarmed but never fired — parked, not history.

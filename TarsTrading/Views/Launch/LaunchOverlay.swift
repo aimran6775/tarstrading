@@ -58,9 +58,9 @@ struct LaunchOverlay: View {
         }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(150))
-            withAnimation(Motion.molasses) { stage = .formed }
+            withAnimation(Motion.grand) { stage = .formed }
             try? await Task.sleep(for: .milliseconds(900))
-            withAnimation(Motion.fluid) { stage = .branded }
+            withAnimation(Motion.spatial) { stage = .branded }
             Haptics.tap()
             try? await Task.sleep(for: .milliseconds(1400))
             withAnimation(.easeInOut(duration: 0.6)) { stage = .gone }

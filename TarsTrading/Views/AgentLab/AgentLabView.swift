@@ -50,7 +50,7 @@ struct AgentLabView: View {
                 }
             }
             .padding(TarsTheme.Space.xl)
-            .animation(Motion.fluid, value: lab.agents)
+            .animation(Motion.spatial, value: lab.agents)
         }
         .background(TarsTheme.bg0)
         .sheet(item: $builderTarget) { target in
@@ -141,14 +141,14 @@ struct AgentLabView: View {
                 .tarsPanel()
             }
         }
-        .animation(Motion.fluid, value: lab.activity)
+        .animation(Motion.spatial, value: lab.activity)
     }
 
     // MARK: Actions
 
     private func seedStarters() {
         Haptics.success()
-        withAnimation(Motion.fluid) {
+        withAnimation(Motion.spatial) {
             for agent in AgentLab.starterAgents() {
                 lab.upsert(agent)
             }
@@ -174,7 +174,7 @@ struct AgentLabView: View {
 
     private func revive(_ agent: TradingAgent) {
         Haptics.tap()
-        withAnimation(Motion.fluid) {
+        withAnimation(Motion.spatial) {
             lab.setStatus(agent.id, .draft)
         }
         lab.recordActivity(agent: agent, text: "Revived as a draft. Backtest before it trades again.")

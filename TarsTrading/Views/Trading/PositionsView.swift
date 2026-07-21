@@ -161,7 +161,7 @@ struct PositionsPanel: View {
                         .accessibilityHint("Opens symbol detail. Long-press to close the position.")
                     }
                 }
-                .animation(Motion.fluid, value: store.positions)
+                .animation(Motion.spatial, value: store.positions)
             }
         }
         .padding(TarsTheme.Space.l)
@@ -346,7 +346,7 @@ struct OpenOrdersPanel: View {
                             order: order,
                             isExpanded: expandedOrderID == order.id,
                             onToggle: {
-                                withAnimation(Motion.fluid) {
+                                withAnimation(Motion.spatial) {
                                     expandedOrderID = expandedOrderID == order.id ? nil : order.id
                                 }
                                 Haptics.tap()
@@ -357,7 +357,7 @@ struct OpenOrdersPanel: View {
                         )
                     }
                 }
-                .animation(Motion.fluid, value: store.openOrders)
+                .animation(Motion.spatial, value: store.openOrders)
             }
         }
         .padding(TarsTheme.Space.l)
@@ -595,7 +595,7 @@ fileprivate struct OrderLifecycleView: View {
             .frame(height: 2)
             .frame(maxWidth: .infinity)
             .padding(.bottom, TarsTheme.Space.l)
-            .animation(Motion.fluid, value: reached)
+            .animation(Motion.spatial, value: reached)
     }
 
     private var accessibilitySummary: String {

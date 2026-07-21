@@ -370,7 +370,7 @@ fileprivate struct FMSleeveCard: View {
                 if reduceMotion {
                     barShown = true
                 } else {
-                    withAnimation(Motion.fluid.delay(0.1)) { barShown = true }
+                    withAnimation(Motion.spatial.delay(0.1)) { barShown = true }
                 }
             }
             .accessibilityLabel("Allocation share \(Int(share * 100)) percent")
@@ -563,7 +563,7 @@ fileprivate struct FMEmptyState: View {
             if reduceMotion {
                 appeared = true
             } else {
-                withAnimation(Motion.fluid) { appeared = true }
+                withAnimation(Motion.spatial) { appeared = true }
             }
         }
     }

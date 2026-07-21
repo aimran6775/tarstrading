@@ -150,7 +150,7 @@ public struct LessonView: View {
                 .tarsPanel(elevation: 2)
             } else {
                 Button {
-                    withAnimation(Motion.fluid) {
+                    withAnimation(Motion.spatial) {
                         progress.complete(lesson)
                         justCompleted = true
                     }
@@ -202,7 +202,7 @@ fileprivate struct BlockReveal: ViewModifier {
                     // Small, capped stagger: the first screenful cascades,
                     // everything after reveals promptly as it scrolls in.
                     let delay = Double(min(index, 6)) * 0.05
-                    withAnimation(Motion.fluid.delay(delay)) { shown = true }
+                    withAnimation(Motion.spatial.delay(delay)) { shown = true }
                 }
             }
     }
@@ -397,7 +397,7 @@ fileprivate struct QuizCard: View {
         let correct = index == quiz.correctIndex
         progress.recordQuiz(correct: correct)
 
-        withAnimation(Motion.fluid) { selection = index }
+        withAnimation(Motion.spatial) { selection = index }
 
         if correct {
             Haptics.success()
@@ -405,7 +405,7 @@ fileprivate struct QuizCard: View {
             withAnimation(Motion.snappy) { correctScale = 1.04 }
             Task {
                 try? await Task.sleep(for: .milliseconds(180))
-                withAnimation(Motion.molasses) { correctScale = 1 }
+                withAnimation(Motion.grand) { correctScale = 1 }
             }
         } else {
             Haptics.failure()
@@ -599,21 +599,21 @@ fileprivate struct MissionCard: View {
                     RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
                         .strokeBorder(TarsTheme.paperBadge.opacity(done ? 0.12 : 0.25),
                                       lineWidth: 1)))
-        .animation(Motion.fluid, value: done)
-        .animation(Motion.fluid, value: showEncouragement)
+        .animation(Motion.spatial, value: done)
+        .animation(Motion.spatial, value: showEncouragement)
     }
 
     private func verify() {
         let passed = progress.verify(mission, trading: tradingStore, tars: tarsStore)
         if passed {
             burstID += 1
-            withAnimation(Motion.molasses) {
+            withAnimation(Motion.grand) {
                 justVerified = true
                 showEncouragement = false
             }
         } else {
             Haptics.warning()
-            withAnimation(Motion.fluid) { showEncouragement = true }
+            withAnimation(Motion.spatial) { showEncouragement = true }
         }
     }
 }
@@ -638,7 +638,7 @@ fileprivate struct XPChip: View {
     }
 }
 
-/// One-shot sparkle burst — fires on appear, radiates out on Motion.molasses,
+/// One-shot sparkle burst — fires on appear, radiates out on Motion.grand,
 /// fades. Reduce-motion collapses it to a simple fade.
 fileprivate struct SparkleBurst: View {
     @State private var fired = false
@@ -660,7 +660,7 @@ fileprivate struct SparkleBurst: View {
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .onAppear {
-            withAnimation(reduceMotion ? Motion.fluid : Motion.molasses) { fired = true }
+            withAnimation(reduceMotion ? Motion.spatial : Motion.grand) { fired = true }
         }
     }
 }

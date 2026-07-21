@@ -704,7 +704,7 @@ struct LeverageSimulatorWidget: View {
     private func resetRun(newSeed: Bool) {
         stopPlayback()
         if newSeed { seed = seed &* 6_364_136_223_846_793_005 &+ 1 }
-        withAnimation(Motion.fluid) {
+        withAnimation(Motion.spatial) {
             marginCalled = false
             cursor = 0
         }
@@ -744,7 +744,7 @@ struct CompoundingCurveWidget: View {
                     value: $annualReturnPct, range: 1...12, step: 0.5
                 )
             }
-            Toggle(isOn: $missBestMonths.animation(Motion.fluid)) {
+            Toggle(isOn: $missBestMonths.animation(Motion.spatial)) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Miss the 10 best months")
                         .font(TarsTheme.Text.body)
@@ -906,7 +906,7 @@ struct CompoundingCurveWidget: View {
                 Rectangle().frame(width: geo.size.width * drawProgress)
             }
         }
-        .animation(Motion.fluid, value: missBestMonths)
+        .animation(Motion.spatial, value: missBestMonths)
         .animation(Motion.ticker, value: monthlyContribution)
         .animation(Motion.ticker, value: annualReturnPct)
         .accessibilityLabel("Thirty-year balance chart, ending at \(riskCompactUSD(active.last ?? 0))\(missBestMonths ? ", with a dashed fully-invested line ending at \(riskCompactUSD(ghost.last ?? 0))" : "")")
@@ -1057,8 +1057,8 @@ struct CorrelationMatrixWidget: View {
                     .trim(from: 0, to: 0.75 * fraction)
                     .stroke(gaugeColor, style: StrokeStyle(lineWidth: 10, lineCap: .round))
                     .rotationEffect(.degrees(135))
-                    .animation(Motion.fluid, value: fraction)
-                    .animation(Motion.fluid, value: crisis)
+                    .animation(Motion.spatial, value: fraction)
+                    .animation(Motion.spatial, value: crisis)
                 VStack(spacing: 0) {
                     Text(portfolioVol, format: .percent.precision(.fractionLength(1)))
                         .font(TarsTheme.Text.price)
@@ -1104,7 +1104,7 @@ struct CorrelationMatrixWidget: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .animation(Motion.fluid, value: crisis)
+        .animation(Motion.spatial, value: crisis)
         .accessibilityLabel("Correlation matrix, \(crisis ? "crisis" : "calm") regime")
     }
 
@@ -1129,10 +1129,10 @@ struct CorrelationMatrixWidget: View {
     private var presets: some View {
         HStack(spacing: TarsTheme.Space.s) {
             RiskChip(title: "All in one") {
-                withAnimation(Motion.fluid) { rawWeights = [100, 0, 0, 0] }
+                withAnimation(Motion.spatial) { rawWeights = [100, 0, 0, 0] }
             }
             RiskChip(title: "Spread out") {
-                withAnimation(Motion.fluid) { rawWeights = [25, 25, 25, 25] }
+                withAnimation(Motion.spatial) { rawWeights = [25, 25, 25, 25] }
             }
             Spacer()
         }
@@ -1190,7 +1190,7 @@ struct CorrelationMatrixWidget: View {
     }
 
     private var crisisToggle: some View {
-        Toggle(isOn: $crisis.animation(Motion.fluid)) {
+        Toggle(isOn: $crisis.animation(Motion.spatial)) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Crisis mode")
                     .font(TarsTheme.Text.body)

@@ -76,7 +76,7 @@ final class AlertEngine {
 
     @MainActor
     func add(_ alert: PriceAlert) {
-        withAnimation(Motion.fluid) { alerts.insert(alert, at: 0) }
+        withAnimation(Motion.spatial) { alerts.insert(alert, at: 0) }
         save()
         Haptics.confirm()
         // Lazy permission ask: the first time a tripwire exists is the first
@@ -89,7 +89,7 @@ final class AlertEngine {
 
     @MainActor
     func remove(_ alert: PriceAlert) {
-        withAnimation(Motion.fluid) { alerts.removeAll { $0.id == alert.id } }
+        withAnimation(Motion.spatial) { alerts.removeAll { $0.id == alert.id } }
         save()
         Haptics.tap()
     }
@@ -106,7 +106,7 @@ final class AlertEngine {
     @MainActor
     func rearm(_ alert: PriceAlert) {
         guard let i = alerts.firstIndex(where: { $0.id == alert.id }) else { return }
-        withAnimation(Motion.fluid) {
+        withAnimation(Motion.spatial) {
             alerts[i].firedAt = nil
             alerts[i].isArmed = true
         }
@@ -126,7 +126,7 @@ final class AlertEngine {
                   let previous = lastPrices[alert.symbol],
                   crossed(alert.kind, from: previous, to: quote.price, threshold: alert.threshold)
             else { continue }
-            withAnimation(Motion.fluid) {
+            withAnimation(Motion.spatial) {
                 alerts[i].firedAt = .now
                 alerts[i].isArmed = false
             }

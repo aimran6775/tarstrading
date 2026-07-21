@@ -186,8 +186,8 @@ struct PayoffBuilderWidget: View {
                       underlying: underlying,
                       isFlat: legs.isEmpty && !includeStock)
             .frame(height: 240)
-            .animation(Motion.fluid, value: legs)
-            .animation(Motion.fluid, value: includeStock)
+            .animation(Motion.spatial, value: legs)
+            .animation(Motion.spatial, value: includeStock)
     }
 
     private var statChips: some View {
@@ -208,14 +208,14 @@ struct PayoffBuilderWidget: View {
         VStack(spacing: TarsTheme.Space.s) {
             if includeStock {
                 OWStockRow {
-                    withAnimation(Motion.fluid) { includeStock = false }
+                    withAnimation(Motion.spatial) { includeStock = false }
                     Haptics.tap()
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
             ForEach($legs) { $leg in
                 OWLegRow(leg: $leg) {
-                    withAnimation(Motion.fluid) { legs.removeAll { $0.id == leg.id } }
+                    withAnimation(Motion.spatial) { legs.removeAll { $0.id == leg.id } }
                     Haptics.tap()
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -234,7 +234,7 @@ struct PayoffBuilderWidget: View {
     private var addLegButton: some View {
         Button {
             guard legs.count < 4 else { return }
-            withAnimation(Motion.fluid) {
+            withAnimation(Motion.spatial) {
                 legs.append(OWLeg(isLong: true, isCall: legs.count.isMultiple(of: 2), strike: 100))
             }
             Haptics.confirm()
@@ -310,7 +310,7 @@ struct PayoffBuilderWidget: View {
     }
 
     private func apply(_ preset: OWPreset) {
-        withAnimation(Motion.fluid) {
+        withAnimation(Motion.spatial) {
             legs = preset.legs
             includeStock = preset.includesStock
         }
@@ -884,10 +884,10 @@ fileprivate struct OWDeltaSlopeViz: View {
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .chartXScale(domain: 68...132)
-        .animation(Motion.fluid, value: spot)
-        .animation(Motion.fluid, value: vol)
-        .animation(Motion.fluid, value: days)
-        .animation(Motion.fluid, value: isCall)
+        .animation(Motion.spatial, value: spot)
+        .animation(Motion.spatial, value: vol)
+        .animation(Motion.spatial, value: days)
+        .animation(Motion.spatial, value: isCall)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Option price curve versus stock price, with a tangent line at spot whose slope is delta, \(String(format: "%.2f", delta))")
     }
@@ -910,7 +910,7 @@ fileprivate struct OWThetaMeltViz: View {
                                            startPoint: .top, endPoint: .bottom)
                         )
                         .frame(height: max(geo.size.height * timeValueFraction, 3))
-                        .animation(Motion.fluid, value: timeValueFraction)
+                        .animation(Motion.spatial, value: timeValueFraction)
                 }
             }
             .frame(width: 34)
@@ -969,9 +969,9 @@ fileprivate struct OWVegaWidthViz: View {
         .chartYAxis(.hidden)
         .chartXScale(domain: -40...40)
         .chartYScale(domain: 0...1.05)
-        .animation(Motion.fluid, value: vol)
-        .animation(Motion.fluid, value: days)
-        .animation(Motion.fluid, value: spot)
+        .animation(Motion.spatial, value: vol)
+        .animation(Motion.spatial, value: days)
+        .animation(Motion.spatial, value: spot)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Bell curve of possible expiry prices — it widens as volatility or time increases. Volatility is currently \(Int(vol * 100)) percent")
     }
@@ -1033,7 +1033,7 @@ fileprivate struct OWTarsCaption: View {
                         .strokeBorder(TarsTheme.accent.opacity(0.15), lineWidth: 1)
                 )
         )
-        .animation(Motion.fluid, value: text)
+        .animation(Motion.spatial, value: text)
     }
 }
 

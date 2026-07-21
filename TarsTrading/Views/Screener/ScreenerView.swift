@@ -75,7 +75,7 @@ public struct ScreenerView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .animation(reduceMotion ? nil : Motion.fluid, value: results.map(\.symbol))
+        .animation(reduceMotion ? nil : Motion.spatial, value: results.map(\.symbol))
     }
 
     private enum ResultsMode: Hashable { case list, heatmap }
@@ -96,7 +96,7 @@ public struct ScreenerView: View {
                 List { resultsSection }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
-                    .animation(reduceMotion ? nil : Motion.fluid, value: results.map(\.symbol))
+                    .animation(reduceMotion ? nil : Motion.spatial, value: results.map(\.symbol))
             case .heatmap:
                 ScrollView {
                     MarketHeatmapView()
@@ -174,7 +174,7 @@ public struct ScreenerView: View {
     }
 
     private func apply(_ preset: ScreenPreset) {
-        withAnimation(reduceMotion ? nil : Motion.fluid) { filters = preset.filters }
+        withAnimation(reduceMotion ? nil : Motion.spatial) { filters = preset.filters }
         Haptics.confirm()
     }
 
@@ -220,7 +220,7 @@ public struct ScreenerView: View {
                         .listRowSeparatorTint(TarsTheme.hairline)
                 }
             } else if rows.isEmpty {
-                EmptyResults { withAnimation(Motion.fluid) { filters = ScreenFilters() } }
+                EmptyResults { withAnimation(Motion.spatial) { filters = ScreenFilters() } }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             } else {
@@ -324,12 +324,12 @@ public struct ScreenerView: View {
         UIPasteboard.general.string = selection.joined(separator: ", ")
         Haptics.success()
         let count = selection.count
-        withAnimation(Motion.fluid) {
+        withAnimation(Motion.spatial) {
             toastText = "Copied \(count) symbol\(count == 1 ? "" : "s") — paste into an agent's universe"
         }
         Task {
             try? await Task.sleep(for: .seconds(2.4))
-            withAnimation(Motion.fluid) { toastText = nil }
+            withAnimation(Motion.spatial) { toastText = nil }
         }
     }
 
@@ -377,7 +377,7 @@ public struct ScreenerView: View {
     private func ensureMetrics(_ symbol: String) async {
         guard metrics[symbol] == nil else { return }
         if let m = await ScreenerMetricsCache.metrics(for: symbol, provider: store.marketData) {
-            withAnimation(reduceMotion ? nil : Motion.fluid) { metrics[symbol] = m }
+            withAnimation(reduceMotion ? nil : Motion.spatial) { metrics[symbol] = m }
         }
     }
 
@@ -618,7 +618,7 @@ fileprivate struct FilterPanel: View {
                 Spacer()
                 if !filters.isDefault {
                     Button("Reset") {
-                        withAnimation(Motion.fluid) { filters = ScreenFilters() }
+                        withAnimation(Motion.spatial) { filters = ScreenFilters() }
                         Haptics.tap()
                     }
                     .font(TarsTheme.Text.caption)

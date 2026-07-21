@@ -74,7 +74,7 @@ public struct OnboardingView: View {
 
     private func go(to index: Int) {
         if reduceMotion { page = index } else {
-            withAnimation(Motion.fluid) { page = index }
+            withAnimation(Motion.spatial) { page = index }
         }
     }
 

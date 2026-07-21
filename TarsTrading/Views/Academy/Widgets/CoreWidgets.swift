@@ -61,7 +61,7 @@ fileprivate struct CWCaption: View {
         }
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(Motion.fluid, value: text)
+        .animation(Motion.spatial, value: text)
     }
 }
 
@@ -234,7 +234,7 @@ struct OrderBookSimWidget: View {
                 }
                 CWCaption(text: caption)
             }
-            .animation(Motion.fluid, value: avgFill != nil)
+            .animation(Motion.spatial, value: avgFill != nil)
         }
     }
 
@@ -342,7 +342,7 @@ struct OrderBookSimWidget: View {
     }
 
     private func reset() {
-        withAnimation(Motion.fluid) {
+        withAnimation(Motion.spatial) {
             asks = Self.freshAsks
             bids = Self.freshBids
             resting = nil
@@ -386,7 +386,7 @@ struct OrderBookSimWidget: View {
 
             if filled > 0 {
                 let avg = cost / filled
-                withAnimation(Motion.fluid) {
+                withAnimation(Motion.spatial) {
                     avgFill = avg
                     slippage = avg - (bestAsk ?? avg)
                     filledQty = filled
@@ -394,7 +394,7 @@ struct OrderBookSimWidget: View {
                 Haptics.fill()
             }
 
-            withAnimation(Motion.fluid) {
+            withAnimation(Motion.spatial) {
                 switch (kind, filled > 0, qtyLeft > 0) {
                 case (.market, true, false):
                     caption = "Your market buy ate \(levelsEaten) ask level\(levelsEaten == 1 ? "" : "s"). Each level up cost a bit more — that gap between best ask and your average is slippage. Speed has a price tag."
@@ -876,7 +876,7 @@ struct DividendTimelineWidget: View {
                 }
                 CWCaption(text: caption, tone: eligible ? TarsTheme.gain : TarsTheme.loss)
             }
-            .animation(Motion.fluid, value: eligible)
+            .animation(Motion.spatial, value: eligible)
         }
     }
 

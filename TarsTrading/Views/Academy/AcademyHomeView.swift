@@ -30,12 +30,12 @@ struct AcademyHomeView: View {
             .frame(maxWidth: .infinity)
         }
         .background(TarsTheme.bg0)
-        .animation(Motion.fluid, value: progress.state.chosenAudience)
+        .animation(Motion.spatial, value: progress.state.chosenAudience)
         .onAppear {
             if reduceMotion {
                 appeared = true
             } else {
-                withAnimation(Motion.fluid.delay(0.1)) { appeared = true }
+                withAnimation(Motion.spatial.delay(0.1)) { appeared = true }
             }
         }
     }
@@ -138,7 +138,7 @@ struct AcademyHomeView: View {
                 .opacity(appeared ? 1 : 0)
                 .offset(y: appeared || reduceMotion ? 0 : 20)
                 .animation(
-                    reduceMotion ? Motion.fluid : Motion.fluid.delay(Double(index) * 0.06),
+                    reduceMotion ? Motion.spatial : Motion.spatial.delay(Double(index) * 0.06),
                     value: appeared)
             }
         }
@@ -188,10 +188,10 @@ fileprivate struct OverallRing: View {
                 .minimumScaleFactor(0.6)
         }
         .onAppear {
-            withAnimation(Motion.molasses.delay(0.25)) { shown = fraction }
+            withAnimation(Motion.grand.delay(0.25)) { shown = fraction }
         }
         .onChange(of: fraction) { _, new in
-            withAnimation(Motion.fluid) { shown = new }
+            withAnimation(Motion.spatial) { shown = new }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Overall progress \(Int(fraction * 100)) percent")
@@ -230,7 +230,7 @@ fileprivate struct AudienceChooser: View {
         ForEach(choices, id: \.rawValue) { audience in
             Button {
                 Haptics.confirm()
-                withAnimation(Motion.fluid) {
+                withAnimation(Motion.spatial) {
                     progress.state.chosenAudience = audience.rawValue
                 }
             } label: {
@@ -289,7 +289,7 @@ fileprivate struct TrackCard: View {
                         Capsule()
                             .fill(track.accent)
                             .frame(width: max(geo.size.width * fraction, fraction > 0 ? 6 : 0))
-                            .animation(Motion.fluid, value: fraction)
+                            .animation(Motion.spatial, value: fraction)
                     }
                 }
                 .frame(height: 5)

@@ -236,7 +236,7 @@ public struct AgentBuilderView: View {
                             .padding(.bottom, TarsTheme.Space.xs)
                     }
                     RuleEditorRow(rule: $rule) {
-                        withAnimation(Motion.fluid) {
+                        withAnimation(Motion.spatial) {
                             rules.wrappedValue.removeAll { $0.id == rule.id }
                         }
                         Haptics.tap()
@@ -247,7 +247,7 @@ public struct AgentBuilderView: View {
             if rules.wrappedValue.count < maxRules {
                 Button {
                     Haptics.tap()
-                    withAnimation(Motion.fluid) {
+                    withAnimation(Motion.spatial) {
                         rules.wrappedValue.append(
                             SignalRule(lhs: .rsi(14), comparator: .crossesBelow, rhs: .constant(30)))
                     }
@@ -283,7 +283,7 @@ public struct AgentBuilderView: View {
                                          : draft.thesisText)
                     .font(TarsTheme.Text.body)
                     .foregroundStyle(TarsTheme.inkPrimary)
-                    .animation(Motion.fluid, value: draft.thesisText)
+                    .animation(Motion.spatial, value: draft.thesisText)
             }
             Spacer(minLength: 0)
         }

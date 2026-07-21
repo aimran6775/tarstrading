@@ -136,7 +136,7 @@ public struct OptionsChainView: View {
                 ForEach([7, 30, 60], id: \.self) { days in
                     Button {
                         Haptics.tick()
-                        withAnimation(reduceMotion ? nil : Motion.fluid) { dte = days }
+                        withAnimation(reduceMotion ? nil : Motion.spatial) { dte = days }
                     } label: {
                         Text("\(days) DTE")
                             .font(TarsTheme.Text.caption)
@@ -441,7 +441,7 @@ public struct OptionsChainView: View {
             }
             Button {
                 Haptics.fill()
-                withAnimation(reduceMotion ? nil : Motion.fluid) {
+                withAnimation(reduceMotion ? nil : Motion.spatial) {
                     book.close(leg, mark: mark)
                 }
             } label: {

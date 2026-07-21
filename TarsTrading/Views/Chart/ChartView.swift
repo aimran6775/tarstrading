@@ -95,7 +95,7 @@ struct ChartView: View {
         do {
             let bars = try await store.marketData.bars(symbol: symbol, timeframe: timeframe)
             guard !Task.isCancelled else { return }
-            withAnimation(reduceMotion ? nil : Motion.fluid) {
+            withAnimation(reduceMotion ? nil : Motion.spatial) {
                 cache[timeframe] = bars
             }
         } catch is CancellationError {
@@ -168,7 +168,7 @@ struct ChartView: View {
     private var pencilToggle: some View {
         Button {
             Haptics.tap()
-            withAnimation(reduceMotion ? nil : Motion.fluid) {
+            withAnimation(reduceMotion ? nil : Motion.spatial) {
                 drawingMode.toggle()
                 if drawingMode {
                     crossIndex = nil
@@ -262,7 +262,7 @@ struct ChartView: View {
                 Button {
                     guard tf != timeframe else { return }
                     Haptics.tap()
-                    withAnimation(reduceMotion ? nil : Motion.fluid) {
+                    withAnimation(reduceMotion ? nil : Motion.spatial) {
                         timeframe = tf
                         crossIndex = nil
                         crossPrice = nil
@@ -298,7 +298,7 @@ struct ChartView: View {
     private var styleToggle: some View {
         Button {
             Haptics.tap()
-            withAnimation(reduceMotion ? nil : Motion.fluid) {
+            withAnimation(reduceMotion ? nil : Motion.spatial) {
                 style = style == .candles ? .line : .candles
             }
         } label: {
@@ -350,17 +350,17 @@ struct ChartView: View {
             set: { isOn in
                 Haptics.tap()
                 if isOn {
-                    withAnimation(reduceMotion ? nil : Motion.fluid) {
+                    withAnimation(reduceMotion ? nil : Motion.spatial) {
                         _ = enabled.insert(indicator)
                     }
                     fade[indicator] = 0
                     Task { @MainActor in
-                        withAnimation(reduceMotion ? nil : Motion.molasses) {
+                        withAnimation(reduceMotion ? nil : Motion.grand) {
                             fade[indicator] = 1
                         }
                     }
                 } else {
-                    withAnimation(reduceMotion ? nil : Motion.fluid) {
+                    withAnimation(reduceMotion ? nil : Motion.spatial) {
                         enabled.remove(indicator)
                         fade[indicator] = 0
                     }

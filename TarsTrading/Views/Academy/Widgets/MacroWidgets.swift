@@ -280,7 +280,7 @@ struct TermStructureWidget: View {
             HStack {
                 ForEach(MWTermPreset.allCases) { p in
                     MWChip(title: p.rawValue, active: preset == p) {
-                        withAnimation(Motion.fluid) {
+                        withAnimation(Motion.spatial) {
                             prices = p.prices
                             preset = p
                         }
@@ -506,7 +506,7 @@ struct YieldCurveSculptorWidget: View {
             HStack {
                 ForEach(MWCurvePreset.allCases) { p in
                     MWChip(title: p.rawValue, active: preset == p) {
-                        withAnimation(Motion.fluid) {
+                        withAnimation(Motion.spatial) {
                             yields = p.yields
                             preset = p
                         }

@@ -162,7 +162,7 @@ struct SymbolSearchSheet: View {
                     Spacer()
                     Button {
                         Haptics.tap()
-                        withAnimation(Motion.fluid) {
+                        withAnimation(Motion.spatial) {
                             recents = []
                             RecentSearchStore.clear()
                         }
@@ -197,7 +197,7 @@ struct SymbolSearchSheet: View {
             }
             .padding(.top, TarsTheme.Space.m)
             .padding(.bottom, TarsTheme.Space.xl)
-            .animation(Motion.fluid, value: assets)
+            .animation(Motion.spatial, value: assets)
         }
         .scrollDismissesKeyboard(.immediately)
     }
@@ -227,7 +227,7 @@ struct SymbolSearchSheet: View {
     private func runDebouncedSearch() async {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else {
-            withAnimation(Motion.fluid) { phase = .idle }
+            withAnimation(Motion.spatial) { phase = .idle }
             return
         }
         try? await Task.sleep(for: .milliseconds(300))
@@ -241,19 +241,19 @@ struct SymbolSearchSheet: View {
         do {
             let assets = try await store.marketData.search(q)
             guard !Task.isCancelled else { return }
-            withAnimation(Motion.fluid) {
+            withAnimation(Motion.spatial) {
                 phase = assets.isEmpty ? .noResults(q) : .results(assets)
             }
         } catch is CancellationError {
             // superseded by a newer keystroke — ignore
         } catch let error as TarsError {
             guard !Task.isCancelled else { return }
-            withAnimation(Motion.fluid) {
+            withAnimation(Motion.spatial) {
                 phase = .error(error.errorDescription ?? "Something went wrong.")
             }
         } catch {
             guard !Task.isCancelled else { return }
-            withAnimation(Motion.fluid) { phase = .error(error.localizedDescription) }
+            withAnimation(Motion.spatial) { phase = .error(error.localizedDescription) }
         }
     }
 
@@ -447,7 +447,7 @@ struct Sparkline: View {
                     .transition(.opacity)
             }
         }
-        .animation(Motion.fluid, value: state)
+        .animation(Motion.spatial, value: state)
         .task(id: symbol) {
             await load()
         }
@@ -568,7 +568,7 @@ struct MarketHeatmapView: View {
                     .accessibilityLabel(tileLabel(symbol))
                 }
             }
-            .animation(Motion.fluid, value: store.watchlist)
+            .animation(Motion.spatial, value: store.watchlist)
         }
     }
 
@@ -654,7 +654,7 @@ fileprivate struct HeatTile: View {
             if reduceMotion {
                 entered = true
             } else {
-                withAnimation(Motion.fluid.delay(Double(index) * 0.045)) {
+                withAnimation(Motion.spatial.delay(Double(index) * 0.045)) {
                     entered = true
                 }
             }

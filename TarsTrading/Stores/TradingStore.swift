@@ -233,13 +233,13 @@ final class TradingStore {
 
     func addToWatchlist(_ symbol: String) {
         guard !watchlist.contains(symbol) else { return }
-        withAnimation(Motion.fluid) { watchlist.append(symbol) }
+        withAnimation(Motion.spatial) { watchlist.append(symbol) }
         persistence.save(watchlist, "watchlist")
         Task { await refreshQuotes() }
     }
 
     func removeFromWatchlist(_ symbol: String) {
-        withAnimation(Motion.fluid) { watchlist.removeAll { $0 == symbol } }
+        withAnimation(Motion.spatial) { watchlist.removeAll { $0 == symbol } }
         persistence.save(watchlist, "watchlist")
     }
 

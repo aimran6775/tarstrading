@@ -268,7 +268,7 @@ fileprivate struct BTSegmentPanel: View {
                         if reduceMotion {
                             drawn = 1
                         } else {
-                            withAnimation(Motion.molasses.delay(delay)) { drawn = 1 }
+                            withAnimation(Motion.grand.delay(delay)) { drawn = 1 }
                         }
                     }
             } else {
@@ -756,7 +756,7 @@ fileprivate struct BTEmptyState: View {
             if reduceMotion {
                 appeared = true
             } else {
-                withAnimation(Motion.fluid) { appeared = true }
+                withAnimation(Motion.spatial) { appeared = true }
             }
         }
     }

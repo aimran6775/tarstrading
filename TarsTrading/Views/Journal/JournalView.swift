@@ -31,8 +31,8 @@ struct JournalView: View {
                 }
             }
             .padding(TarsTheme.Space.xl)
-            .animation(Motion.fluid, value: filter)
-            .animation(Motion.fluid, value: store.journal)
+            .animation(Motion.spatial, value: filter)
+            .animation(Motion.spatial, value: store.journal)
         }
         .background(TarsTheme.bg0)
         .scrollIndicators(.hidden)
@@ -658,7 +658,7 @@ fileprivate struct JournalEmptyState: View {
             if reduceMotion {
                 appeared = true
             } else {
-                withAnimation(Motion.molasses) { appeared = true }
+                withAnimation(Motion.grand) { appeared = true }
             }
         }
         .accessibilityElement(children: .combine)

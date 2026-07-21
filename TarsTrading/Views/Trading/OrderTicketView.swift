@@ -490,7 +490,7 @@ struct OrderTicketView: View {
             do {
                 let order = try await store.submit(draft)
                 Haptics.fill()
-                withAnimation(Motion.fluid) { phase = .filled(order) }
+                withAnimation(Motion.spatial) { phase = .filled(order) }
             } catch let error as TarsError {
                 Haptics.failure()
                 withAnimation(Motion.snappy) { phase = .error(error) }
@@ -956,7 +956,7 @@ fileprivate struct TicketSlideToConfirm: View {
                                         Haptics.confirm()
                                         onConfirm()
                                     } else {
-                                        withAnimation(Motion.fluid) { dragX = 0 }
+                                        withAnimation(Motion.spatial) { dragX = 0 }
                                     }
                                 }
                         )
@@ -1081,7 +1081,7 @@ fileprivate struct TicketFilledView: View {
             if reduceMotion {
                 burst = true
             } else {
-                withAnimation(Motion.molasses) { burst = true }
+                withAnimation(Motion.grand) { burst = true }
             }
         }
         .accessibilityElement(children: .combine)

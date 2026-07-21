@@ -300,11 +300,11 @@ struct WorkspaceView: View {
 
     private func inspect(_ symbol: String) {
         Haptics.tap()
-        withAnimation(reduceMotion ? nil : Motion.fluid) { inspectedSymbol = symbol }
+        withAnimation(reduceMotion ? nil : Motion.spatial) { inspectedSymbol = symbol }
     }
 
     private func closeInspector() {
-        withAnimation(reduceMotion ? nil : Motion.fluid) { inspectedSymbol = nil }
+        withAnimation(reduceMotion ? nil : Motion.spatial) { inspectedSymbol = nil }
     }
 
     // MARK: - Keyboard layer (gap 16)
@@ -339,7 +339,7 @@ struct WorkspaceView: View {
     private func switchPreset(_ newPreset: WorkspacePreset) {
         guard preset != newPreset else { return }
         Haptics.tick()
-        withAnimation(reduceMotion ? nil : Motion.fluid) { preset = newPreset }
+        withAnimation(reduceMotion ? nil : Motion.spatial) { preset = newPreset }
     }
 
     private func moveWatchlistSelection(_ delta: Int) {
@@ -437,7 +437,7 @@ fileprivate struct WorkspacePresetPicker: View {
         return Button {
             guard !isSelected else { return }
             Haptics.tick()
-            withAnimation(reduceMotion ? nil : Motion.fluid) {
+            withAnimation(reduceMotion ? nil : Motion.spatial) {
                 selection = preset
             }
         } label: {

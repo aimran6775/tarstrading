@@ -269,7 +269,7 @@ public struct SettingsView: View {
                 .confirmationDialog("Clear the conversation with Tars?",
                                     isPresented: $confirmClearTars, titleVisibility: .visible) {
                     Button("Clear conversation", role: .destructive) {
-                        withAnimation(Motion.fluid) { tars.clearHistory() }
+                        withAnimation(Motion.spatial) { tars.clearHistory() }
                         Haptics.warning()
                     }
                 } message: {
@@ -389,7 +389,7 @@ public struct SettingsView: View {
                 .confirmationDialog("Delete all journal entries?",
                                     isPresented: $confirmClearJournal, titleVisibility: .visible) {
                     Button("Delete \(trading.journal.count) \(trading.journal.count == 1 ? "entry" : "entries")", role: .destructive) {
-                        withAnimation(Motion.fluid) { trading.journal.removeAll() }
+                        withAnimation(Motion.spatial) { trading.journal.removeAll() }
                         Persistence().save([JournalEntry](), "journal")
                         Haptics.warning()
                     }
@@ -410,7 +410,7 @@ public struct SettingsView: View {
                 .confirmationDialog("Reset all Academy progress?",
                                     isPresented: $confirmClearAcademy, titleVisibility: .visible) {
                     Button("Reset progress", role: .destructive) {
-                        withAnimation(Motion.fluid) { academy.state = AcademyProgress.State() }
+                        withAnimation(Motion.spatial) { academy.state = AcademyProgress.State() }
                         Persistence().save(AcademyProgress.State(), "academy")
                         Haptics.warning()
                     }
@@ -610,13 +610,13 @@ fileprivate struct SettingsDisclosuresView: View {
                             .opacity(appeared ? 1 : 0)
                             .offset(y: appeared ? 0 : 18)
                             .animation(reduceMotion ? nil
-                                       : Motion.fluid.delay(0.08 * Double(i + 1)),
+                                       : Motion.spatial.delay(0.08 * Double(i + 1)),
                                        value: appeared)
                     }
                 }
                 footer
                     .opacity(appeared ? 1 : 0)
-                    .animation(reduceMotion ? nil : Motion.molasses.delay(0.6), value: appeared)
+                    .animation(reduceMotion ? nil : Motion.grand.delay(0.6), value: appeared)
             }
             .frame(maxWidth: 620, alignment: .leading)
             .padding(TarsTheme.Space.xxl)
@@ -641,7 +641,7 @@ fileprivate struct SettingsDisclosuresView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .opacity(appeared ? 1 : 0)
-        .animation(reduceMotion ? nil : Motion.fluid, value: appeared)
+        .animation(reduceMotion ? nil : Motion.spatial, value: appeared)
     }
 
     private var footer: some View {

@@ -50,7 +50,7 @@ struct PortfolioView: View {
             if reduceMotion {
                 drawProgress = 1
             } else {
-                withAnimation(Motion.molasses.delay(0.15)) { drawProgress = 1 }
+                withAnimation(Motion.grand.delay(0.15)) { drawProgress = 1 }
             }
         }
     }
@@ -1018,7 +1018,7 @@ fileprivate struct PortfolioProportionBar: View {
             }
         }
         .frame(height: 8)
-        .animation(Motion.fluid, value: fraction)
+        .animation(Motion.spatial, value: fraction)
         .accessibilityHidden(true)   // the parent row carries the value
     }
 }

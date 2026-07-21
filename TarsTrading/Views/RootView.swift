@@ -53,7 +53,7 @@ struct RootView: View {
             TarsTheme.bg0.ignoresSafeArea()
             TarsTheme.aurora(for: store.account.dayPnL)
                 .ignoresSafeArea()
-                .animation(Motion.molasses, value: store.account.dayPnL > 0)
+                .animation(Motion.grand, value: store.account.dayPnL > 0)
 
             HStack(spacing: 0) {
                 rail
@@ -253,13 +253,13 @@ private struct ErrorToast: View {
                     dismissTask = Task {
                         try? await Task.sleep(for: .seconds(6))
                         guard !Task.isCancelled else { return }
-                        withAnimation(Motion.fluid) { store.lastError = nil }
+                        withAnimation(Motion.spatial) { store.lastError = nil }
                     }
                 }
             }
             Spacer()
         }
-        .animation(Motion.fluid, value: store.lastError == nil)
+        .animation(Motion.spatial, value: store.lastError == nil)
         .allowsHitTesting(store.lastError != nil)
     }
 }
