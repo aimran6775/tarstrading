@@ -1,34 +1,54 @@
 import SwiftUI
 
-/// The single source of visual truth. Every color, type style, spacing, and
-/// radius in the app comes from here — no raw Color/Font literals in views.
+/// The single source of visual truth. Every color, type style, spacing, radius,
+/// and material in the app comes from here — no raw literals in views.
+///
+/// Design laws this file enforces:
+/// - One material system: void → panel → card/raised → glass. No orphan grays.
+/// - Elevation by light: each step up adds luminance *and* a whisper of
+///   blue-violet, so dark surfaces feel lit by the screen, not painted gray.
+/// - Color is meaning: green/red = P&L, amber = mode, blue = interactive/Tars,
+///   purple = agents. Everything else is ink.
+/// - Wide gamut: all color is authored in Display P3.
 enum TarsTheme {
 
-    // MARK: Surfaces (dark-first, 4 elevation levels)
-    static let bg0 = Color(red: 0.031, green: 0.035, blue: 0.055)   // void — app background
-    static let bg1 = Color(red: 0.055, green: 0.063, blue: 0.094)   // panel
-    static let bg2 = Color(red: 0.086, green: 0.098, blue: 0.141)   // card
-    static let bg3 = Color(red: 0.125, green: 0.141, blue: 0.196)   // raised control
+    // MARK: Surfaces (dark-first, 4 elevation levels, P3, violet-tinted rise)
+    static let bg0 = Color(.displayP3, red: 0.027, green: 0.031, blue: 0.051)  // void — app background
+    static let bg1 = Color(.displayP3, red: 0.051, green: 0.059, blue: 0.092)  // panel
+    static let bg2 = Color(.displayP3, red: 0.082, green: 0.094, blue: 0.139)  // card
+    static let bg3 = Color(.displayP3, red: 0.122, green: 0.137, blue: 0.196)  // raised control
 
     // MARK: Ink
-    static let inkPrimary = Color(red: 0.925, green: 0.937, blue: 0.965)
-    static let inkSecondary = Color(red: 0.60, green: 0.63, blue: 0.71)
-    static let inkTertiary = Color(red: 0.40, green: 0.43, blue: 0.51)
+    static let inkPrimary = Color(.displayP3, red: 0.925, green: 0.937, blue: 0.965)
+    static let inkSecondary = Color(.displayP3, red: 0.60, green: 0.63, blue: 0.71)
+    static let inkTertiary = Color(.displayP3, red: 0.40, green: 0.43, blue: 0.51)
+    static let inkQuaternary = Color(.displayP3, red: 0.27, green: 0.29, blue: 0.36)
     static let hairline = Color.white.opacity(0.07)
+    /// Stronger hairline for Increase Contrast contexts and focused states.
+    static let hairlineStrong = Color.white.opacity(0.16)
 
     // MARK: Meaning colors — color is reserved for meaning
-    // Luminance-tuned so red/green don't vibrate against the near-black field.
-    static let gain = Color(red: 0.24, green: 0.80, blue: 0.52)      // P&L up
-    static let loss = Color(red: 0.94, green: 0.40, blue: 0.44)      // P&L down
-    static let accent = Color(red: 0.42, green: 0.62, blue: 1.0)     // interactive / Tars
-    static let paperBadge = Color(red: 1.0, green: 0.72, blue: 0.20) // mode amber
-    static let warning = Color(red: 1.0, green: 0.62, blue: 0.26)
-    static let agentPurple = Color(red: 0.66, green: 0.50, blue: 1.0) // agent activity
+    // Luminance-tuned so red/green don't vibrate against the near-black field,
+    // and differ in luminance (not just hue) for color-blind safety.
+    static let gain = Color(.displayP3, red: 0.22, green: 0.82, blue: 0.53)      // P&L up
+    static let loss = Color(.displayP3, red: 0.95, green: 0.39, blue: 0.44)      // P&L down
+    static let accent = Color(.displayP3, red: 0.40, green: 0.62, blue: 1.0)     // interactive / Tars
+    static let paperBadge = Color(.displayP3, red: 1.0, green: 0.72, blue: 0.20) // mode amber
+    static let warning = Color(.displayP3, red: 1.0, green: 0.62, blue: 0.26)
+    static let agentPurple = Color(.displayP3, red: 0.66, green: 0.50, blue: 1.0) // agent activity
 
     /// Signed value → meaning color; zero stays neutral.
     static func pnl(_ value: Double) -> Color {
         if value > 0 { gain } else if value < 0 { loss } else { inkSecondary }
     }
+
+    // MARK: State derivations — formulas, never hand-picked one-offs
+    /// Pressed: the surface dims like a physical key taking travel.
+    static func pressed(_ color: Color) -> Color { color.opacity(0.82) }
+    /// Disabled ink/tint.
+    static func disabled(_ color: Color) -> Color { color.opacity(0.38) }
+    /// Selected wash behind a tinted control (rows, rail icons, chips).
+    static func selectionWash(_ tint: Color) -> Color { tint.opacity(0.14) }
 
     // MARK: Gradients
     static let chartGain = LinearGradient(
@@ -41,8 +61,15 @@ enum TarsTheme {
         colors: [accent.opacity(0.25), agentPurple.opacity(0.12), .clear],
         startPoint: .topLeading, endPoint: .bottomTrailing)
 
+    /// The top-light: raised surfaces catch light on their upper edge. This is
+    /// how depth reads on near-black, where shadows barely work.
+    static let topLight = LinearGradient(
+        colors: [.white.opacity(0.10), .white.opacity(0.03)],
+        startPoint: .top, endPoint: .bottom)
+
     /// The whole-workspace mood light: a barely-there wash that leans gain or
-    /// loss with the day's P&L. 2-3% opacity — felt, never seen.
+    /// loss with the day's P&L. 2-3% opacity — felt, never seen. Lives on the
+    /// void layer only, never on glass.
     static func aurora(for dayPnL: Double) -> RadialGradient {
         let tint: Color = dayPnL >= 0 ? gain : loss
         let strength = min(abs(dayPnL) / 2_000, 1.0) * 0.05 + 0.015
@@ -51,42 +78,72 @@ enum TarsTheme {
             center: .top, startRadius: 0, endRadius: 900)
     }
 
-    // MARK: Type scale (monospaced digits for anything numeric)
+    // MARK: Type ramp
+    // Three voices, strictly cast: SF Pro for UI, SF Rounded for Tars/Academy
+    // warmth, monospaced digits for every number that can change.
+    // Ramp is Dynamic-Type-native: UI styles track text styles; only display
+    // numerals are fixed (they scale down via minimumScaleFactor at the view).
     enum Text {
         /// Display numerals — equity, hero prices. Big enough to feel.
         static let display = Font.system(size: 56, weight: .bold).width(.condensed).monospacedDigit()
         static let displayMedium = Font.system(size: 44, weight: .bold).width(.condensed).monospacedDigit()
-        static let hero = Font.system(size: 40, weight: .bold, design: .rounded)
-        static let title = Font.system(size: 26, weight: .bold, design: .rounded)
-        static let heading = Font.system(size: 19, weight: .semibold)
-        static let body = Font.system(size: 15)
-        static let caption = Font.system(size: 12, weight: .medium)
-        static let micro = Font.system(size: 10, weight: .semibold)
+        static let hero = Font.system(.largeTitle, design: .rounded, weight: .bold)
+        static let title = Font.system(.title2, design: .rounded, weight: .bold)
+        static let heading = Font.system(.headline, weight: .semibold)
+        /// Data-dense UI text (rows, panels). Tracks Dynamic Type.
+        static let body = Font.system(.subheadline)
+        /// Long-form reading (Academy lessons, Tars prose).
+        static let reading = Font.system(.body)
+        static let caption = Font.system(.caption, weight: .medium)
+        static let micro = Font.system(.caption2, weight: .semibold)
         static let priceHero = Font.system(size: 36, weight: .semibold).monospacedDigit()
-        static let price = Font.system(size: 17, weight: .semibold).monospacedDigit()
-        static let priceSmall = Font.system(size: 13, weight: .medium).monospacedDigit()
-        static let mono = Font.system(size: 13, design: .monospaced)
+        static let price = Font.system(.body, weight: .semibold).monospacedDigit()
+        static let priceSmall = Font.system(.footnote, weight: .medium).monospacedDigit()
+        static let mono = Font.system(.footnote, design: .monospaced)
     }
 
     // MARK: Spacing grid & shape
+    // 4pt base grid. Screen margins: iPhone 16, iPad 24. Panel padding 16,
+    // card padding 12.
     enum Space {
         static let xs: CGFloat = 4
         static let s: CGFloat = 8
         static let m: CGFloat = 12
         static let l: CGFloat = 16
         static let xl: CGFloat = 24
-        static let xxl: CGFloat = 40
+        static let xxl: CGFloat = 32
+        static let xxxl: CGFloat = 48
     }
+
     enum Radius {
         static let s: CGFloat = 8
         static let m: CGFloat = 14
         static let l: CGFloat = 22
         static let capsule: CGFloat = 999
+        /// Concentric radius law: inner radius = outer − inset (floored so
+        /// nested corners never go sharp). The single biggest "built by Apple"
+        /// tell in nested surfaces.
+        static func inner(_ outer: CGFloat, inset: CGFloat) -> CGFloat {
+            max(outer - inset, 4)
+        }
+    }
+
+    // MARK: Control metrics — one set of heights everywhere
+    enum Metrics {
+        static let row: CGFloat = 44            // minimum list row
+        static let rowPrimary: CGFloat = 52     // primary data rows (positions, watchlist)
+        static let buttonPrimary: CGFloat = 50
+        static let buttonSecondary: CGFloat = 44
+        static let buttonCompact: CGFloat = 36
+        static let minTarget: CGFloat = 44      // no tap target below this, ever
     }
 }
 
 // MARK: - Reusable chrome
 
+/// Opaque panel — the workhorse surface. Elevation 1 = panel, 2 = card.
+/// Raised surfaces catch a top-light on their upper edge instead of a uniform
+/// border: hierarchy by light, not lines.
 struct PanelBackground: ViewModifier {
     var elevation: Int = 1
     func body(content: Content) -> some View {
@@ -96,14 +153,53 @@ struct PanelBackground: ViewModifier {
                     .fill(elevation >= 2 ? TarsTheme.bg2 : TarsTheme.bg1)
                     .overlay(
                         RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
-                            .strokeBorder(TarsTheme.hairline, lineWidth: 1)
+                            .strokeBorder(
+                                elevation >= 2 ? AnyShapeStyle(TarsTheme.topLight) : AnyShapeStyle(TarsTheme.hairline),
+                                lineWidth: 1)
                     )
             )
+    }
+}
+
+/// Glass — for anything that floats over content: toolbars, the mode banner,
+/// the command palette, sheets, docked Tars. Content scrolls *under* glass.
+/// Respects Reduce Transparency by swapping to an opaque card.
+struct GlassBackground: ViewModifier {
+    var radius: CGFloat = TarsTheme.Radius.l
+    /// Floating overlays get an ambient shadow; docked glass does not.
+    var floating: Bool = false
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        return content
+            .background {
+                if reduceTransparency {
+                    shape.fill(TarsTheme.bg2)
+                } else {
+                    ZStack {
+                        shape.fill(.ultraThinMaterial)
+                        shape.fill(TarsTheme.bg1.opacity(0.55))
+                    }
+                }
+            }
+            .overlay(shape.strokeBorder(TarsTheme.topLight, lineWidth: 1))
+            .clipShape(shape)
+            .shadow(color: .black.opacity(floating ? 0.35 : 0),
+                    radius: floating ? 30 : 0, y: floating ? 10 : 0)
     }
 }
 
 extension View {
     func tarsPanel(elevation: Int = 1) -> some View {
         modifier(PanelBackground(elevation: elevation))
+    }
+    /// Docked glass chrome (toolbars, banners, tab bars).
+    func tarsGlass(radius: CGFloat = TarsTheme.Radius.l) -> some View {
+        modifier(GlassBackground(radius: radius, floating: false))
+    }
+    /// Floating glass overlay (palette, toasts, floating CTAs) — adds ambient shadow.
+    func tarsFloatingGlass(radius: CGFloat = TarsTheme.Radius.l) -> some View {
+        modifier(GlassBackground(radius: radius, floating: true))
     }
 }
