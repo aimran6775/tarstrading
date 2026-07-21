@@ -310,11 +310,7 @@ fileprivate struct LabAgentCard: View {
         }
         .padding(TarsTheme.Space.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .tarsPanel(elevation: 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
-                .strokeBorder(borderTint, lineWidth: 1)
-        )
+        .tarsPanel(elevation: 2, tint: borderTint)
         .animation(Motion.snappy, value: agent.status)
     }
 
@@ -356,7 +352,7 @@ fileprivate struct LabAgentCard: View {
     /// The explainability card: what this agent does, in plain English.
     private var thesisBlock: some View {
         HStack(alignment: .top, spacing: TarsTheme.Space.m) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
+            RoundedRectangle(cornerRadius: TarsTheme.Radius.micro, style: .continuous)
                 .fill(TarsTheme.agentPurple.opacity(0.7))
                 .frame(width: 3)
 
@@ -571,7 +567,7 @@ fileprivate struct LabPulsingDot: View {
             )
             .onAppear {
                 guard !reduceMotion else { return }
-                withAnimation(.easeOut(duration: 1.2).repeatForever(autoreverses: false)) {
+                withAnimation(Motion.breathe(1.2).repeatForever(autoreverses: false)) {
                     pulsing = true
                 }
             }

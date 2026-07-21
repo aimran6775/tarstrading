@@ -311,12 +311,15 @@ struct OrderBookSimWidget: View {
                     reset()
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(TarsTheme.Text.caption.weight(.semibold))
                         .foregroundStyle(TarsTheme.inkSecondary)
                         .frame(width: 30, height: 30)
                         .background(Circle().fill(TarsTheme.bg3))
+                        .frame(width: TarsTheme.Metrics.minTarget, height: TarsTheme.Metrics.minTarget)
+                        .contentShape(Circle())
                 }
                 .buttonStyle(PressableStyle())
+                .hoverEffect(.highlight)
                 .accessibilityLabel("Reset the book")
             }
             HStack(spacing: TarsTheme.Space.l) {
@@ -824,7 +827,7 @@ fileprivate struct CWFillPulse: View {
         }
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(.easeOut(duration: 0.7)) { expanded = true }
+            withAnimation(Motion.grand) { expanded = true }
         }
     }
 }

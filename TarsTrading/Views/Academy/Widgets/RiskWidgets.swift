@@ -403,7 +403,7 @@ struct PositionSizerWidget: View {
         drawProgress = 0
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(80))
-            withAnimation(.easeOut(duration: 1.1)) { drawProgress = 1 }
+            withAnimation(Motion.grand) { drawProgress = 1 }
         }
     }
 }
@@ -922,7 +922,7 @@ struct CompoundingCurveWidget: View {
         drawProgress = 0
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(80))
-            withAnimation(.easeOut(duration: 1.2)) { drawProgress = 1 }
+            withAnimation(Motion.grand) { drawProgress = 1 }
         }
     }
 }

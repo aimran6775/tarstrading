@@ -282,7 +282,7 @@ struct RootView: View {
                 .font(.system(size: 19, weight: .medium))
                 .symbolRenderingMode(.hierarchical)
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
+                .font(TarsTheme.Text.micro)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }

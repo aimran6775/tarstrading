@@ -77,10 +77,17 @@ struct SymbolSearchSheet: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(TarsTheme.Text.body)
                         .foregroundStyle(TarsTheme.inkTertiary)
+                        .frame(width: TarsTheme.Metrics.minTarget, height: TarsTheme.Metrics.minTarget)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableStyle())
+                .hoverEffect(.highlight)
                 .accessibilityLabel("Clear search")
                 .transition(.scale.combined(with: .opacity))
+                // Bleed the 44pt hit area into the field's padding so the
+                // visible row height doesn't grow.
+                .padding(.vertical, -TarsTheme.Space.m)
+                .padding(.trailing, -TarsTheme.Space.xs)
             }
         }
         .padding(.horizontal, TarsTheme.Space.m)
@@ -617,13 +624,24 @@ fileprivate struct HeatTile: View {
         TarsTheme.pnl(quote?.changePercent ?? 0)
     }
 
+    /// Data honesty: a frozen closed-market quote must not read as "hot".
+    private var isStale: Bool { (quote?.age ?? 0) > 300 }
+
     var body: some View {
         VStack(alignment: .leading, spacing: TarsTheme.Space.xs) {
-            Text(symbol)
-                .font(TarsTheme.Text.priceSmall)
-                .foregroundStyle(TarsTheme.inkPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            HStack(spacing: TarsTheme.Space.xs) {
+                Text(symbol)
+                    .font(TarsTheme.Text.priceSmall)
+                    .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                if isStale {
+                    Image(systemName: "clock")
+                        .font(TarsTheme.Text.micro)
+                        .foregroundStyle(TarsTheme.inkTertiary)
+                        .accessibilityLabel("Delayed quote")
+                }
+            }
             Spacer(minLength: 0)
             if let quote {
                 PercentText(value: quote.changePercent)
@@ -647,6 +665,8 @@ fileprivate struct HeatTile: View {
                             lineWidth: 1)
                 )
         )
+        .saturation(isStale ? 0.45 : 1)
+        .hoverEffect(.highlight)
         .animation(Motion.ticker, value: intensity)
         .scaleEffect(entered ? 1 : 0.86)
         .opacity(entered ? 1 : 0)

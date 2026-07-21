@@ -29,6 +29,21 @@ enum Motion {
     static let fluid = spatial
     static let molasses = grand
 
+    /// Sanctioned breathing loop for the few always-on status glows (mode
+    /// banner, live pips). The ONLY place an eased curve is allowed — views
+    /// must use this, never ad-hoc .easeInOut. Callers pair it with
+    /// repeatForever and a Reduce Motion guard.
+    static func breathe(_ duration: Double = 2.2) -> Animation {
+        .easeInOut(duration: duration)
+    }
+
+    /// Sanctioned continuous rotation for the Tars orbital identity marks.
+    /// Constant angular velocity is the point (an orbit, not a movement), so
+    /// linear is correct here — and only here.
+    static func orbit(_ duration: Double) -> Animation {
+        .linear(duration: duration)
+    }
+
     /// Stagger step for choreographed entrances. Max 6 staggered items —
     /// beyond that, animate as a block.
     static let stagger: Double = 0.025

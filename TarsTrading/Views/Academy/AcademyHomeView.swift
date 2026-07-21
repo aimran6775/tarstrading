@@ -335,6 +335,7 @@ fileprivate struct TrackDetailView: View {
                                       accent: track.accent)
                         }
                         .buttonStyle(PressableStyle())
+        .hoverEffect(.lift)
                     }
                 }
             }
@@ -422,7 +423,7 @@ fileprivate struct LessonRow: View {
         }
         .foregroundStyle(tint)
         .padding(.horizontal, TarsTheme.Space.s)
-        .padding(.vertical, 3)
+        .padding(.vertical, TarsTheme.Space.xs)
         .background(Capsule().fill(tint.opacity(0.12)))
     }
 }

@@ -42,8 +42,11 @@ struct TarsPanelView: View {
             Button { showLetter = true } label: {
                 Image(systemName: "envelope")
                     .foregroundStyle(TarsTheme.inkSecondary)
+                    .frame(width: TarsTheme.Metrics.minTarget, height: TarsTheme.Metrics.minTarget)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(PressableStyle())
+            .hoverEffect(.highlight)
             .accessibilityLabel("The Sunday letter, your weekly review")
             if !tars.messages.isEmpty {
                 Menu {
@@ -53,7 +56,10 @@ struct TarsPanelView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .foregroundStyle(TarsTheme.inkSecondary)
+                        .frame(width: TarsTheme.Metrics.minTarget, height: TarsTheme.Metrics.minTarget)
+                        .contentShape(Rectangle())
                 }
+                .hoverEffect(.highlight)
                 .accessibilityLabel("Conversation options")
             }
         }
@@ -114,7 +120,7 @@ struct TarsPanelView: View {
 
             Button(action: sendDraft) {
                 Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 32))
+                    .font(TarsTheme.Text.hero)
                     .foregroundStyle(trimmedDraft.isEmpty ? TarsTheme.inkTertiary : TarsTheme.accent)
                     .symbolEffect(.bounce, value: tars.isStreaming)
             }
@@ -156,7 +162,7 @@ private struct MessageBubble: View {
                     .background(
                         RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
                             .fill(TarsTheme.selectionWash(TarsTheme.accent)))
-                    .contentTransition(.numericText())
+                    .contentTransition(.opacity)
                     .accessibilityLabel("You: \(message.text.isEmpty ? "typing" : message.text)")
             } else {
                 // Tars: no bubble — the mentor's words float on the room
@@ -168,7 +174,7 @@ private struct MessageBubble: View {
                     .foregroundStyle(TarsTheme.inkPrimary)
                     .lineSpacing(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentTransition(.numericText())
+                    .contentTransition(.opacity)
                     .accessibilityLabel("Tars: \(message.text.isEmpty ? "typing" : message.text)")
             }
         }
@@ -200,7 +206,7 @@ struct TarsAvatar: View {
         .frame(width: size, height: size)
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(.linear(duration: thinking ? 1.6 : 9).repeatForever(autoreverses: false)) {
+            withAnimation(Motion.orbit(thinking ? 1.6 : 9).repeatForever(autoreverses: false)) {
                 spin = true
             }
         }

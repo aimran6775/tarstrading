@@ -168,15 +168,18 @@ struct CommandPalette: View {
                         .font(TarsTheme.Text.micro)
                         .foregroundStyle(TarsTheme.accent)
                         .padding(.horizontal, TarsTheme.Space.m)
-                        .padding(.vertical, 5)
-                        .background(Capsule().fill(TarsTheme.accent.opacity(0.14)))
+                        .padding(.vertical, TarsTheme.Space.xs)
+                        .background(Capsule(style: .continuous).fill(TarsTheme.selectionWash(TarsTheme.accent)))
+                        .frame(minHeight: TarsTheme.Metrics.minTarget)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableStyle())
+                .hoverEffect(.highlight)
                 .accessibilityLabel("Add \(title) to watchlist")
             }
         }
         .padding(.horizontal, TarsTheme.Space.s)
-        .padding(.vertical, 6)
+        .frame(minHeight: TarsTheme.Metrics.row)
     }
 
     private func paletteHeader(_ text: String) -> some View {

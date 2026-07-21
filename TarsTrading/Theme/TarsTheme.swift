@@ -23,6 +23,9 @@ enum TarsTheme {
     static let inkSecondary = Color(.displayP3, red: 0.60, green: 0.63, blue: 0.71)
     static let inkTertiary = Color(.displayP3, red: 0.40, green: 0.43, blue: 0.51)
     static let inkQuaternary = Color(.displayP3, red: 0.27, green: 0.29, blue: 0.36)
+    /// Text/glyphs sitting ON a meaning-colored fill (gain/loss/accent
+    /// buttons, badges). Defined once so on-color contrast has one source.
+    static let onFill = bg0
     static let hairline = Color.white.opacity(0.07)
     /// Stronger hairline for Increase Contrast contexts and focused states.
     static let hairlineStrong = Color.white.opacity(0.16)
@@ -100,6 +103,9 @@ enum TarsTheme {
         static let price = Font.system(.body, weight: .semibold).monospacedDigit()
         static let priceSmall = Font.system(.footnote, weight: .medium).monospacedDigit()
         static let mono = Font.system(.footnote, design: .monospaced)
+        /// The Sunday Letter's editorial serif voice — the one serif in the app.
+        static let letterMasthead = Font.system(.title, design: .serif, weight: .bold)
+        static let letterSection = Font.system(.title3, design: .serif, weight: .semibold)
     }
 
     // MARK: Spacing grid & shape
@@ -116,6 +122,8 @@ enum TarsTheme {
     }
 
     enum Radius {
+        /// Sub-token for thin data marks (sparkline bars, legend chips).
+        static let micro: CGFloat = 3
         static let s: CGFloat = 8
         static let m: CGFloat = 14
         static let l: CGFloat = 22
@@ -141,11 +149,34 @@ enum TarsTheme {
 
 // MARK: - Reusable chrome
 
+/// THE paper-mode stamp. One treatment everywhere the honesty marker appears
+/// (Law 9: restyle it endlessly, never dilute it — and never fork it).
+struct PaperBadge: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(TarsTheme.Text.micro)
+            .tracking(1.2)
+            .foregroundStyle(TarsTheme.paperBadge)
+            .padding(.horizontal, TarsTheme.Space.s)
+            .padding(.vertical, TarsTheme.Space.xs)
+            .background(
+                Capsule(style: .continuous).fill(TarsTheme.paperBadge.opacity(0.12))
+                    .overlay(Capsule(style: .continuous)
+                        .strokeBorder(TarsTheme.paperBadge.opacity(0.4), lineWidth: 1))
+            )
+            .accessibilityLabel("\(text) trading mode. No real money.")
+    }
+}
+
 /// Opaque panel — the workhorse surface. Elevation 1 = panel, 2 = card.
 /// Raised surfaces catch a top-light on their upper edge instead of a uniform
 /// border: hierarchy by light, not lines.
 struct PanelBackground: ViewModifier {
     var elevation: Int = 1
+    /// Optional state tint for the border (running agent, active preset) —
+    /// replaces the default border instead of stacking a second stroke on it.
+    var tint: Color? = nil
     func body(content: Content) -> some View {
         content
             .background(
@@ -154,7 +185,8 @@ struct PanelBackground: ViewModifier {
                     .overlay(
                         RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
                             .strokeBorder(
-                                elevation >= 2 ? AnyShapeStyle(TarsTheme.topLight) : AnyShapeStyle(TarsTheme.hairline),
+                                tint.map(AnyShapeStyle.init)
+                                    ?? (elevation >= 2 ? AnyShapeStyle(TarsTheme.topLight) : AnyShapeStyle(TarsTheme.hairline)),
                                 lineWidth: 1)
                     )
             )
@@ -191,8 +223,8 @@ struct GlassBackground: ViewModifier {
 }
 
 extension View {
-    func tarsPanel(elevation: Int = 1) -> some View {
-        modifier(PanelBackground(elevation: elevation))
+    func tarsPanel(elevation: Int = 1, tint: Color? = nil) -> some View {
+        modifier(PanelBackground(elevation: elevation, tint: tint))
     }
     /// Docked glass chrome (toolbars, banners, tab bars).
     func tarsGlass(radius: CGFloat = TarsTheme.Radius.l) -> some View {

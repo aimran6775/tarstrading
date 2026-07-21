@@ -674,7 +674,7 @@ fileprivate struct BTTradeRow: View {
 
     var body: some View {
         HStack(spacing: TarsTheme.Space.m) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
+            RoundedRectangle(cornerRadius: TarsTheme.Radius.micro, style: .continuous)
                 .fill(TarsTheme.pnl(trade.pnlPercent))
                 .frame(width: 3, height: 34)
 

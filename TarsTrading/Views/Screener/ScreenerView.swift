@@ -549,10 +549,8 @@ fileprivate struct PresetCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
-        .tarsPanel(elevation: 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
-                .strokeBorder(isActive ? TarsTheme.accent.opacity(0.6) : .clear, lineWidth: 1.5))
+        .hoverEffect(.lift)
+        .tarsPanel(elevation: 2, tint: isActive ? TarsTheme.accent.opacity(0.6) : nil)
         .overlay(alignment: .topTrailing) { infoButton }
         .animation(Motion.snappy, value: isActive)
         .accessibilityLabel("\(preset.name) preset screen. \(preset.tagline)")
@@ -878,6 +876,7 @@ fileprivate struct ScreenerRow: View {
             if isSelecting {
                 Button(action: toggleSelect) { content }
                     .buttonStyle(PressableStyle())
+        .hoverEffect(.highlight)
             } else {
                 NavigationLink(value: asset.symbol) { content }
             }

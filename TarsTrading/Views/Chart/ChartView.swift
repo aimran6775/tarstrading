@@ -191,7 +191,10 @@ struct ChartView: View {
                                 .strokeBorder(drawingMode ? TarsTheme.accent.opacity(0.5) : TarsTheme.hairline, lineWidth: 1)
                         )
                 )
+                .frame(minWidth: TarsTheme.Metrics.minTarget, minHeight: TarsTheme.Metrics.minTarget)
+                .contentShape(Rectangle())
         }
+        .hoverEffect(.highlight)
         .buttonStyle(PressableStyle())
         .accessibilityLabel(drawingMode ? "Exit drawing mode" : "Draw on chart")
         .accessibilityAddTraits(drawingMode ? .isSelected : [])
@@ -211,10 +214,11 @@ struct ChartView: View {
                         .frame(width: 30, height: 26)
                         .background {
                             if tool == drawingTool {
-                                RoundedRectangle(cornerRadius: TarsTheme.Radius.s - 2, style: .continuous)
+                                RoundedRectangle(cornerRadius: TarsTheme.Radius.inner(TarsTheme.Radius.s, inset: 2), style: .continuous)
                                     .fill(TarsTheme.bg3)
                             }
                         }
+                        .frame(width: 34, height: TarsTheme.Metrics.minTarget)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableStyle())
@@ -250,7 +254,10 @@ struct ChartView: View {
                                 .strokeBorder(TarsTheme.loss.opacity(0.4), lineWidth: 1)
                         )
                 )
+                .frame(minWidth: TarsTheme.Metrics.minTarget, minHeight: TarsTheme.Metrics.minTarget)
+                .contentShape(Rectangle())
         }
+        .hoverEffect(.highlight)
         .buttonStyle(PressableStyle())
         .accessibilityLabel("Delete selected drawing")
         .transition(.opacity.combined(with: .scale(scale: 0.9)))
@@ -272,7 +279,7 @@ struct ChartView: View {
                         .font(TarsTheme.Text.caption)
                         .foregroundStyle(tf == timeframe ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
                         .padding(.horizontal, TarsTheme.Space.m)
-                        .padding(.vertical, TarsTheme.Space.s - 2)
+                        .padding(.vertical, TarsTheme.Space.xs)
                         .background {
                             if tf == timeframe {
                                 Capsule(style: .continuous)
@@ -280,7 +287,8 @@ struct ChartView: View {
                                     .matchedGeometryEffect(id: "tfPill", in: timeframePill)
                             }
                         }
-                        .contentShape(Capsule())
+                        .frame(minHeight: TarsTheme.Metrics.buttonCompact)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableStyle())
                 .accessibilityLabel("Timeframe \(tf.rawValue)")
@@ -315,7 +323,10 @@ struct ChartView: View {
                         )
                 )
                 .contentTransition(.symbolEffect(.replace))
+                .frame(minWidth: TarsTheme.Metrics.minTarget, minHeight: TarsTheme.Metrics.minTarget)
+                .contentShape(Rectangle())
         }
+        .hoverEffect(.highlight)
         .buttonStyle(PressableStyle())
         .accessibilityLabel(style == .candles ? "Switch to line chart" : "Switch to candlestick chart")
     }
@@ -340,7 +351,10 @@ struct ChartView: View {
                                 .strokeBorder(TarsTheme.hairline, lineWidth: 1)
                         )
                 )
+                .frame(minWidth: TarsTheme.Metrics.minTarget, minHeight: TarsTheme.Metrics.minTarget)
+                .contentShape(Rectangle())
         }
+        .hoverEffect(.highlight)
         .accessibilityLabel("Indicators. \(enabled.isEmpty ? "None active" : "\(enabled.count) active")")
     }
 
@@ -968,14 +982,14 @@ struct ChartView: View {
         HStack(alignment: .bottom, spacing: TarsTheme.Space.xs) {
             ForEach(0..<28, id: \.self) { i in
                 let wave = (sin(Double(i) * 0.7) + 1) / 2
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                RoundedRectangle(cornerRadius: TarsTheme.Radius.micro, style: .continuous)
                     .fill(TarsTheme.bg3)
                     .frame(height: 40 + wave * (priceHeight * 0.5))
                     .frame(maxWidth: .infinity)
             }
             VStack(alignment: .trailing, spacing: TarsTheme.Space.xl) {
                 ForEach(0..<4, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    RoundedRectangle(cornerRadius: TarsTheme.Radius.micro, style: .continuous)
                         .fill(TarsTheme.bg3)
                         .frame(width: 40, height: 8)
                 }
@@ -1200,7 +1214,7 @@ fileprivate struct LastPricePill: View {
             .scaleEffect(pulsing ? 1.02 : 1)
             .onAppear {
                 guard animated else { return }
-                withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
+                withAnimation(Motion.breathe(1.6).repeatForever(autoreverses: true)) {
                     pulsing = true
                 }
             }

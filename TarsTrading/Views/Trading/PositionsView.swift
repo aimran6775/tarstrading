@@ -75,15 +75,7 @@ fileprivate struct AccountSummaryStrip: View {
                     .font(TarsTheme.Text.caption)
                     .foregroundStyle(TarsTheme.inkSecondary)
                 Spacer()
-                Text(store.mode.badgeText)
-                    .font(TarsTheme.Text.micro)
-                    .foregroundStyle(TarsTheme.paperBadge)
-                    .padding(.horizontal, TarsTheme.Space.s)
-                    .padding(.vertical, TarsTheme.Space.xs)
-                    .background(
-                        Capsule().strokeBorder(TarsTheme.paperBadge.opacity(0.5), lineWidth: 1)
-                    )
-                    .accessibilityLabel("\(store.mode.badgeText) trading mode. No real money.")
+                PaperBadge(text: store.mode.badgeText)
             }
 
             TickerText(value: store.account.equity, font: TarsTheme.Text.priceHero)
@@ -275,7 +267,7 @@ fileprivate struct NoPositionsCard: View {
             .accessibilityHidden(true)
             .onAppear {
                 guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) {
+                withAnimation(Motion.breathe(2.6).repeatForever(autoreverses: true)) {
                     drift = true
                 }
             }
@@ -399,42 +391,52 @@ fileprivate struct OrderRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Button(action: onToggle) {
-                HStack(spacing: TarsTheme.Space.m) {
-                    VStack(alignment: .leading, spacing: TarsTheme.Space.xs) {
-                        HStack(spacing: TarsTheme.Space.s) {
-                            Text(order.symbol)
-                                .font(TarsTheme.Text.heading)
-                                .foregroundStyle(TarsTheme.inkPrimary)
+            // Cancel is a SIBLING of the toggle, not nested inside its label —
+            // nesting made taps near the X ambiguous and doubled VoiceOver actions.
+            HStack(spacing: 0) {
+                Button(action: onToggle) {
+                    HStack(spacing: TarsTheme.Space.m) {
+                        VStack(alignment: .leading, spacing: TarsTheme.Space.xs) {
+                            HStack(spacing: TarsTheme.Space.s) {
+                                Text(order.symbol)
+                                    .font(TarsTheme.Text.heading)
+                                    .foregroundStyle(TarsTheme.inkPrimary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                    .layoutPriority(1)
+                                Text(order.side.label.uppercased())
+                                    .font(TarsTheme.Text.micro)
+                                    .foregroundStyle(order.side == .buy ? TarsTheme.gain : TarsTheme.loss)
+                            }
+                            Text(orderSummary)
+                                .font(TarsTheme.Text.priceSmall)
+                                .foregroundStyle(TarsTheme.inkSecondary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
-                                .layoutPriority(1)
-                            Text(order.side.label.uppercased())
-                                .font(TarsTheme.Text.micro)
-                                .foregroundStyle(order.side == .buy ? TarsTheme.gain : TarsTheme.loss)
                         }
-                        Text(orderSummary)
-                            .font(TarsTheme.Text.priceSmall)
-                            .foregroundStyle(TarsTheme.inkSecondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+                        Spacer(minLength: TarsTheme.Space.s)
+                        OrderStatusPill(status: order.status)
                     }
-                    Spacer(minLength: TarsTheme.Space.s)
-                    OrderStatusPill(status: order.status)
-                    Button(action: onCancel) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(TarsTheme.Text.heading)
-                            .foregroundStyle(TarsTheme.inkTertiary)
-                    }
-                    .buttonStyle(PressableStyle())
-                    .accessibilityLabel("Cancel \(order.side.label) order for \(order.symbol)")
+                    .padding(TarsTheme.Space.m)
+                    .contentShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
                 }
-                .padding(TarsTheme.Space.m)
-                .contentShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+                .buttonStyle(PressableStyle())
+                .hoverEffect(.highlight)
+                .accessibilityLabel("\(order.side.label) \(order.qty.formatted()) \(order.symbol), \(order.type.label) order, status \(statusLabel)")
+                .accessibilityHint(isExpanded ? "Collapses order timeline" : "Expands order timeline")
+
+                Button(action: onCancel) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(TarsTheme.Text.heading)
+                        .foregroundStyle(TarsTheme.inkTertiary)
+                        .frame(width: TarsTheme.Metrics.minTarget, height: TarsTheme.Metrics.minTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableStyle())
+                .hoverEffect(.highlight)
+                .accessibilityLabel("Cancel \(order.side.label) order for \(order.symbol)")
+                .padding(.trailing, TarsTheme.Space.xs)
             }
-            .buttonStyle(PressableStyle())
-            .accessibilityLabel("\(order.side.label) \(order.qty.formatted()) \(order.symbol), \(order.type.label) order, status \(statusLabel)")
-            .accessibilityHint(isExpanded ? "Collapses order timeline" : "Expands order timeline")
 
             if isExpanded {
                 OrderLifecycleView(status: order.status)
@@ -486,7 +488,7 @@ fileprivate struct OrderStatusPill: View {
             .animation(Motion.snappy, value: status)
             .onAppear {
                 guard isLive, !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                withAnimation(Motion.breathe(1.2).repeatForever(autoreverses: true)) {
                     pulsing = true
                 }
             }
@@ -590,7 +592,7 @@ fileprivate struct OrderLifecycleView: View {
     }
 
     private func rail(reached: Bool) -> some View {
-        RoundedRectangle(cornerRadius: TarsTheme.Radius.capsule)
+        RoundedRectangle(cornerRadius: TarsTheme.Radius.capsule, style: .continuous)
             .fill(reached ? TarsTheme.accent : TarsTheme.hairline)
             .frame(height: 2)
             .frame(maxWidth: .infinity)

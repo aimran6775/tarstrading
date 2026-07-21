@@ -152,8 +152,8 @@ public struct TarsLetterView: View {
 /// The ONE sanctioned deviation from TarsTheme type: the letter speaks in
 /// serif so it reads as correspondence, not another dashboard.
 fileprivate enum LetterType {
-    static let masthead = Font.system(size: 30, weight: .bold, design: .serif)
-    static let section = Font.system(size: 19, weight: .semibold, design: .serif)
+    static let masthead = TarsTheme.Text.letterMasthead
+    static let section = TarsTheme.Text.letterSection
 }
 
 // MARK: - Composition

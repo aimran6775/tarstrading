@@ -48,7 +48,7 @@ struct ModeBanner: View {
             if reduceMotion {
                 breathing = true
             } else {
-                withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
+                withAnimation(Motion.breathe(2.2).repeatForever(autoreverses: true)) {
                     breathing = true
                 }
             }

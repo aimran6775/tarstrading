@@ -991,17 +991,7 @@ fileprivate struct PortfolioSectionHeader: View {
 
 fileprivate struct PortfolioModeStamp: View {
     let text: String
-
-    var body: some View {
-        Text(text)
-            .font(TarsTheme.Text.micro)
-            .foregroundStyle(TarsTheme.paperBadge)
-            .padding(.horizontal, TarsTheme.Space.s)
-            .padding(.vertical, TarsTheme.Space.xs)
-            .background(
-                Capsule().strokeBorder(TarsTheme.paperBadge.opacity(0.5), lineWidth: 1))
-            .accessibilityLabel("\(text) trading mode — simulated money")
-    }
+    var body: some View { PaperBadge(text: text) }
 }
 
 fileprivate struct PortfolioProportionBar: View {
@@ -1151,7 +1141,7 @@ fileprivate struct PortfolioSkeleton: View {
 
     var body: some View {
         if reduceMotion {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: TarsTheme.Radius.inner(TarsTheme.Radius.s, inset: 2), style: .continuous)
                 .fill(TarsTheme.bg3)
                 .frame(width: width, height: height)
         } else {

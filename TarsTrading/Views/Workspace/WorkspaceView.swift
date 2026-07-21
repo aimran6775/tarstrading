@@ -525,19 +525,7 @@ fileprivate struct WorkspaceDeckPicker: View {
 
 fileprivate struct WorkspaceModeStamp: View {
     let text: String
-    var body: some View {
-        Text(text)
-            .font(TarsTheme.Text.micro)
-            .tracking(1.2)
-            .foregroundStyle(TarsTheme.paperBadge)
-            .padding(.horizontal, TarsTheme.Space.s)
-            .padding(.vertical, TarsTheme.Space.xs)
-            .background(
-                Capsule().fill(TarsTheme.paperBadge.opacity(0.12))
-                    .overlay(Capsule().strokeBorder(TarsTheme.paperBadge.opacity(0.4), lineWidth: 1))
-            )
-            .accessibilityLabel("\(text) trading mode. No real money.")
-    }
+    var body: some View { PaperBadge(text: text) }
 }
 
 // MARK: - Symbol cover (in-hierarchy hero presentation)
@@ -653,7 +641,7 @@ fileprivate struct WorkspaceWatchlistRow: View {
         HStack(spacing: 0) {
             Button(action: onSelect) {
                 HStack(spacing: TarsTheme.Space.s) {
-                    RoundedRectangle(cornerRadius: TarsTheme.Radius.capsule)
+                    RoundedRectangle(cornerRadius: TarsTheme.Radius.capsule, style: .continuous)
                         .fill(isSelected ? TarsTheme.accent : Color.clear)
                         .frame(width: 3, height: 24)
                     Text(symbol)
@@ -676,10 +664,11 @@ fileprivate struct WorkspaceWatchlistRow: View {
                     }
                 }
                 .padding(.leading, TarsTheme.Space.s)
-                .padding(.vertical, TarsTheme.Space.s)
+                .frame(minHeight: TarsTheme.Metrics.row)
                 .contentShape(Rectangle())
             }
             .buttonStyle(PressableStyle())
+            .hoverEffect(.highlight)
             .accessibilityLabel("Show \(symbol) chart")
             .accessibilityAddTraits(isSelected ? [.isSelected] : [])
 
@@ -687,10 +676,11 @@ fileprivate struct WorkspaceWatchlistRow: View {
                 Image(systemName: "chevron.forward.circle")
                     .font(TarsTheme.Text.body)
                     .foregroundStyle(TarsTheme.inkTertiary)
-                    .frame(width: 32, height: 32)
+                    .frame(width: TarsTheme.Metrics.minTarget, height: TarsTheme.Metrics.minTarget)
                     .contentShape(Rectangle())
             }
             .buttonStyle(PressableStyle())
+            .hoverEffect(.highlight)
             .accessibilityLabel("\(symbol) details")
             .accessibilityHint("Opens the full symbol page.")
         }
@@ -700,6 +690,14 @@ fileprivate struct WorkspaceWatchlistRow: View {
                 .fill(isSelected ? TarsTheme.bg3 : Color.clear)
         )
         .animation(Motion.snappy, value: isSelected)
+        .contextMenu {
+            Button(action: onSelect) {
+                Label("Show chart", systemImage: "chart.xyaxis.line")
+            }
+            Button(action: onInspect) {
+                Label("Open \(symbol)", systemImage: "arrow.up.forward.square")
+            }
+        }
     }
 }
 

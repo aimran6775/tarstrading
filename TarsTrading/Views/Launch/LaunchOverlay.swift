@@ -73,7 +73,7 @@ struct LaunchOverlay: View {
 
     private func dismiss() {
         guard stage != .gone else { return }
-        withAnimation(.easeOut(duration: 0.4)) { stage = .gone }
+        withAnimation(Motion.spatial) { stage = .gone }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(420))
             isPresented = false

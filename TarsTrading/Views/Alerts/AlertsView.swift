@@ -303,7 +303,7 @@ fileprivate struct FiredAlertRow: View {
                     .font(TarsTheme.Text.caption)
                     .foregroundStyle(TarsTheme.accent)
                     .padding(.horizontal, TarsTheme.Space.m)
-                    .padding(.vertical, TarsTheme.Space.xs + 2)
+                    .padding(.vertical, TarsTheme.Space.s)
                     .background(
                         Capsule().strokeBorder(TarsTheme.accent.opacity(0.4), lineWidth: 1)
                     )
@@ -336,7 +336,7 @@ fileprivate struct AlertsEmptyState: View {
                         .opacity(pulsing ? 0.25 : 0.9)
                         .animation(
                             reduceMotion ? nil :
-                                .easeInOut(duration: 2.4)
+                                Motion.breathe(2.4)
                                 .repeatForever(autoreverses: true)
                                 .delay(Double(ring) * 0.4),
                             value: pulsing
@@ -405,7 +405,7 @@ fileprivate struct PermissionDeniedBanner: View {
                     .font(TarsTheme.Text.caption)
                     .foregroundStyle(TarsTheme.warning)
                     .padding(.horizontal, TarsTheme.Space.m)
-                    .padding(.vertical, TarsTheme.Space.xs + 2)
+                    .padding(.vertical, TarsTheme.Space.s)
                     .background(
                         Capsule().strokeBorder(TarsTheme.warning.opacity(0.5), lineWidth: 1)
                     )

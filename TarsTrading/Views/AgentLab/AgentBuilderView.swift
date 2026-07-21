@@ -271,7 +271,7 @@ public struct AgentBuilderView: View {
 
     private var thesisCard: some View {
         HStack(alignment: .top, spacing: TarsTheme.Space.m) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
+            RoundedRectangle(cornerRadius: TarsTheme.Radius.micro, style: .continuous)
                 .fill(TarsTheme.agentPurple)
                 .frame(width: 3)
             VStack(alignment: .leading, spacing: TarsTheme.Space.xs) {
@@ -574,34 +574,40 @@ fileprivate struct RuleEditorRow: View {
                         .foregroundStyle(TarsTheme.inkTertiary)
                         .frame(width: 32, height: 32)
                         .background(Circle().fill(TarsTheme.bg3))
+                        .frame(width: TarsTheme.Metrics.minTarget, height: TarsTheme.Metrics.minTarget)
+                        .contentShape(Circle())
                 }
                 .buttonStyle(PressableStyle())
+                .hoverEffect(.highlight)
                 .accessibilityLabel("Remove rule")
             }
 
-            // Comparator
-            Picker("Comparator", selection: $rule.comparator) {
-                ForEach(Comparator.allCases, id: \.self) { comparator in
-                    Text(comparator.plainEnglish).tag(comparator)
-                }
+            // Comparator — sliding capsule, not the stock segmented control.
+            SlidingCapsulePicker(options: Array(Comparator.allCases),
+                                 selection: $rule.comparator,
+                                 tint: TarsTheme.agentPurple) { comparator, selected in
+                Text(comparator.plainEnglish)
+                    .font(TarsTheme.Text.caption)
+                    .foregroundStyle(selected ? TarsTheme.inkPrimary : TarsTheme.inkSecondary)
             }
-            .pickerStyle(.segmented)
-            .onChange(of: rule.comparator) { _, _ in Haptics.tick() }
+            .accessibilityLabel("Comparator")
 
             // Right-hand side
             HStack(spacing: TarsTheme.Space.s) {
-                Picker("Compare against", selection: Binding(
-                    get: { rhsIsIndicator },
-                    set: { wantsIndicator in
-                        Haptics.tick()
-                        withAnimation(Motion.snappy) {
-                            rule.rhs = wantsIndicator ? .indicator(.sma(50)) : .constant(30)
-                        }
-                    })) {
-                    Text("Indicator").tag(true)
-                    Text("Value").tag(false)
+                SlidingCapsulePicker(options: [true, false],
+                                     selection: Binding(
+                                        get: { rhsIsIndicator },
+                                        set: { wantsIndicator in
+                                            withAnimation(Motion.snappy) {
+                                                rule.rhs = wantsIndicator ? .indicator(.sma(50)) : .constant(30)
+                                            }
+                                        }),
+                                     tint: TarsTheme.agentPurple) { isIndicator, selected in
+                    Text(isIndicator ? "Indicator" : "Value")
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(selected ? TarsTheme.inkPrimary : TarsTheme.inkSecondary)
                 }
-                .pickerStyle(.segmented)
+                .accessibilityLabel("Compare against")
                 .fixedSize()
 
                 if rhsIsIndicator {

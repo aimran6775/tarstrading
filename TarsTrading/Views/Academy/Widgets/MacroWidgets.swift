@@ -130,7 +130,7 @@ fileprivate struct MWPulsingBadge: View {
                     if reduceMotion {
                         on = true  // steady emphasis, no repeatForever
                     } else {
-                        withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                        withAnimation(Motion.breathe(0.7).repeatForever(autoreverses: true)) {
                             on = true
                         }
                     }

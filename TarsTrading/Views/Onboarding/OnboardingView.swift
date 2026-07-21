@@ -55,11 +55,15 @@ public struct OnboardingView: View {
 
             Spacer()
 
-            HStack(spacing: TarsTheme.Space.s) {
+            HStack(spacing: 0) {
                 ForEach(0..<3, id: \.self) { index in
+                    // The dot is 7pt; the tap target is 44pt.
                     Capsule()
                         .fill(index == page ? TarsTheme.accent : TarsTheme.bg3)
                         .frame(width: index == page ? 22 : 7, height: 7)
+                        .frame(minWidth: TarsTheme.Metrics.minTarget,
+                               minHeight: TarsTheme.Metrics.minTarget)
+                        .contentShape(Rectangle())
                         .onTapGesture { go(to: index) }
                         .accessibilityLabel("Page \(index + 1) of 3")
                         .accessibilityAddTraits(index == page ? [.isSelected] : [])
@@ -391,7 +395,7 @@ fileprivate struct OrbitalMark: View {
         .frame(width: size, height: size)
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(.linear(duration: 9).repeatForever(autoreverses: false)) {
+            withAnimation(Motion.orbit(9).repeatForever(autoreverses: false)) {
                 spin = true
             }
         }

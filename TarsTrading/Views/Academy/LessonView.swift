@@ -70,7 +70,7 @@ public struct LessonView: View {
         }
         .foregroundStyle(tint)
         .padding(.horizontal, TarsTheme.Space.s)
-        .padding(.vertical, 3)
+        .padding(.vertical, TarsTheme.Space.xs)
         .background(Capsule().fill(tint.opacity(0.12)))
     }
 
@@ -634,7 +634,7 @@ fileprivate struct XPChip: View {
         }
         .foregroundStyle(TarsTheme.gain)
         .padding(.horizontal, TarsTheme.Space.s)
-        .padding(.vertical, 3)
+        .padding(.vertical, TarsTheme.Space.xs)
         .background(Capsule().fill(TarsTheme.gain.opacity(0.12)))
         .accessibilityLabel("\(amount) experience points earned")
     }
