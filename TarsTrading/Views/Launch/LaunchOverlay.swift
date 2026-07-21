@@ -46,6 +46,8 @@ struct LaunchOverlay: View {
             }
             .opacity(stage == .gone ? 0 : 1)
             .onAppear(perform: run)
+            // The open is a gift, never a gate: any touch skips straight in.
+            .onTapGesture(perform: dismiss)
             .accessibilityHidden(true)
             .allowsHitTesting(stage != .gone)
         }
@@ -57,14 +59,23 @@ struct LaunchOverlay: View {
             return
         }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(150))
+            try? await Task.sleep(for: .milliseconds(120))
+            guard stage == .scattered else { return }
             withAnimation(Motion.grand) { stage = .formed }
-            try? await Task.sleep(for: .milliseconds(900))
+            try? await Task.sleep(for: .milliseconds(650))
+            guard stage == .formed else { return }
             withAnimation(Motion.spatial) { stage = .branded }
             Haptics.tap()
-            try? await Task.sleep(for: .milliseconds(1400))
-            withAnimation(.easeInOut(duration: 0.6)) { stage = .gone }
-            try? await Task.sleep(for: .milliseconds(650))
+            try? await Task.sleep(for: .milliseconds(800))
+            dismiss()
+        }
+    }
+
+    private func dismiss() {
+        guard stage != .gone else { return }
+        withAnimation(.easeOut(duration: 0.4)) { stage = .gone }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(420))
             isPresented = false
         }
     }

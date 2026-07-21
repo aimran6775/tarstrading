@@ -144,26 +144,33 @@ private struct MessageBubble: View {
     let message: TarsStore.Message
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: TarsTheme.Space.s) {
-            if message.role == .user { Spacer(minLength: 40) }
-            if message.role == .tars {
+        HStack(alignment: .top, spacing: TarsTheme.Space.s) {
+            if message.role == .user {
+                // User: a quiet tinted capsule, trailing.
+                Spacer(minLength: 40)
+                Text(message.text.isEmpty ? "…" : message.text)
+                    .font(TarsTheme.Text.body)
+                    .foregroundStyle(TarsTheme.inkPrimary)
+                    .padding(.horizontal, TarsTheme.Space.l)
+                    .padding(.vertical, TarsTheme.Space.m)
+                    .background(
+                        RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
+                            .fill(TarsTheme.selectionWash(TarsTheme.accent)))
+                    .contentTransition(.numericText())
+                    .accessibilityLabel("You: \(message.text.isEmpty ? "typing" : message.text)")
+            } else {
+                // Tars: no bubble — the mentor's words float on the room
+                // itself, anchored by the mark. Reading type, not UI type.
                 TarsAvatar(size: 24, thinking: false)
-                    .padding(.bottom, 2)
+                    .padding(.top, 1)
+                Text(message.text.isEmpty ? "…" : message.text)
+                    .font(TarsTheme.Text.reading)
+                    .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineSpacing(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentTransition(.numericText())
+                    .accessibilityLabel("Tars: \(message.text.isEmpty ? "typing" : message.text)")
             }
-            Text(message.text.isEmpty ? "…" : message.text)
-                .font(TarsTheme.Text.body)
-                .foregroundStyle(TarsTheme.inkPrimary)
-                .padding(.horizontal, TarsTheme.Space.l)
-                .padding(.vertical, TarsTheme.Space.m)
-                .background(
-                    RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
-                        .fill(message.role == .user ? TarsTheme.accent.opacity(0.18) : TarsTheme.bg2)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
-                                .strokeBorder(TarsTheme.hairline, lineWidth: 1)))
-                .contentTransition(.numericText())
-                .accessibilityLabel("\(message.role == .user ? "You" : "Tars"): \(message.text.isEmpty ? "typing" : message.text)")
-            if message.role == .tars { Spacer(minLength: 40) }
         }
         .animation(Motion.ticker, value: message.text)
     }

@@ -87,10 +87,12 @@ public struct LessonView: View {
                 .padding(.top, TarsTheme.Space.s)
 
         case .paragraph(let text):
+            // Long-form prose reads in reading type (17pt, generous leading),
+            // not data-density UI type — the Apple News rule.
             Text(text)
-                .font(TarsTheme.Text.body)
+                .font(TarsTheme.Text.reading)
                 .foregroundStyle(TarsTheme.inkSecondary)
-                .lineSpacing(5)
+                .lineSpacing(6)
                 .fixedSize(horizontal: false, vertical: true)
 
         case .keyIdea(let text):

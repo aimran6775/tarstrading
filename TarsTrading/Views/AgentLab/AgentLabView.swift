@@ -721,6 +721,7 @@ fileprivate struct LabSlideToKill: View {
                                 if dragOffset / travel > 0.92 {
                                     withAnimation(Motion.snappy) { dragOffset = travel }
                                     isKilling = true
+                                    Haptics.killSwitch()
                                     Task {
                                         await onKill()
                                         isKilling = false
@@ -741,7 +742,7 @@ fileprivate struct LabSlideToKill: View {
         .accessibilityAction(named: "Kill agent") {
             guard !isKilling else { return }
             isKilling = true
-            Haptics.warning()
+            Haptics.killSwitch()
             Task {
                 await onKill()
                 isKilling = false

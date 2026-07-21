@@ -427,7 +427,7 @@ struct OrderTicketView: View {
     private var confirmArea: some View {
         switch phase {
         case .idle:
-            TicketSlideToConfirm(
+            TicketHoldToSubmit(
                 side: chosenSide,
                 symbol: symbol,
                 enabled: canSubmit,
@@ -876,9 +876,12 @@ fileprivate struct TicketBracketSection: View {
     }
 }
 
-// MARK: - Slide to confirm
+// MARK: - Hold to submit (the signature interaction)
 
-fileprivate struct TicketSlideToConfirm: View {
+/// Press-and-hold CTA: hold for 0.6s while a ring traces the capsule and the
+/// haptic ramps; release early and it springs back. Deliberate, unmistakable,
+/// impossible to fat-finger — and easier one-handed than slide-to-confirm.
+fileprivate struct TicketHoldToSubmit: View {
     let side: OrderSide
     let symbol: String
     let enabled: Bool
@@ -886,93 +889,75 @@ fileprivate struct TicketSlideToConfirm: View {
     let reduceMotion: Bool
     let onConfirm: () -> Void
 
-    @State private var dragX: CGFloat = 0
+    @State private var progress: CGFloat = 0
+    @State private var pressing = false
     @State private var completed = false
-    @State private var hintPhase: CGFloat = 0
+    @State private var tickTask: Task<Void, Never>?
 
-    private let knobSize: CGFloat = 52
-    private let trackHeight: CGFloat = 60
-
+    private let holdDuration: Double = 0.6
     private var tint: Color { side == .buy ? TarsTheme.gain : TarsTheme.loss }
 
     var body: some View {
         VStack(spacing: TarsTheme.Space.s) {
-            GeometryReader { geo in
-                let travel = geo.size.width - knobSize - 8
-                ZStack(alignment: .leading) {
-                    Capsule(style: .continuous)
-                        .fill(TarsTheme.bg2)
-                        .overlay(
-                            Capsule(style: .continuous)
-                                .strokeBorder(enabled ? tint.opacity(0.5) : TarsTheme.hairline, lineWidth: 1)
-                        )
+            ZStack {
+                // Track.
+                Capsule(style: .continuous)
+                    .fill(enabled ? tint.opacity(pressing ? 0.30 : 0.18) : TarsTheme.bg2)
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(enabled ? tint.opacity(0.35) : TarsTheme.hairline, lineWidth: 1)
+                    )
 
-                    // Progress tint behind the knob.
-                    Capsule(style: .continuous)
-                        .fill(tint.opacity(0.22))
-                        .frame(width: knobSize + 8 + dragX)
+                // The ring: traces the capsule as the hold progresses. This is
+                // a progress indicator, so linear timing is correct here.
+                Capsule(style: .continuous)
+                    .trim(from: 0, to: progress)
+                    .stroke(tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .padding(1.5)
 
-                    // Label + PAPER stamp, fading as the knob advances.
-                    HStack(spacing: TarsTheme.Space.s) {
-                        Spacer()
-                        Text("Slide to \(side.label.lowercased()) \(symbol)")
-                            .font(TarsTheme.Text.body)
-                            .foregroundStyle(enabled ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                        Text(badgeText)
-                            .font(TarsTheme.Text.micro)
-                            .kerning(1.2)
-                            .foregroundStyle(TarsTheme.bg0)
-                            .padding(.horizontal, TarsTheme.Space.s)
-                            .padding(.vertical, TarsTheme.Space.xs)
-                            .background(Capsule(style: .continuous).fill(TarsTheme.paperBadge))
-                        Spacer()
-                    }
-                    .opacity(1 - Double(dragX / max(travel, 1)) * 1.6)
-
-                    // Knob.
-                    Circle()
-                        .fill(enabled ? tint : TarsTheme.bg3)
-                        .frame(width: knobSize, height: knobSize)
-                        .overlay(
-                            Image(systemName: completed ? "checkmark" : "arrow.right")
-                                .font(TarsTheme.Text.heading)
-                                .foregroundStyle(enabled ? TarsTheme.bg0 : TarsTheme.inkTertiary)
-                                .offset(x: reduceMotion || completed || !enabled ? 0 : hintPhase)
-                        )
-                        .offset(x: 4 + dragX)
-                        .gesture(
-                            DragGesture()
-                                .onChanged { drag in
-                                    guard enabled, !completed else { return }
-                                    dragX = min(max(0, drag.translation.width), travel)
-                                }
-                                .onEnded { _ in
-                                    guard enabled, !completed else { return }
-                                    if dragX > travel * 0.82 {
-                                        completed = true
-                                        withAnimation(Motion.snappy) { dragX = travel }
-                                        Haptics.confirm()
-                                        onConfirm()
-                                    } else {
-                                        withAnimation(Motion.spatial) { dragX = 0 }
-                                    }
-                                }
-                        )
+                HStack(spacing: TarsTheme.Space.s) {
+                    Image(systemName: completed ? "checkmark" : "hand.tap.fill")
+                        .font(TarsTheme.Text.heading)
+                        .foregroundStyle(enabled ? tint : TarsTheme.inkTertiary)
+                        .contentTransition(.symbolEffect(.replace))
+                    Text(completed ? "Confirmed" : "Hold to \(side.label.lowercased()) \(symbol)")
+                        .font(TarsTheme.Text.heading)
+                        .foregroundStyle(enabled ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(badgeText)
+                        .font(TarsTheme.Text.micro)
+                        .kerning(1.2)
+                        .foregroundStyle(TarsTheme.bg0)
+                        .padding(.horizontal, TarsTheme.Space.s)
+                        .padding(.vertical, TarsTheme.Space.xs)
+                        .background(Capsule(style: .continuous).fill(TarsTheme.paperBadge))
+                }
+                .padding(.horizontal, TarsTheme.Space.l)
+            }
+            .frame(height: TarsTheme.Metrics.buttonPrimary + 10)
+            .scaleEffect(pressing ? 0.985 : 1)
+            .animation(Motion.instant, value: pressing)
+            .opacity(enabled ? 1 : 0.6)
+            .contentShape(Capsule(style: .continuous))
+            .onLongPressGesture(minimumDuration: holdDuration, maximumDistance: 40) {
+                finish()
+            } onPressingChanged: { isPressing in
+                guard enabled, !completed else { return }
+                pressing = isPressing
+                if isPressing {
+                    startHold()
+                } else if !completed {
+                    cancelHold()
                 }
             }
-            .frame(height: trackHeight)
-            .opacity(enabled ? 1 : 0.6)
             .accessibilityElement()
-            .accessibilityLabel("Slide to \(side.label.lowercased()) \(symbol). \(badgeText) trading — no real money.")
+            .accessibilityLabel("\(side.label) \(symbol). \(badgeText) trading — no real money.")
             .accessibilityHint(enabled ? "Double tap to submit the order." : "Fix the highlighted issues first.")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction {
                 guard enabled, !completed else { return }
-                completed = true
-                Haptics.confirm()
-                onConfirm()
+                finish()
             }
 
             Text("Simulated fills. No real money moves.")
@@ -980,12 +965,37 @@ fileprivate struct TicketSlideToConfirm: View {
                 .foregroundStyle(TarsTheme.inkTertiary)
                 .frame(maxWidth: .infinity)
         }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
-                hintPhase = 5
+    }
+
+    private func startHold() {
+        Haptics.tap()
+        withAnimation(reduceMotion ? .none : .linear(duration: holdDuration)) {
+            progress = 1
+        }
+        // Haptic ramp: ticks marching toward commitment.
+        tickTask?.cancel()
+        tickTask = Task {
+            for millis: UInt64 in [200, 400] {
+                try? await Task.sleep(for: .milliseconds(millis))
+                guard !Task.isCancelled else { return }
+                Haptics.tick()
             }
         }
+    }
+
+    private func cancelHold() {
+        tickTask?.cancel()
+        withAnimation(Motion.snappy) { progress = 0 }
+    }
+
+    private func finish() {
+        guard enabled, !completed else { return }
+        tickTask?.cancel()
+        completed = true
+        progress = 1
+        pressing = false
+        Haptics.confirm()
+        onConfirm()
     }
 }
 
