@@ -16,15 +16,21 @@ struct ChartView: View {
     @Environment(TradingStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var timeframe: Timeframe = .month3
+    // The trader's chart setup is a preference, not per-visit state: it
+    // survives symbol switches and relaunches.
+    @State private var timeframe: Timeframe =
+        Timeframe(rawValue: UserDefaults.standard.string(forKey: "chart.timeframe") ?? "") ?? .month3
     @State private var cache: [Timeframe: [Bar]] = [:]
     // Failures are keyed per timeframe so switching to an uncached
     // timeframe never flashes another timeframe's stale error.
     @State private var loadFailures: [Timeframe: String] = [:]
     @State private var attempt = 0
 
-    @State private var style: PriceStyle = .candles
-    @State private var enabled: Set<ChartIndicator> = []
+    @State private var style: PriceStyle =
+        PriceStyle(rawValue: UserDefaults.standard.string(forKey: "chart.style") ?? "") ?? .candles
+    @State private var enabled: Set<ChartIndicator> = Set(
+        (UserDefaults.standard.stringArray(forKey: "chart.indicators") ?? [])
+            .compactMap(ChartIndicator.init(rawValue:)))
     @State private var fade: [ChartIndicator: Double] = [:]
 
     @State private var crossIndex: Int?
@@ -78,6 +84,15 @@ struct ChartView: View {
         }
         .task(id: loadKey) { await load() }
         .onAppear { drawings = ChartDrawingStore.load(symbol: symbol) }
+        .onChange(of: timeframe) { _, tf in
+            UserDefaults.standard.set(tf.rawValue, forKey: "chart.timeframe")
+        }
+        .onChange(of: style) { _, st in
+            UserDefaults.standard.set(st.rawValue, forKey: "chart.style")
+        }
+        .onChange(of: enabled) { _, set in
+            UserDefaults.standard.set(set.map(\.rawValue).sorted(), forKey: "chart.indicators")
+        }
         .onChange(of: symbol) { _, newSymbol in
             cache = [:]
             loadFailures = [:]
@@ -1139,7 +1154,7 @@ struct ChartView: View {
 
 // MARK: - fileprivate support types
 
-fileprivate enum PriceStyle {
+fileprivate enum PriceStyle: String {
     case candles, line
 }
 

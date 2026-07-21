@@ -56,8 +56,11 @@ struct RootView: View {
         }
     }
 
-    @State private var section: Section = .terminal
-    @State private var tab: CompactTab = .trade
+    // Relaunch resumes where the user left off, not back at the terminal.
+    @State private var section: Section =
+        Section(rawValue: UserDefaults.standard.string(forKey: "root.section") ?? "") ?? .terminal
+    @State private var tab: CompactTab =
+        CompactTab(rawValue: UserDefaults.standard.string(forKey: "root.tab") ?? "") ?? .trade
     @State private var showLaunch = true
     @State private var showTars = false
     @State private var showPalette = false
@@ -123,6 +126,8 @@ struct RootView: View {
                                             set: { _ in })) {
             OnboardingView { hasOnboarded = true }
         }
+        .onChange(of: section) { _, s in UserDefaults.standard.set(s.rawValue, forKey: "root.section") }
+        .onChange(of: tab) { _, t in UserDefaults.standard.set(t.rawValue, forKey: "root.tab") }
         .onAppear {
             agentLab.connect(trading: store)
             alertEngine.start(store: store)

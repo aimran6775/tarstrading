@@ -16,7 +16,9 @@ struct WorkspaceView: View {
     @State private var preset: WorkspacePreset =
         WorkspacePreset(rawValue: UserDefaults.standard.string(forKey: WorkspaceDefaults.presetKey) ?? "")
         ?? .trade
-    @State private var deck: WorkspaceDeck = .watchlist
+    @State private var deck: WorkspaceDeck =
+        WorkspaceDeck(rawValue: UserDefaults.standard.string(forKey: WorkspaceDefaults.deckKey) ?? "")
+        ?? .watchlist
     @State private var showingTicket = false
     @State private var inspectedSymbol: String?
 
@@ -33,6 +35,9 @@ struct WorkspaceView: View {
         .overlay { symbolHeroOverlay }
         .onChange(of: preset) { _, newValue in
             UserDefaults.standard.set(newValue.rawValue, forKey: WorkspaceDefaults.presetKey)
+        }
+        .onChange(of: deck) { _, newValue in
+            UserDefaults.standard.set(newValue.rawValue, forKey: WorkspaceDefaults.deckKey)
         }
         .onChange(of: selectedSymbol) { _, newValue in
             UserDefaults.standard.set(newValue, forKey: WorkspaceDefaults.symbolKey)
@@ -192,6 +197,7 @@ struct WorkspaceView: View {
             }
             .padding(TarsTheme.Space.l)
         }
+        .refreshable { await store.refreshQuotes() }
     }
 
     // MARK: - Header bar
@@ -422,6 +428,7 @@ fileprivate enum WorkspaceDeck: String, CaseIterable, Identifiable {
 fileprivate enum WorkspaceDefaults {
     static let presetKey = "workspace.preset"
     static let symbolKey = "workspace.selectedSymbol"
+    static let deckKey = "workspace.deck"
 }
 
 // MARK: - Preset picker (sliding-thumb segmented control)

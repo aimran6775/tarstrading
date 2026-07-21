@@ -43,9 +43,12 @@ struct PortfolioView: View {
             }
         }
         .background(TarsTheme.bg0)
+        .refreshable { await store.refreshAll() }
         .task {
             spyBars = (try? await store.marketData.bars(symbol: "SPY", timeframe: .month3)) ?? []
+            refreshRiskStats()
         }
+        .task(id: equityHistory.count) { refreshRiskStats() }
         .onAppear {
             if reduceMotion {
                 drawProgress = 1
@@ -104,8 +107,12 @@ struct PortfolioView: View {
         allocationSlices.allSatisfy(\.isCash)
     }
 
-    private var riskStats: PortfolioRiskStats {
-        PortfolioRiskStats.compute(history: equityHistory, spyBars: spyBars)
+    @State private var cachedRiskStats = PortfolioRiskStats.empty
+
+    /// Recomputed only when history grows or the SPY benchmark arrives —
+    /// never inside `body` on an account tick.
+    private func refreshRiskStats() {
+        cachedRiskStats = PortfolioRiskStats.compute(history: equityHistory, spyBars: spyBars)
     }
 
     // MARK: Hero — equity + curve
@@ -166,61 +173,12 @@ struct PortfolioView: View {
     @ViewBuilder
     private var equityChart: some View {
         if equityHistory.count >= 2 {
-            Chart(equityHistory) { point in
-                AreaMark(
-                    x: .value("Time", point.time),
-                    y: .value("Equity", point.equity))
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(trendIsUp ? TarsTheme.chartGain : TarsTheme.chartLoss)
-                LineMark(
-                    x: .value("Time", point.time),
-                    y: .value("Equity", point.equity))
-                    .interpolationMethod(.catmullRom)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(trendIsUp ? TarsTheme.gain : TarsTheme.loss)
-            }
-            .chartXAxis(.hidden)
-            .chartYAxis {
-                AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
-                    AxisGridLine().foregroundStyle(TarsTheme.hairline)
-                    AxisValueLabel {
-                        if let v = value.as(Double.self) {
-                            Text(v, format: .currency(code: "USD")
-                                .precision(.fractionLength(0)))
-                                .font(TarsTheme.Text.priceSmall)
-                                .foregroundStyle(TarsTheme.inkTertiary)
-                        }
-                    }
-                }
-            }
-            .chartYScale(domain: equityDomain)
-            .frame(height: 220)
-            .mask(alignment: .leading) {
-                GeometryReader { geo in
-                    Rectangle().frame(width: geo.size.width * drawProgress)
-                }
-            }
-            .accessibilityLabel("Equity curve chart")
-            .accessibilityValue(equityChartAccessibilityValue)
+            PortfolioEquityChartView(history: equityHistory,
+                                     trendIsUp: trendIsUp,
+                                     drawProgress: drawProgress)
         } else {
             PortfolioEmptyChart()
         }
-    }
-
-    private var equityChartAccessibilityValue: String {
-        guard let first = equityHistory.first, let last = equityHistory.last else {
-            return "No data yet"
-        }
-        let from = first.equity.formatted(.currency(code: "USD").precision(.fractionLength(0)))
-        let to = last.equity.formatted(.currency(code: "USD").precision(.fractionLength(0)))
-        return "From \(from) to \(to) over \(equityHistory.count) points, trending \(trendIsUp ? "up" : "down")"
-    }
-
-    private var equityDomain: ClosedRange<Double> {
-        let values = equityHistory.map(\.equity)
-        guard let lo = values.min(), let hi = values.max() else { return 0...1 }
-        let pad = max((hi - lo) * 0.18, max(hi * 0.0015, 1))
-        return (lo - pad)...(hi + pad)
     }
 
     // MARK: Allocation donut
@@ -433,7 +391,7 @@ struct PortfolioView: View {
                 title: "Risk",
                 subtitle: "Tap any stat for a plain-English read")
 
-            let stats = riskStats
+            let stats = cachedRiskStats
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: TarsTheme.Space.m)],
                       spacing: TarsTheme.Space.m) {
                 ForEach(PortfolioStatKind.allCases) { kind in
@@ -815,6 +773,8 @@ fileprivate struct PortfolioRiskStats {
     var sharpeish: Double?
     var beta: Double?
 
+    static let empty = PortfolioRiskStats()
+
     static func compute(history: [TradingStore.EquityPoint], spyBars: [Bar]) -> PortfolioRiskStats {
         var stats = PortfolioRiskStats()
         let equities = history.map(\.equity).filter { $0 > 0 }
@@ -991,6 +951,69 @@ fileprivate struct PortfolioSectionHeader: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// The equity curve, isolated: its inputs (history array, trend, draw mask)
+/// change once a minute, so SwiftUI skips this whole Chart on account ticks.
+fileprivate struct PortfolioEquityChartView: View {
+    let history: [TradingStore.EquityPoint]
+    let trendIsUp: Bool
+    let drawProgress: CGFloat
+
+    private var domain: ClosedRange<Double> {
+        let values = history.map(\.equity)
+        guard let lo = values.min(), let hi = values.max() else { return 0...1 }
+        let pad = max((hi - lo) * 0.18, max(hi * 0.0015, 1))
+        return (lo - pad)...(hi + pad)
+    }
+
+    private var accessibilityValueText: String {
+        guard let first = history.first, let last = history.last else {
+            return "No data yet"
+        }
+        let from = first.equity.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        let to = last.equity.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        return "From \(from) to \(to) over \(history.count) points, trending \(trendIsUp ? "up" : "down")"
+    }
+
+    var body: some View {
+        Chart(history) { point in
+            AreaMark(
+                x: .value("Time", point.time),
+                y: .value("Equity", point.equity))
+                .interpolationMethod(.catmullRom)
+                .foregroundStyle(trendIsUp ? TarsTheme.chartGain : TarsTheme.chartLoss)
+            LineMark(
+                x: .value("Time", point.time),
+                y: .value("Equity", point.equity))
+                .interpolationMethod(.catmullRom)
+                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                .foregroundStyle(trendIsUp ? TarsTheme.gain : TarsTheme.loss)
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
+                AxisGridLine().foregroundStyle(TarsTheme.hairline)
+                AxisValueLabel {
+                    if let v = value.as(Double.self) {
+                        Text(v, format: .currency(code: "USD")
+                            .precision(.fractionLength(0)))
+                            .font(TarsTheme.Text.priceSmall)
+                            .foregroundStyle(TarsTheme.inkTertiary)
+                    }
+                }
+            }
+        }
+        .chartYScale(domain: domain)
+        .frame(height: 220)
+        .mask(alignment: .leading) {
+            GeometryReader { geo in
+                Rectangle().frame(width: geo.size.width * drawProgress)
+            }
+        }
+        .accessibilityLabel("Equity curve chart")
+        .accessibilityValue(accessibilityValueText)
     }
 }
 

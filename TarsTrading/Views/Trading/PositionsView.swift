@@ -134,7 +134,7 @@ struct PositionsPanel: View {
             } else if store.positions.isEmpty {
                 NoPositionsCard()
             } else {
-                VStack(spacing: TarsTheme.Space.s) {
+                LazyVStack(spacing: TarsTheme.Space.s) {
                     ForEach(store.positions) { position in
                         NavigationLink {
                             SymbolDetailView(symbol: position.symbol)
@@ -332,7 +332,7 @@ struct OpenOrdersPanel: View {
             } else if store.openOrders.isEmpty {
                 NoOrdersCard()
             } else {
-                VStack(spacing: TarsTheme.Space.s) {
+                LazyVStack(spacing: TarsTheme.Space.s) {
                     ForEach(store.openOrders) { order in
                         OrderRow(
                             order: order,

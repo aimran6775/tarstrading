@@ -67,9 +67,22 @@ struct OrderTicketView: View {
     private var canSubmit: Bool { fieldsValid && !blockedByBuyingPower }
 
     var body: some View {
-        switch style {
-        case .sheet: sheetBody
-        case .inline: inlineBody
+        Group {
+            switch style {
+            case .sheet: sheetBody
+            case .inline: inlineBody
+            }
+        }
+        // Keyboard-first trading: ⌘⏎ submits when the ticket is valid. The
+        // hold-to-submit CTA stays the touch path; this is the Magic Keyboard path.
+        .background {
+            Button("") {
+                submitOrder()
+            }
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(!canSubmit || phase != .idle)
+            .opacity(0)
+            .accessibilityHidden(true)
         }
     }
 
