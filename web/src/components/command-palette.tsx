@@ -17,6 +17,7 @@ const SECTIONS: [string, string][] = [
   ["Academy", "/app/academy"],
   ["Agent Lab", "/app/agents"],
   ["Tars — the mentor", "/app/tars"],
+  ["Standings — badges & leaderboard", "/app/standings"],
   ["Performance", "/app?perf=1"],
 ];
 

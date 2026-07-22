@@ -12,13 +12,14 @@ import CommandPalette from "./command-palette";
   bar on mobile so the four sections are always reachable on a phone.
 */
 
-export type Section = "terminal" | "academy" | "agents" | "tars";
+export type Section = "terminal" | "academy" | "agents" | "tars" | "standings";
 
 const NAV: [Section, string, string][] = [
   ["terminal", "Terminal", "/app"],
   ["academy", "Academy", "/app/academy"],
   ["agents", "Agents", "/app/agents"],
   ["tars", "Tars", "/app/tars"],
+  ["standings", "Standings", "/app/standings"],
 ];
 
 const ICON: Record<Section, string> = {
@@ -26,6 +27,7 @@ const ICON: Record<Section, string> = {
   academy: "M12 4L2 9l10 5 8-4v6M6 12v4c0 1 3 2 6 2s6-1 6-2v-4",
   agents: "M12 3a4 4 0 014 4v1a3 3 0 013 3v3a5 5 0 01-5 5H8a5 5 0 01-5-5v-3a3 3 0 013-3V7a4 4 0 014-4z M9 13h.01M15 13h.01",
   tars: "M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z",
+  standings: "M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM7 6H4v1a3 3 0 003 3M17 6h3v1a3 3 0 01-3 3", // trophy
 };
 
 export default function AppNav({ active, right }: { active: Section; right?: React.ReactNode }) {
