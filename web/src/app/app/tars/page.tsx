@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import AppNav from "@/components/app-nav";
 import TarsChat from "./chat";
 
+export const metadata = { title: "Tars" };
+
 export default async function TarsPage() {
   const user = await currentUser();
   if (!user) redirect("/login");

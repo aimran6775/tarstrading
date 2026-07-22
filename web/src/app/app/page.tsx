@@ -7,6 +7,8 @@ import Terminal from "./terminal";
   Chart, ticket, positions land in Act III — this page proves the whole
   loop: auth → $100k account → real quotes → simulated badge.
 */
+export const metadata = { title: "Terminal" };
+
 export default async function AppPage() {
   const user = await currentUser();
   if (!user) redirect("/login");

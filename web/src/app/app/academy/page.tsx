@@ -10,6 +10,8 @@ import AppNav from "@/components/app-nav";
   Academy home: seven tracks from "what is a market" to "run it like a fund."
   Server-rendered — progress comes with the page, no loading spinners.
 */
+export const metadata = { title: "Academy" };
+
 export default async function AcademyHome() {
   const user = await currentUser();
   if (!user) redirect("/login");

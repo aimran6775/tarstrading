@@ -4,6 +4,12 @@ import { findLesson, nextLesson } from "@/lib/academy";
 import AppNav from "@/components/app-nav";
 import LessonReader from "./reader";
 
+export async function generateMetadata(props: { params: Promise<{ lessonId: string }> }) {
+  const { lessonId } = await props.params;
+  const found = findLesson(lessonId);
+  return { title: found ? found.lesson.title : "Lesson" };
+}
+
 export default async function LessonPage(props: { params: Promise<{ lessonId: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/login");

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Archivo, IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -26,9 +26,35 @@ const instrument = Instrument_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Tars Trading — a flight simulator for markets",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://tarstrading.com"),
+  title: {
+    default: "Tars Trading — a flight simulator for markets",
+    template: "%s · Tars Trading",
+  },
   description:
     "Learn to trade before you trade. $100,000 in simulated capital, real market data, an academy that starts at zero, and trading agents you program yourself.",
+  applicationName: "Tars Trading",
+  openGraph: {
+    title: "Tars Trading — a flight simulator for markets",
+    description:
+      "$100,000 in simulated capital, real market data, an academy from zero to Greeks, and trading agents you program yourself. Every fill is practice.",
+    type: "website",
+    siteName: "Tars Trading",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Tars Trading — learn to trade before you trade",
+    description: "Simulated $100k. Real data. An academy from zero to fund manager. Agents you program.",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#1a1726" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f7fa" },
+  ],
+  width: "device-width",
+  initialScale: 1,
 };
 
 /** Applies the saved theme before first paint — no flash of wrong theme. */
