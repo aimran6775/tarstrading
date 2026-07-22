@@ -4,6 +4,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion, useReducedMotion } from "framer-motion";
 import ThemeToggle from "./theme-toggle";
+import TarsMark from "./tars-mark";
 
 const OrbitalMarket = dynamic(() => import("./orbital-market"), {
   ssr: false,
@@ -39,7 +40,7 @@ export default function Landing() {
     <main className="flex min-h-screen flex-col">
       <header className="glass fixed inset-x-0 top-0 z-50 flex items-center justify-between px-5 py-3 md:px-10">
         <div className="flex items-center gap-3">
-          <OrbGlyph />
+          <TarsMark size={28} />
           <span className="font-display text-sm font-bold tracking-[0.08em] text-ink-1">
             TARS
           </span>
@@ -256,7 +257,7 @@ export default function Landing() {
       <footer className="border-t border-hairline px-5 py-10 md:px-10">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-start justify-between gap-6 md:flex-row md:items-center">
           <div className="flex items-center gap-3">
-            <OrbGlyph />
+            <TarsMark size={28} />
             <span className="font-display text-xs font-bold tracking-[0.08em] text-ink-2">TARS TRADING</span>
           </div>
           <p className="max-w-xl text-xs leading-relaxed text-ink-4">
@@ -267,16 +268,6 @@ export default function Landing() {
         </div>
       </footer>
     </main>
-  );
-}
-
-function OrbGlyph() {
-  return (
-    <span className="relative inline-flex h-7 w-7 items-center justify-center" aria-hidden>
-      <span className="absolute inset-0 rounded-full border border-gold/40" />
-      <span className="absolute h-[36%] w-[112%] rounded-[50%] border border-gold/70" />
-      <span className="h-1 w-1 rounded-full bg-gold" />
-    </span>
   );
 }
 

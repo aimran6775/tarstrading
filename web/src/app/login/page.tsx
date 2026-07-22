@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ThemeToggle from "@/components/theme-toggle";
+import TarsMark from "@/components/tars-mark";
 
 export default function Login() {
   const router = useRouter();
@@ -34,6 +35,10 @@ export default function Login() {
     <main className="relative flex min-h-screen items-center justify-center px-6">
       <div className="absolute right-4 top-4"><ThemeToggle /></div>
       <div className="w-full max-w-md">
+        <Link href="/" className="pressable mb-6 flex items-center justify-center gap-2.5">
+          <TarsMark size={30} />
+          <span className="font-display text-lg font-bold tracking-[0.1em] text-ink-1">TARS</span>
+        </Link>
         <h1 className="mb-8 text-center text-3xl font-bold tracking-tight text-ink-1">
           Welcome back
         </h1>

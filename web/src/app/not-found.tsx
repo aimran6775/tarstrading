@@ -1,10 +1,10 @@
 import Link from "next/link";
-import OrbGlyph from "@/components/orb-glyph";
+import TarsMark from "@/components/tars-mark";
 
 export default function NotFound() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
-      <OrbGlyph size={40} />
+      <TarsMark size={40} />
       <p className="kicker mt-8">404 · off the tape</p>
       <h1 className="display mt-3 text-4xl text-ink-1 md:text-6xl">Nothing trades here.</h1>
       <p className="mt-4 max-w-sm text-base text-ink-2">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import OrbGlyph from "@/components/orb-glyph";
+import TarsMark from "@/components/tars-mark";
 
 export const metadata = { title: "Disclosures" };
 
@@ -7,7 +7,7 @@ export default function Disclosures() {
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-16 md:px-0">
       <Link href="/" className="inline-flex items-center gap-2">
-        <OrbGlyph size={24} />
+        <TarsMark size={24} />
         <span className="font-display text-sm font-bold tracking-[0.08em] text-ink-1">TARS TRADING</span>
       </Link>
       <p className="kicker mt-10">The fine print, in plain language</p>

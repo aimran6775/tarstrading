@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import OrbGlyph from "@/components/orb-glyph";
+import TarsMark from "@/components/tars-mark";
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => { console.error(error); }, [error]);
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
-      <OrbGlyph size={40} />
+      <TarsMark size={40} />
       <p className="kicker mt-8">Something broke</p>
       <h1 className="display mt-3 text-4xl text-ink-1 md:text-5xl">The desk hit an error.</h1>
       <p className="mt-4 max-w-sm text-base text-ink-2">

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ThemeToggle from "./theme-toggle";
 import CommandPalette from "./command-palette";
+import TarsMark from "./tars-mark";
 
 /*
   The authenticated shell: a sticky top header (wordmark, simulated marker,
@@ -56,7 +57,9 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
       <CommandPalette />
       <header className="glass sticky top-0 z-50 flex items-center justify-between px-4 py-2.5 md:px-6">
         <div className="flex items-center gap-3">
-          <Link href="/app" className="font-display text-sm font-bold tracking-[0.08em] text-ink-1">TARS</Link>
+          <Link href="/app" className="flex items-center gap-2 font-display text-sm font-bold tracking-[0.08em] text-ink-1">
+            <TarsMark size={22} />TARS
+          </Link>
           <Link href="/disclosures" className="sim-mark" title="All capital on Tars is simulated — no real money.">
             SIMULATED
           </Link>

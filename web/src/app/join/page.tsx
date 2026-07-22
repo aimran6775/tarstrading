@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ThemeToggle from "@/components/theme-toggle";
+import TarsMark from "@/components/tars-mark";
 
 /** The $100k moment starts here. */
 export default function Join() {
@@ -37,6 +38,10 @@ export default function Join() {
       <div className="absolute right-4 top-4"><ThemeToggle /></div>
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
+          <Link href="/" className="pressable mb-6 inline-flex items-center gap-2.5">
+            <TarsMark size={30} />
+            <span className="font-display text-lg font-bold tracking-[0.1em] text-ink-1">TARS</span>
+          </Link>
           <p className="kicker mb-5">Simulated capital</p>
           <h1 className="display text-3xl text-ink-1 md:text-4xl">
             Your <span className="tnum">$100,000</span> is waiting
