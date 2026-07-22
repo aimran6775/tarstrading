@@ -1,14 +1,21 @@
 import "server-only";
+import { db, schema } from "./db";
+import { inArray } from "drizzle-orm";
 
 /*
   Market data service. Massive (formerly Polygon.io) proxied server-side ONLY —
   the API key never reaches the client. Free tier is 5 req/min EOD, so:
   - token-bucket rate limiter (never 429 by design)
-  - layered in-memory cache (quotes 5 min, bars 30 min)
+  - TWO cache layers: L1 in-memory (per instance) + L2 Postgres quote_cache
+    (shared by every instance). L2 is the scaling fix: with many serverless
+    instances and 500+ users, upstream is hit at most once per symbol per TTL
+    FLEET-WIDE instead of once per instance.
   - crypto pairs map to Massive's "X:BTCUSD" ticker form
   - every payload carries `asOf` so the UI can be honest about staleness
   Without a key, a deterministic demo market takes over (same shapes).
 */
+
+const QUOTE_TTL = 5 * 60_000;
 
 export type Quote = {
   symbol: string;
@@ -64,6 +71,40 @@ function massiveTicker(symbol: string): string {
   return symbol.includes("/") ? "X:" + symbol.replace("/", "") : symbol;
 }
 
+// ---------- L2: shared Postgres quote cache ----------
+function rowToQuote(r: typeof schema.quoteCache.$inferSelect): Quote {
+  return { symbol: r.symbol, price: r.price, previousClose: r.previousClose,
+    changePercent: r.changePercent, asOf: r.asOf };
+}
+
+/** Read fresh (< TTL) quotes from the shared cache for the given symbols. */
+async function readQuoteCacheBatch(symbols: string[]): Promise<Map<string, Quote>> {
+  if (!symbols.length) return new Map();
+  try {
+    const rows = await db.select().from(schema.quoteCache)
+      .where(inArray(schema.quoteCache.symbol, symbols));
+    const now = Date.now();
+    const map = new Map<string, Quote>();
+    for (const r of rows) if (now - r.updatedAt < QUOTE_TTL) map.set(r.symbol, rowToQuote(r));
+    return map;
+  } catch { return new Map(); } // cache is an optimization — never fail the request on it
+}
+
+/** Upsert a freshly fetched quote into the shared cache. */
+async function writeQuoteCache(q: Quote): Promise<void> {
+  try {
+    const now = Date.now();
+    await db.insert(schema.quoteCache)
+      .values({ symbol: q.symbol, price: q.price, previousClose: q.previousClose,
+        changePercent: q.changePercent, asOf: q.asOf, updatedAt: now })
+      .onConflictDoUpdate({
+        target: schema.quoteCache.symbol,
+        set: { price: q.price, previousClose: q.previousClose,
+          changePercent: q.changePercent, asOf: q.asOf, updatedAt: now },
+      });
+  } catch { /* best-effort */ }
+}
+
 async function massive<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const url = new URL(BASE + path);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
@@ -96,7 +137,8 @@ async function fetchQuote(symbol: string): Promise<Quote | null> {
     changePercent: bar.o > 0 ? bar.c / bar.o - 1 : 0,
     asOf: bar.t,
   };
-  store(`q:${symbol}`, quote);
+  store(`q:${symbol}`, quote);     // L1 (this instance)
+  await writeQuoteCache(quote);    // L2 (shared) — so other instances skip the fetch
   return quote;
 }
 
@@ -108,9 +150,11 @@ async function fetchQuote(symbol: string): Promise<Quote | null> {
  */
 export async function getQuote(symbol: string): Promise<Quote | null> {
   const key = `q:${symbol}`;
-  const hit = cached<Quote>(key, 5 * 60_000);
-  if (hit) return hit;
+  const hit = cached<Quote>(key, QUOTE_TTL);
+  if (hit) return hit;                       // L1
   if (!hasLiveData) return demoQuote(symbol);
+  const l2 = (await readQuoteCacheBatch([symbol])).get(symbol);
+  if (l2) { store(key, l2); return l2; }     // L2 (shared)
   if (tryTakeToken()) {
     try {
       return await fetchQuote(symbol);
@@ -127,7 +171,23 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
 
 export async function getQuotes(symbols: string[]): Promise<Quote[]> {
   const out: Quote[] = [];
+  const need: string[] = [];
   for (const s of symbols) {
+    const l1 = cached<Quote>(`q:${s}`, QUOTE_TTL);
+    if (l1) out.push(l1); else need.push(s);
+  }
+  if (!need.length) return out;
+  if (!hasLiveData) { for (const s of need) out.push(demoQuote(s)); return out; }
+
+  // One batched L2 read for the whole watchlist instead of N round-trips.
+  const l2 = await readQuoteCacheBatch(need);
+  const miss: string[] = [];
+  for (const s of need) {
+    const q = l2.get(s);
+    if (q) { store(`q:${s}`, q); out.push(q); } else miss.push(s);
+  }
+  // Only genuine misses reach the upstream (rate-limited) path.
+  for (const s of miss) {
     const q = await getQuote(s);
     if (q) out.push(q);
   }

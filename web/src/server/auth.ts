@@ -2,7 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { randomBytes, scryptSync, timingSafeEqual, randomUUID } from "crypto";
 import { db, schema } from "./db";
-import { eq, and, gt, lt } from "drizzle-orm";
+import { eq, and, gt, lt, sql } from "drizzle-orm";
 
 /*
   Auth: scrypt-hashed passwords + opaque session tokens in an httpOnly cookie.
@@ -122,18 +122,29 @@ export async function loginWithPassword(email: string, password: string): Promis
   return user.id;
 }
 
-// ---- in-memory auth throttle (per key: IP or email). Swap for Redis at scale. ----
-const attempts = new Map<string, { count: number; resetAt: number }>();
-export function rateLimit(key: string, max: number, windowMs: number): boolean {
+// ---- cross-instance auth throttle (per key: IP or email) ----
+// Backed by Postgres so it holds across serverless instances, where an
+// in-memory Map would be per-instance and barely throttle at all. One atomic
+// upsert per check: within the window count increments; past it, the bucket
+// resets. Returns true if the attempt is ALLOWED.
+export async function rateLimit(key: string, max: number, windowMs: number): Promise<boolean> {
   const now = Date.now();
-  const rec = attempts.get(key);
-  if (!rec || now > rec.resetAt) {
-    attempts.set(key, { count: 1, resetAt: now + windowMs });
+  try {
+    const [row] = await db.insert(schema.rateLimits)
+      .values({ key, count: 1, resetAt: now + windowMs })
+      .onConflictDoUpdate({
+        target: schema.rateLimits.key,
+        set: {
+          count: sql`case when ${schema.rateLimits.resetAt} <= ${now} then 1 else ${schema.rateLimits.count} + 1 end`,
+          resetAt: sql`case when ${schema.rateLimits.resetAt} <= ${now} then ${now + windowMs} else ${schema.rateLimits.resetAt} end`,
+        },
+      })
+      .returning({ count: schema.rateLimits.count });
+    return (row?.count ?? 1) <= max;
+  } catch {
+    // Fail OPEN: a DB blip shouldn't lock every user out of signing in.
     return true;
   }
-  if (rec.count >= max) return false;
-  rec.count++;
-  return true;
 }
 
 /** Sweep expired sessions — called opportunistically on login. */

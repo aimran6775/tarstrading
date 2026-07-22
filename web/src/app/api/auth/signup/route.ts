@@ -10,7 +10,7 @@ const ERRORS: Record<string, string> = {
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-  if (!rateLimit(`signup:${ip}`, 5, 10 * 60_000)) {
+  if (!await rateLimit(`signup:${ip}`, 5, 10 * 60_000)) {
     return NextResponse.json({ ok: false, error: "Too many sign-ups from here. Wait a bit." }, { status: 429 });
   }
   try {

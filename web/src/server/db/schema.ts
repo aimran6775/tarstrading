@@ -151,6 +151,25 @@ export const tarsMemory = pgTable("tars_memory", {
   updatedAt: epochMs("updated_at").notNull(),
 });
 
+/** Shared L2 quote cache — one row per symbol, read by every instance so
+    upstream (Massive) is hit at most once per symbol per TTL, fleet-wide. */
+export const quoteCache = pgTable("quote_cache", {
+  symbol: text("symbol").primaryKey(),
+  price: doublePrecision("price").notNull(),
+  previousClose: doublePrecision("previous_close").notNull(),
+  changePercent: doublePrecision("change_percent").notNull(),
+  asOf: epochMs("as_of").notNull(),
+  updatedAt: epochMs("updated_at").notNull(),
+});
+
+/** Cross-instance rate-limit buckets (auth throttle). Keyed by e.g.
+    "login:<ip>"; the app upserts atomically so serverless instances share it. */
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  resetAt: epochMs("reset_at").notNull(),
+});
+
 export const priceAlerts = pgTable("price_alerts", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),

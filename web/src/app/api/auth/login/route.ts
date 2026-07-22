@@ -4,7 +4,7 @@ import { loginWithPassword, startSession, rateLimit, purgeExpiredSessions } from
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   // 10 attempts / 5 min per IP — throttles credential stuffing.
-  if (!rateLimit(`login:${ip}`, 10, 5 * 60_000)) {
+  if (!await rateLimit(`login:${ip}`, 10, 5 * 60_000)) {
     return NextResponse.json({ ok: false, error: "Too many attempts. Wait a few minutes." }, { status: 429 });
   }
   try {

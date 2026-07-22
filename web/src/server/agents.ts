@@ -306,6 +306,23 @@ export async function tickAgents(userId: string): Promise<number> {
   }
 }
 
+/**
+ * Server-side tick for EVERY user who has a running agent — the engine behind
+ * "agents run 24/7," independent of whether anyone's browser is open. Called by
+ * the cron endpoint. Ticks users sequentially to stay within the market-data
+ * rate limit; each user's tick keeps its own in-flight lock.
+ */
+export async function tickAllRunningAgents(): Promise<{ users: number; actions: number }> {
+  const rows = await db.selectDistinct({ userId: schema.agents.userId })
+    .from(schema.agents).where(eq(schema.agents.status, "running"));
+  let actions = 0;
+  for (const { userId } of rows) {
+    try { actions += await tickAgents(userId); }
+    catch { /* one user's failure never halts the desk-wide tick */ }
+  }
+  return { users: rows.length, actions };
+}
+
 async function runTick(userId: string): Promise<number> {
   const running = await db.select().from(schema.agents).where(and(
     eq(schema.agents.userId, userId),
