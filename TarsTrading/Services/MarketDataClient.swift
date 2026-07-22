@@ -15,19 +15,37 @@ final class MarketDataClient: MarketProviding, Sendable {
         return comps.url!
     }
 
+    /// App symbols → Massive tickers. Crypto pairs are "X:BTCUSD" on the wire;
+    /// a raw "BTC/USD" would break the URL path (404) and used to kill the
+    /// whole quote batch.
+    private func massiveTicker(_ symbol: String) -> String {
+        symbol.contains("/") ? "X:" + symbol.replacingOccurrences(of: "/", with: "") : symbol
+    }
+
     func quotes(for symbols: [String]) async throws -> [Quote] {
         // Free tier: previous-close endpoint per symbol. Cached 5 min.
+        // One symbol failing (bad ticker, 429 after retries) must not sink
+        // the batch — return what succeeded; the UI shows gaps honestly.
         var results: [Quote] = []
+        var firstError: Error?
         for symbol in symbols {
-            let reply = try await http.get(PrevCloseReply.self,
-                                           url: url("/v2/aggs/ticker/\(symbol)/prev"))
-            if let bar = reply.results?.first {
-                results.append(Quote(symbol: symbol,
-                                     price: bar.c,
-                                     previousClose: bar.o,
-                                     asOf: Date(timeIntervalSince1970: bar.t / 1000)))
+            do {
+                let reply = try await http.get(PrevCloseReply.self,
+                                               url: url("/v2/aggs/ticker/\(massiveTicker(symbol))/prev"))
+                if let bar = reply.results?.first {
+                    results.append(Quote(symbol: symbol,
+                                         price: bar.c,
+                                         previousClose: bar.o,
+                                         asOf: Date(timeIntervalSince1970: bar.t / 1000)))
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                firstError = firstError ?? error
             }
         }
+        // Total failure still surfaces (offline, bad key); partial success wins.
+        if results.isEmpty, let firstError { throw firstError }
         return results
     }
 
@@ -47,7 +65,7 @@ final class MarketDataClient: MarketProviding, Sendable {
         let fmt = { (d: Date) in d.formatted(.iso8601.year().month().day().dateSeparator(.dash)) }
         let reply = try await http.get(
             AggsReply.self,
-            url: url("/v2/aggs/ticker/\(symbol)/range/\(multiplier)/\(span)/\(fmt(from))/\(fmt(to))",
+            url: url("/v2/aggs/ticker/\(massiveTicker(symbol))/range/\(multiplier)/\(span)/\(fmt(from))/\(fmt(to))",
                      query: ["adjusted": "true", "sort": "asc", "limit": "5000"]))
         return (reply.results ?? []).map {
             Bar(time: Date(timeIntervalSince1970: $0.t / 1000),
