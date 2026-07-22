@@ -45,15 +45,24 @@ export default function TarsChat({ userName }: { userName: string }) {
     setThinking(true);
     // Optimistic append — the room answers at the speed of thought.
     setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", text: clean, createdAt: Date.now() }]);
-    const res = await fetch("/api/tars", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: clean }),
-    });
-    const data = await res.json();
-    setThinking(false);
-    if (data.ok) {
-      setMessages((m) => [...m, { id: `tars-${Date.now()}`, role: "tars", text: data.reply, createdAt: Date.now() }]);
-      load(); // refresh canonical history + memory
+    try {
+      const res = await fetch("/api/tars", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: clean }),
+      });
+      const data = await res.json();
+      setThinking(false);
+      if (data.ok) {
+        setMessages((m) => [...m, { id: `tars-${Date.now()}`, role: "tars", text: data.reply, createdAt: Date.now() }]);
+        load(); // refresh canonical history + memory
+      } else {
+        setMessages((m) => [...m, { id: `err-${Date.now()}`, role: "tars",
+          text: "I couldn't answer that one — something failed on my end. Try again in a moment.", createdAt: Date.now() }]);
+      }
+    } catch {
+      setThinking(false);
+      setMessages((m) => [...m, { id: `err-${Date.now()}`, role: "tars",
+        text: "We lost the connection mid-thought. Check your network and ask again.", createdAt: Date.now() }]);
     }
   }
 

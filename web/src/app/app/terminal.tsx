@@ -57,6 +57,9 @@ function TerminalInner({ userName }: { userName: string }) {
   const [timeframe, setTimeframe] = useState<Timeframe>("3M");
   const [bars, setBars] = useState<ChartBar[]>([]);
   const [barsError, setBarsError] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const [accountError, setAccountError] = useState(false);
+  const [quotesStale, setQuotesStale] = useState(false);
   const [rail, setRail] = useState<"watch" | "positions" | "orders" | "perf">("watch");
   const [chartHeight, setChartHeight] = useState(420);
 
@@ -73,16 +76,19 @@ function TerminalInner({ userName }: { userName: string }) {
 
   // ---------- data loops ----------
   const loadAccount = useCallback(async () => {
-    const res = await fetch("/api/account");
-    if (res.status === 401) { router.push("/login"); return; }
-    const data = await res.json();
-    if (data.ok) {
-      setAccount(data.account);
-      setPositions(data.positions);
-      positionsRef.current = data.positions;
-      setWatchlist(data.watchlist);
-      watchlistRef.current = data.watchlist;
-    }
+    try {
+      const res = await fetch("/api/account");
+      if (res.status === 401) { router.push("/login"); return; }
+      const data = await res.json();
+      if (data.ok) {
+        setAccount(data.account);
+        setPositions(data.positions);
+        positionsRef.current = data.positions;
+        setWatchlist(data.watchlist);
+        watchlistRef.current = data.watchlist;
+        setAccountError(false);
+      } else setAccountError(true);
+    } catch { setAccountError(true); }
   }, [router]);
 
   const loadQuotes = useCallback(async () => {
@@ -91,17 +97,20 @@ function TerminalInner({ userName }: { userName: string }) {
       ...positionsRef.current.map((p) => p.symbol),
     ]));
     if (!symbols.length) return;
-    const res = await fetch(`/api/market/quotes?symbols=${encodeURIComponent(symbols.join(","))}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    if (data.ok) {
-      setQuotes((prev) => {
-        const next = new Map(prev);
-        (data.quotes as Quote[]).forEach((q) => next.set(q.symbol, q));
-        return next;
-      });
-      setMarketOpen(data.marketOpen);
-    }
+    try {
+      const res = await fetch(`/api/market/quotes?symbols=${encodeURIComponent(symbols.join(","))}`);
+      if (!res.ok) { setQuotesStale(true); return; }
+      const data = await res.json();
+      if (data.ok) {
+        setQuotes((prev) => {
+          const next = new Map(prev);
+          (data.quotes as Quote[]).forEach((q) => next.set(q.symbol, q));
+          return next;
+        });
+        setMarketOpen(data.marketOpen);
+        setQuotesStale(false);
+      } else setQuotesStale(true);
+    } catch { setQuotesStale(true); }
   }, []);
 
   const loadOrders = useCallback(async () => {
@@ -125,14 +134,16 @@ function TerminalInner({ userName }: { userName: string }) {
     setBarsError(null);
     setBars([]);
     (async () => {
-      const res = await fetch(`/api/market/bars?symbol=${encodeURIComponent(symbol)}&tf=${timeframe}`);
-      const data = await res.json();
-      if (!alive) return;
-      if (data.ok) setBars(data.bars);
-      else setBarsError(data.error ?? "Couldn't load history.");
+      try {
+        const res = await fetch(`/api/market/bars?symbol=${encodeURIComponent(symbol)}&tf=${timeframe}`);
+        const data = await res.json();
+        if (!alive) return;
+        if (data.ok) setBars(data.bars);
+        else setBarsError(data.error ?? "Couldn't load history.");
+      } catch { if (alive) setBarsError("Couldn't reach the data service. Check your connection."); }
     })();
     return () => { alive = false; };
-  }, [symbol, timeframe]);
+  }, [symbol, timeframe, reloadNonce]);
 
   const refreshAfterTrade = useCallback(() => {
     loadAccount().then(() => { loadQuotes(); loadOrders(); });
@@ -161,6 +172,17 @@ function TerminalInner({ userName }: { userName: string }) {
       {welcome && (
         <p className="mx-4 mt-4 rounded-lg border border-gold/25 bg-gold/8 px-4 py-2.5 text-sm text-gold md:mx-6">
           Your simulated $100,000 is live, {userName.split(" ")[0]}. Spend it on lessons, not luck.
+        </p>
+      )}
+      {accountError && (
+        <p role="alert" className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-lg border border-loss/40 bg-loss/10 px-4 py-2.5 text-sm text-loss md:mx-6">
+          Couldn&apos;t reach your account. Your positions are safe — retrying.
+          <button onClick={() => loadAccount()} className="pressable rounded-full border border-loss/40 px-3 py-1 text-xs">Retry now</button>
+        </p>
+      )}
+      {quotesStale && (
+        <p className="mx-4 mt-4 rounded-lg border border-warning/40 bg-warning/10 px-4 py-2 text-xs text-warning md:mx-6">
+          Prices paused — reconnecting to the data feed. The numbers below may be a moment behind.
         </p>
       )}
 
@@ -206,7 +228,7 @@ function TerminalInner({ userName }: { userName: string }) {
               <div className="flex h-[300px] flex-col items-center justify-center gap-3 px-6 text-center md:h-[420px]">
                 <p className="text-sm text-ink-2">{barsError}</p>
                 <button
-                  onClick={() => setTimeframe((t) => t)}
+                  onClick={() => setReloadNonce((n) => n + 1)}
                   className="pressable rounded-full border border-hairline px-4 py-2 text-xs text-ink-2"
                 >
                   Retry
@@ -309,21 +331,25 @@ function Ticket({ symbol, quote, cash, marketOpen, onPlaced }: {
   async function submit() {
     if (!valid) return;
     setPhase({ kind: "sending" });
-    const res = await fetch("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        symbol, side, type, qty: qtyNum,
-        limitPrice: type === "limit" ? Number(limitPrice) : undefined,
-        stopPrice: type === "stop" ? Number(stopPrice) : undefined,
-      }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      setPhase({ kind: "done", order: data.order });
-      onPlaced();
-    } else {
-      setPhase({ kind: "error", message: data.order?.rejectReason ?? "Order didn't go through." });
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol, side, type, qty: qtyNum,
+          limitPrice: type === "limit" ? Number(limitPrice) : undefined,
+          stopPrice: type === "stop" ? Number(stopPrice) : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setPhase({ kind: "done", order: data.order });
+        onPlaced();
+      } else {
+        setPhase({ kind: "error", message: data.order?.rejectReason ?? data.error ?? "Order didn't go through." });
+      }
+    } catch {
+      setPhase({ kind: "error", message: "Couldn't reach the exchange. Nothing was placed — try again." });
     }
   }
 
@@ -557,12 +583,15 @@ function Positions({ positions, quotes, onSelect, onClosed }: {
 
   async function close(p: Position) {
     setClosing(p.id);
-    await fetch("/api/orders", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol: p.symbol, side: "sell", type: "market", qty: p.qty }),
-    });
-    setClosing(null);
-    onClosed();
+    try {
+      await fetch("/api/orders", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: p.symbol, side: "sell", type: "market", qty: p.qty }),
+      });
+    } finally {
+      setClosing(null);
+      onClosed();
+    }
   }
 
   if (!positions.length) {
@@ -619,8 +648,8 @@ function Positions({ positions, quotes, onSelect, onClosed }: {
 
 function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: () => void }) {
   async function cancel(id: string) {
-    await fetch(`/api/orders/${id}`, { method: "DELETE" });
-    onCanceled();
+    try { await fetch(`/api/orders/${id}`, { method: "DELETE" }); }
+    finally { onCanceled(); }
   }
 
   if (!orders.length) {

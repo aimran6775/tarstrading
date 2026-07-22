@@ -29,15 +29,22 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
   const [correct, setCorrect] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [xpTotal, setXpTotal] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
 
   async function complete() {
-    const res = await fetch("/api/academy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lessonId: lesson.id }),
-    });
-    const data = await res.json();
-    if (data.ok) { setCompleted(true); setXpTotal(data.xp); }
+    setSaving(true); setSaveError(false);
+    try {
+      const res = await fetch("/api/academy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lessonId: lesson.id }),
+      });
+      const data = await res.json();
+      if (data.ok) { setCompleted(true); setXpTotal(data.xp); }
+      else setSaveError(true);
+    } catch { setSaveError(true); }
+    finally { setSaving(false); }
   }
 
   return (
@@ -79,10 +86,11 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
             {quizCount > 0 && (
               <p className="tnum text-xs text-ink-4">{correct} of {quizCount} checks answered correctly</p>
             )}
-            <button onClick={complete}
-              className="pressable cta-gold rounded-full px-8 py-3.5 text-base font-semibold">
-              Complete lesson · +{lesson.xp} XP
+            <button onClick={complete} disabled={saving}
+              className="pressable cta-gold rounded-full px-8 py-3.5 text-base font-semibold disabled:opacity-60">
+              {saving ? "Banking XP…" : `Complete lesson · +${lesson.xp} XP`}
             </button>
+            {saveError && <p role="alert" className="text-xs text-loss">Couldn&apos;t save your progress. Try again.</p>}
             <Link href="/app/academy" className="text-xs text-ink-3 hover:text-ink-1">
               Back to tracks
             </Link>
