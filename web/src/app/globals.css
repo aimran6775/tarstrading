@@ -34,6 +34,8 @@
   --loss: oklch(0.67 0.185 22);
   /* Agents only */
   --agent: oklch(0.70 0.16 300);
+  /* Caution — overfit warnings, near-limit meters. Amber, not the loss red. */
+  --warning: oklch(0.80 0.15 65);
 
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
   --dur-instant: 140ms;
@@ -68,6 +70,7 @@
   --gain: oklch(0.58 0.14 158);
   --loss: oklch(0.55 0.18 24);
   --agent: oklch(0.56 0.18 300);
+  --warning: oklch(0.66 0.15 62);
 }
 
 @media (prefers-color-scheme: light) {
@@ -89,6 +92,7 @@
     --gain: oklch(0.58 0.14 158);
     --loss: oklch(0.55 0.18 24);
     --agent: oklch(0.56 0.18 300);
+    --warning: oklch(0.66 0.15 62);
   }
 }
 
@@ -107,6 +111,7 @@
   --color-gain: var(--gain);
   --color-loss: var(--loss);
   --color-agent: var(--agent);
+  --color-warning: var(--warning);
   --color-hairline: var(--hairline);
   --radius-s: var(--r-s);
   --radius-m: var(--r-m);

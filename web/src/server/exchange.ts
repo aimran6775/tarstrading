@@ -49,46 +49,73 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
   };
 
   if (!Number.isFinite(input.qty) || input.qty <= 0) return reject("Quantity must be positive.");
+  // Equities trade in whole shares; only crypto is fractional.
+  if (!isCrypto && !Number.isInteger(input.qty)) return reject("Stocks trade in whole shares.");
   if (input.type === "limit" && !(input.limitPrice && input.limitPrice > 0))
     return reject("Limit orders need a limit price.");
   if (input.type === "stop" && !(input.stopPrice && input.stopPrice > 0))
     return reject("Stop orders need a stop price.");
 
+  // The one await: fetch the quote BEFORE the transaction. Everything after is
+  // synchronous, so no other request can interleave between check and settle.
   const quote = await getQuote(symbol);
   if (!quote) return reject(`No market data for ${symbol}.`);
-
-  // Sells require inventory (no shorting in v1 — teaching tool first).
-  if (input.side === "sell") {
-    const pos = db.select().from(schema.positions)
-      .where(and(eq(schema.positions.userId, userId), eq(schema.positions.symbol, symbol))).get();
-    if (!pos || pos.qty < input.qty) return reject("You can't sell more than you hold.");
-  }
-
-  // Buys require buying power at the worst plausible fill.
-  if (input.side === "buy") {
-    const account = db.select().from(schema.accounts)
-      .where(eq(schema.accounts.userId, userId)).get();
-    const estPrice = input.type === "limit" ? input.limitPrice! : quote.price * (1 + SLIPPAGE);
-    if (!account || account.cash < estPrice * input.qty)
-      return reject("This order exceeds your buying power.");
-  }
 
   const row = {
     id, userId, symbol, side: input.side, type: input.type, qty: input.qty,
     limitPrice: input.limitPrice ?? null, stopPrice: input.stopPrice ?? null,
     status: "accepted" as const, filledPrice: null as number | null,
     filledAt: null as number | null,
-    agentId: input.agentId ?? null, rejectReason: null, createdAt: now,
+    agentId: input.agentId ?? null, rejectReason: null as string | null, createdAt: now,
   };
-  db.insert(schema.orders).values(row).run();
-
-  // Immediate-fill path: market orders while the venue is open.
   const venueOpen = isCrypto || isUSMarketOpen();
-  if (venueOpen) {
-    const filled = tryFill(row, quote.price);
-    if (filled) return { ...row, ...filled };
+
+  // Atomic check → insert → (maybe) settle. Accounts for capital and inventory
+  // already committed to resting orders, so N pending buys can't collectively
+  // overspend and a resting sell can't be double-sold.
+  const result = db.transaction((): PlacedOrder => {
+    const resting = db.select().from(schema.orders).where(and(
+      eq(schema.orders.userId, userId), eq(schema.orders.status, "accepted"))).all();
+
+    if (input.side === "sell") {
+      const pos = db.select().from(schema.positions)
+        .where(and(eq(schema.positions.userId, userId), eq(schema.positions.symbol, symbol))).get();
+      const lockedForSale = resting
+        .filter((o) => o.side === "sell" && o.symbol === symbol)
+        .reduce((s, o) => s + o.qty, 0);
+      const available = (pos?.qty ?? 0) - lockedForSale;
+      if (available < input.qty) {
+        return rejectIn("You can't sell more than you hold (some may be committed to resting orders).");
+      }
+    } else {
+      const account = db.select().from(schema.accounts)
+        .where(eq(schema.accounts.userId, userId)).get();
+      const estPrice = input.type === "limit" ? input.limitPrice! : quote.price * (1 + SLIPPAGE);
+      const reservedByResting = resting
+        .filter((o) => o.side === "buy")
+        .reduce((s, o) => s + (o.limitPrice ?? o.stopPrice ?? quote.price * (1 + SLIPPAGE)) * o.qty, 0);
+      const available = (account?.cash ?? 0) - reservedByResting;
+      if (available < estPrice * input.qty) {
+        return rejectIn("This order exceeds your buying power (some is committed to resting orders).");
+      }
+    }
+
+    db.insert(schema.orders).values(row).run();
+    if (venueOpen) {
+      const filled = tryFill(row, quote.price);
+      if (filled) return { ...row, ...filled };
+    }
+    return row;
+  });
+
+  return result;
+
+  // reject that writes inside the surrounding transaction.
+  function rejectIn(reason: string): PlacedOrder {
+    const r = { ...row, status: "rejected" as const, rejectReason: reason };
+    db.insert(schema.orders).values(r).run();
+    return r;
   }
-  return row;
 }
 
 /** Attempt to fill an accepted order against a price. Returns fill patch or null. */

@@ -16,11 +16,19 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
-  const body = await request.json();
+
+  let body: Record<string, unknown>;
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ ok: false, error: "Bad request body." }, { status: 400 }); }
+
+  const symbol = String(body.symbol ?? "").toUpperCase().trim();
+  if (!/^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/.test(symbol)) {
+    return NextResponse.json({ ok: false, error: "That doesn't look like a symbol." }, { status: 400 });
+  }
   const order = await placeOrder(user.id, {
-    symbol: String(body.symbol ?? ""),
+    symbol,
     side: body.side === "sell" ? "sell" : "buy",
-    type: ["market", "limit", "stop"].includes(body.type) ? body.type : "market",
+    type: ["market", "limit", "stop"].includes(body.type as string) ? (body.type as "market" | "limit" | "stop") : "market",
     qty: Number(body.qty),
     limitPrice: body.limitPrice != null ? Number(body.limitPrice) : undefined,
     stopPrice: body.stopPrice != null ? Number(body.stopPrice) : undefined,

@@ -292,7 +292,21 @@ async function agentPnL(userId: string, agentId: string): Promise<number> {
  * honest contract: agents trade while your desk is open (server cron comes
  * with deploy). Idempotent per bar because entries require crosses or flat.
  */
+// Per-user in-flight lock: two overlapping ticks (two tabs, a double-click,
+// or account-reconcile racing a tick) must not both read held=0 and both buy.
+const ticking = new Set<string>();
+
 export async function tickAgents(userId: string): Promise<number> {
+  if (ticking.has(userId)) return 0;
+  ticking.add(userId);
+  try {
+    return await runTick(userId);
+  } finally {
+    ticking.delete(userId);
+  }
+}
+
+async function runTick(userId: string): Promise<number> {
   const running = db.select().from(schema.agents).where(and(
     eq(schema.agents.userId, userId),
     eq(schema.agents.status, "running"),
