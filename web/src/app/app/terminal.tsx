@@ -141,6 +141,7 @@ function TerminalInner({ userName }: { userName: string }) {
             <span className="rounded-full bg-bg3 px-3.5 py-1.5 text-xs font-medium text-ink-1">Terminal</span>
             <a href="/app/academy" className="pressable rounded-full px-3.5 py-1.5 text-xs font-medium text-ink-3 hover:text-ink-1">Academy</a>
             <a href="/app/agents" className="pressable rounded-full px-3.5 py-1.5 text-xs font-medium text-ink-3 hover:text-ink-1">Agents</a>
+            <a href="/app/tars" className="pressable rounded-full px-3.5 py-1.5 text-xs font-medium text-ink-3 hover:text-ink-1">Tars</a>
           </nav>
           {marketOpen === false && (
             <span className="hidden text-[11px] text-ink-4 sm:inline">US market closed</span>

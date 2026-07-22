@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
   The authenticated shell header: wordmark, quiet simulated marker, section
   nav, theme, logout. One component so every app surface wears the same hat.
 */
-export default function AppNav({ active }: { active: "terminal" | "academy" | "agents" }) {
+export default function AppNav({ active }: { active: "terminal" | "academy" | "agents" | "tars" }) {
   const router = useRouter();
   return (
     <header className="glass sticky top-0 z-50 flex items-center justify-between px-4 py-2.5 md:px-6">
@@ -24,6 +24,7 @@ export default function AppNav({ active }: { active: "terminal" | "academy" | "a
             ["terminal", "Terminal", "/app"],
             ["academy", "Academy", "/app/academy"],
             ["agents", "Agents", "/app/agents"],
+            ["tars", "Tars", "/app/tars"],
           ] as const).map(([key, label, href]) => (
             <Link
               key={key}

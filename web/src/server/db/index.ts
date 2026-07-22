@@ -92,6 +92,14 @@ function bootstrap(sqlite: Database.Database) {
     id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
     lesson_id TEXT NOT NULL, completed_at INTEGER NOT NULL, xp INTEGER NOT NULL);
   CREATE INDEX IF NOT EXISTS progress_user ON lesson_progress(user_id);
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
+    role TEXT NOT NULL, text TEXT NOT NULL, created_at INTEGER NOT NULL);
+  CREATE INDEX IF NOT EXISTS chat_user_time ON chat_messages(user_id, created_at);
+  CREATE TABLE IF NOT EXISTS tars_memory (
+    user_id TEXT PRIMARY KEY REFERENCES users(id),
+    summary TEXT NOT NULL, message_count INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL);
   `);
 }
 

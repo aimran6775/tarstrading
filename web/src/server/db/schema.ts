@@ -124,3 +124,19 @@ export const lessonProgress = sqliteTable("lesson_progress", {
   completedAt: integer("completed_at").notNull(),
   xp: integer("xp").notNull(),
 }, (t) => [index("progress_user").on(t.userId)]);
+
+export const chatMessages = sqliteTable("chat_messages", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  role: text("role").$type<"user" | "tars">().notNull(),
+  text: text("text").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, (t) => [index("chat_user_time").on(t.userId, t.createdAt)]);
+
+/** Tars's long-term memory of each trader: a distilled, evolving summary. */
+export const tarsMemory = sqliteTable("tars_memory", {
+  userId: text("user_id").primaryKey().references(() => users.id),
+  summary: text("summary").notNull(),
+  messageCount: integer("message_count").notNull().default(0),
+  updatedAt: integer("updated_at").notNull(),
+});
