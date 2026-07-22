@@ -20,6 +20,7 @@ export default async function AcademyHome() {
     .where(eq(schema.lessonProgress.userId, user.id)).all();
   const done = new Set(rows.map((r) => r.lessonId));
   const xp = rows.reduce((s, r) => s + r.xp, 0);
+  const next = tracks.flatMap((t) => t.lessons).find((l) => !done.has(l.id));
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -41,6 +42,13 @@ export default async function AcademyHome() {
           $100,000. No credential at the end; something better: a book you run
           like you mean it.
         </p>
+
+        {next && (
+          <Link href={`/app/academy/${next.id}`}
+            className="pressable cta-gold mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold">
+            {done.size > 0 ? "Continue" : "Start"}: {next.title}
+          </Link>
+        )}
 
         <div className="mt-10 flex flex-col gap-5">
           {tracks.map((track, ti) => {

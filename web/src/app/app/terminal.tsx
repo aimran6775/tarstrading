@@ -44,6 +44,7 @@ function TerminalInner({ userName }: { userName: string }) {
   const router = useRouter();
   const search = useSearchParams();
   const welcome = search.get("welcome") === "1";
+  const initialSymbol = (search.get("symbol") || "AAPL").toUpperCase();
 
   const [account, setAccount] = useState<Account | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -52,11 +53,11 @@ function TerminalInner({ userName }: { userName: string }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [marketOpen, setMarketOpen] = useState<boolean | null>(null);
 
-  const [symbol, setSymbol] = useState("AAPL");
+  const [symbol, setSymbol] = useState(initialSymbol);
   const [timeframe, setTimeframe] = useState<Timeframe>("3M");
   const [bars, setBars] = useState<ChartBar[]>([]);
   const [barsError, setBarsError] = useState<string | null>(null);
-  const [rail, setRail] = useState<"watch" | "positions" | "orders">("watch");
+  const [rail, setRail] = useState<"watch" | "positions" | "orders" | "perf">("watch");
   const [chartHeight, setChartHeight] = useState(420);
 
 
@@ -230,7 +231,7 @@ function TerminalInner({ userName }: { userName: string }) {
         {/* ---------- right rail ---------- */}
         <aside className="flex min-w-0 flex-col gap-4">
           <nav className="flex gap-1 rounded-full border border-hairline bg-bg1 p-1">
-            {([["watch", "Watchlist"], ["positions", `Positions${positions.length ? ` · ${positions.length}` : ""}`], ["orders", `Orders${openOrders.length ? ` · ${openOrders.length}` : ""}`]] as const).map(([key, label]) => (
+            {([["watch", "Watch"], ["positions", `Positions${positions.length ? ` · ${positions.length}` : ""}`], ["orders", `Orders${openOrders.length ? ` · ${openOrders.length}` : ""}`], ["perf", "Perf"]] as const).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setRail(key)}
@@ -264,6 +265,7 @@ function TerminalInner({ userName }: { userName: string }) {
           {rail === "orders" && (
             <Orders orders={orders} onCanceled={refreshAfterTrade} />
           )}
+          {rail === "perf" && <Performance />}
         </aside>
       </main>
 
@@ -669,6 +671,103 @@ function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: () => voi
         ))}
       </ul>
     </section>
+  );
+}
+
+type JournalEntry = {
+  id: string; symbol: string; side: string; qty: number;
+  entryPrice: number; exitPrice: number | null; pnl: number | null; createdAt: number;
+};
+
+/** Your track record — the equity curve and closed-trade journal that the
+    app records on every fill but never showed until now. */
+function Performance() {
+  const [history, setHistory] = useState<{ time: number; equity: number }[] | null>(null);
+  const [journal, setJournal] = useState<JournalEntry[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/portfolio");
+        const data = await res.json();
+        if (alive && data.ok) { setHistory(data.history); setJournal(data.journal); }
+        else if (alive) setHistory([]);
+      } catch { if (alive) setHistory([]); }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const realized = journal.reduce((s, j) => s + (j.pnl ?? 0), 0);
+  const wins = journal.filter((j) => (j.pnl ?? 0) > 0).length;
+  const closed = journal.filter((j) => j.pnl != null).length;
+
+  return (
+    <section className="panel overflow-hidden">
+      <div className="border-b border-hairline px-4 py-3">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Performance</h2>
+      </div>
+
+      <div className="p-4">
+        {history == null ? (
+          <div className="skeleton h-16 w-full" />
+        ) : history.length >= 2 ? (
+          <EquitySpark points={history} />
+        ) : (
+          <p className="py-6 text-center text-xs text-ink-4">
+            Your equity curve draws itself as you trade. Make a move on the desk.
+          </p>
+        )}
+        <div className="mt-4 grid grid-cols-2 gap-3 text-center">
+          <div className="rounded-lg bg-bg2 py-2.5">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-ink-4">Realized</p>
+            <p className={`tnum text-sm font-semibold ${realized > 0 ? "text-gain" : realized < 0 ? "text-loss" : "text-ink-2"}`}>
+              {realized >= 0 ? "+" : ""}{usd(realized)}
+            </p>
+          </div>
+          <div className="rounded-lg bg-bg2 py-2.5">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-ink-4">Win rate</p>
+            <p className="tnum text-sm font-semibold text-ink-1">
+              {closed ? `${Math.round((wins / closed) * 100)}%` : "—"}
+              <span className="text-[10px] font-normal text-ink-4"> · {closed} closed</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {journal.length > 0 && (
+        <ul className="max-h-[300px] overflow-y-auto border-t border-hairline">
+          {journal.map((j) => (
+            <li key={j.id} className="flex items-center justify-between px-4 py-2.5 text-xs">
+              <span className="text-ink-1">
+                {j.symbol} <span className="tnum text-ink-4">{j.qty} @ {usd(j.entryPrice)}
+                {j.exitPrice != null ? ` → ${usd(j.exitPrice)}` : ""}</span>
+              </span>
+              {j.pnl != null && (
+                <span className={`tnum font-medium ${j.pnl > 0 ? "text-gain" : j.pnl < 0 ? "text-loss" : "text-ink-3"}`}>
+                  {j.pnl >= 0 ? "+" : ""}{usd(j.pnl)}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function EquitySpark({ points }: { points: { time: number; equity: number }[] }) {
+  const vals = points.map((p) => p.equity);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const W = 300, H = 64;
+  const up = vals[vals.length - 1] >= vals[0];
+  const path = points.map((p, i) =>
+    `${((i / (points.length - 1)) * W).toFixed(1)},${(H - ((p.equity - min) / range) * H).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-16 w-full" preserveAspectRatio="none" aria-label="Equity curve">
+      <polyline points={path} fill="none" stroke={up ? "var(--gain)" : "var(--loss)"} strokeWidth="1.5" />
+    </svg>
   );
 }
 

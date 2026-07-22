@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { currentUser } from "@/server/auth";
 import { db, schema } from "@/server/db";
 import { desc, eq } from "drizzle-orm";
-import { recentActivity, describeStrategy, type Strategy } from "@/server/agents";
+import { recentActivity, describeStrategy, agentPnL, type Strategy } from "@/server/agents";
 
 export async function GET() {
   const user = await currentUser();
@@ -11,16 +11,16 @@ export async function GET() {
   const agents = db.select().from(schema.agents)
     .where(eq(schema.agents.userId, user.id))
     .orderBy(desc(schema.agents.createdAt)).all();
-  return NextResponse.json({
-    ok: true,
-    agents: agents.map((a) => ({
-      ...a,
-      strategy: JSON.parse(a.strategy),
-      backtest: a.backtest ? JSON.parse(a.backtest) : null,
-      thesis: describeStrategy(JSON.parse(a.strategy) as Strategy),
-    })),
-    activity: recentActivity(user.id),
-  });
+  const enriched = await Promise.all(agents.map(async (a) => ({
+    ...a,
+    strategy: JSON.parse(a.strategy),
+    backtest: a.backtest ? JSON.parse(a.backtest) : null,
+    thesis: describeStrategy(JSON.parse(a.strategy) as Strategy),
+    // Live realized+unrealized P&L of the agent's tagged book.
+    pnl: (a.status === "running" || a.status === "paused" || a.status === "killed")
+      ? await agentPnL(user.id, a.id) : 0,
+  })));
+  return NextResponse.json({ ok: true, agents: enriched, activity: recentActivity(user.id) });
 }
 
 const VALID_KINDS = new Set(["price", "sma", "ema", "rsi", "constant"]);

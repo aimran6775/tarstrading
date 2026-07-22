@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ThemeToggle from "./theme-toggle";
 
@@ -28,6 +29,12 @@ const ICON: Record<Section, string> = {
 
 export default function AppNav({ active, right }: { active: Section; right?: React.ReactNode }) {
   const router = useRouter();
+  const [xp, setXp] = useState<number | null>(null);
+  useEffect(() => {
+    fetch("/api/academy").then((r) => r.ok ? r.json() : null).then((d) => {
+      if (d?.ok) setXp(d.xp);
+    }).catch(() => {});
+  }, []);
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/");
@@ -53,6 +60,10 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
           </nav>
         </div>
         <div className="flex items-center gap-2 md:gap-3">
+          {xp != null && xp > 0 && (
+            <span className="tnum hidden rounded-full bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold sm:inline"
+              title="Academy XP earned">{xp} XP</span>
+          )}
           {right}
           <ThemeToggle />
           <button onClick={logout}

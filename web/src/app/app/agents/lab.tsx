@@ -27,7 +27,7 @@ type Agent = {
   id: string; name: string; emoji: string; strategy: Strategy;
   allocation: number; maxDrawdown: number;
   status: "draft" | "backtested" | "running" | "paused" | "killed";
-  backtest: Backtest | null; thesis: string;
+  backtest: Backtest | null; thesis: string; pnl: number;
 };
 type Activity = { id: string; agentName: string; text: string; createdAt: number };
 
@@ -176,6 +176,11 @@ function AgentCard({ agent, busy, onAction, onDelete }: {
             <p className="tnum text-[11px] text-ink-4">
               {usd(agent.allocation)} · halts at −{pctf(agent.maxDrawdown)}
             </p>
+            {(agent.status === "running" || agent.status === "paused" || agent.status === "killed") && (
+              <p className={`tnum text-[11px] font-medium ${agent.pnl > 0 ? "text-gain" : agent.pnl < 0 ? "text-loss" : "text-ink-3"}`}>
+                {agent.pnl >= 0 ? "+" : ""}{usd(agent.pnl)} live
+              </p>
+            )}
           </div>
         </div>
         <span className={`tnum text-[10px] uppercase tracking-[0.2em] ${STATUS_STYLE[agent.status]}`}>

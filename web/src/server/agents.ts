@@ -264,7 +264,7 @@ function agentHoldings(userId: string, agentId: string): Map<string, { qty: numb
 }
 
 /** Realized + unrealized P&L of the agent's book, for the drawdown guard. */
-async function agentPnL(userId: string, agentId: string): Promise<number> {
+export async function agentPnL(userId: string, agentId: string): Promise<number> {
   const rows = db.select().from(schema.orders).where(and(
     eq(schema.orders.userId, userId),
     eq(schema.orders.agentId, agentId),

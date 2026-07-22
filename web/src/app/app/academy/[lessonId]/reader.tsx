@@ -124,7 +124,8 @@ function SectionView({ section, onQuiz }: { section: Section; onQuiz: (right: bo
         <div className="card border-l-2 border-l-gain p-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-gain">To the desk</p>
           <p className="mt-2 text-sm leading-relaxed text-ink-2">{section.instruction}</p>
-          <Link href="/app" className="pressable mt-3 inline-block rounded-full border border-hairline px-4 py-2 text-xs text-ink-1 hover:border-ink-4">
+          <Link href={section.symbol ? `/app?symbol=${encodeURIComponent(section.symbol)}` : "/app"}
+            className="pressable mt-3 inline-block rounded-full border border-hairline px-4 py-2 text-xs text-ink-1 hover:border-ink-4">
             Open the terminal{section.symbol ? ` · ${section.symbol}` : ""}
           </Link>
         </div>
