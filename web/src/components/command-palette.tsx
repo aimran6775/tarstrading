@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { searchSymbols, SYMBOLS as SYMBOL_DICT } from "@/lib/symbols";
 
 /*
   ⌘K / Ctrl-K from anywhere: jump to a symbol's chart or navigate the app.
@@ -19,9 +20,8 @@ const SECTIONS: [string, string][] = [
   ["Performance", "/app?perf=1"],
 ];
 
-// A small, recognizable universe for quick symbol jumps. Typing anything else
-// still works — it routes to that symbol's chart.
-const SYMBOLS = ["AAPL", "NVDA", "TSLA", "SPY", "MSFT", "AMZN", "META", "GOOG", "AMD", "NFLX", "BTC/USD", "ETH/USD"];
+// Popular defaults shown before the user types anything.
+const DEFAULT_SYMBOLS = ["AAPL", "NVDA", "TSLA", "SPY", "BTC/USD", "ETH/USD"];
 
 export default function CommandPalette() {
   const router = useRouter();
@@ -55,13 +55,16 @@ export default function CommandPalette() {
       .filter(([label]) => !q || label.toUpperCase().includes(q))
       .map(([label, href]) => ({ id: `s:${href}`, label, sub: "Go to section", run: go(href) }));
 
-    const symMatches = (q
-      ? SYMBOLS.filter((s) => s.includes(q))
-      : SYMBOLS.slice(0, 6)
-    ).map((s) => ({ id: `sym:${s}`, label: s, sub: "Open chart", run: go(`/app?symbol=${encodeURIComponent(s)}`) }));
+    const matches = q ? searchSymbols(q, 6) : DEFAULT_SYMBOLS.map((s) => ({ symbol: s, name: "" }));
+    const symMatches = matches.map((m) => ({
+      id: `sym:${m.symbol}`, label: m.symbol,
+      sub: m.name || "Open chart", run: go(`/app?symbol=${encodeURIComponent(m.symbol)}`),
+    }));
 
-    // Free-form symbol: whatever the user typed, routed to its chart.
-    const freeform: Item[] = q && /^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/.test(q) && !SYMBOLS.includes(q)
+    // Free-form ticker: whatever the user typed, if it looks like a symbol and
+    // isn't already in the dictionary matches, routed straight to its chart.
+    const known = new Set([...SYMBOL_DICT.map((e) => e.symbol), ...matches.map((m) => m.symbol)]);
+    const freeform: Item[] = q && /^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/.test(q) && !known.has(q)
       ? [{ id: `free:${q}`, label: q, sub: "Open chart", run: go(`/app?symbol=${encodeURIComponent(q)}`) }]
       : [];
 

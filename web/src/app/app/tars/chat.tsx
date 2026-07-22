@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { linkifyLesson } from "@/lib/tars-links";
 
 /*
   The mentor's room. Tars's words float on the room itself (no bubbles —
@@ -164,7 +166,7 @@ export default function TarsChat({ userName }: { userName: string }) {
             <div key={m.id} className="flex items-start gap-3">
               <OrbAvatar thinking={false} size={24} />
               <p className="flex-1 whitespace-pre-wrap text-[16px] leading-[1.65] text-ink-1">
-                {m.text}
+                <LinkedText text={m.text} />
               </p>
             </div>
           ),
@@ -201,6 +203,26 @@ export default function TarsChat({ userName }: { userName: string }) {
         Tars teaches and critiques. It never gives directive advice — that&apos;s the one promise it keeps.
       </p>
     </main>
+  );
+}
+
+/** Renders Tars prose with the first mention of each concept linked to its
+    Academy lesson — every answer becomes a doorway into the curriculum. */
+function LinkedText({ text }: { text: string }) {
+  const segments = linkifyLesson(text);
+  return (
+    <>
+      {segments.map((seg, i) =>
+        "lessonId" in seg ? (
+          <Link key={i} href={`/app/academy/${seg.lessonId}`}
+            className="text-gold underline decoration-gold/40 underline-offset-2 hover:decoration-gold">
+            {seg.text}
+          </Link>
+        ) : (
+          <span key={i}>{seg.text}</span>
+        ),
+      )}
+    </>
   );
 }
 

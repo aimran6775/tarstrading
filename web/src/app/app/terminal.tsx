@@ -6,6 +6,8 @@ import dynamic from "next/dynamic";
 import HoldButton from "@/components/hold-button";
 import AppNav from "@/components/app-nav";
 import GettingStarted from "@/components/getting-started";
+import { useToast } from "@/components/toast";
+import SymbolInput from "@/components/symbol-input";
 import type { ChartBar } from "@/components/price-chart";
 
 const PriceChart = dynamic(() => import("@/components/price-chart"), {
@@ -319,6 +321,7 @@ function Ticket({ symbol, quote, cash, marketOpen, onPlaced }: {
   const [phase, setPhase] = useState<
     { kind: "idle" } | { kind: "sending" } | { kind: "done"; order: Order } | { kind: "error"; message: string }
   >({ kind: "idle" });
+  const toast = useToast();
 
   const isCrypto = symbol.includes("/");
   const qtyNum = Number(qty) || 0;
@@ -348,9 +351,20 @@ function Ticket({ symbol, quote, cash, marketOpen, onPlaced }: {
       const data = await res.json();
       if (data.ok) {
         setPhase({ kind: "done", order: data.order });
+        const o = data.order;
+        if (o.status === "filled") {
+          toast({ kind: side === "buy" ? "gain" : "loss",
+            title: `${side === "buy" ? "Bought" : "Sold"} ${o.qty} ${symbol}`,
+            body: `Filled @ ${usd(o.filledPrice ?? 0)}` });
+        } else {
+          toast({ kind: "info", title: `${side === "buy" ? "Buy" : "Sell"} ${o.qty} ${symbol} resting`,
+            body: "It'll fill when price agrees." });
+        }
         onPlaced();
       } else {
-        setPhase({ kind: "error", message: data.order?.rejectReason ?? data.error ?? "Order didn't go through." });
+        const message = data.order?.rejectReason ?? data.error ?? "Order didn't go through.";
+        setPhase({ kind: "error", message });
+        toast({ kind: "loss", title: "Order rejected", body: message });
       }
     } catch {
       setPhase({ kind: "error", message: "Couldn't reach the exchange. Nothing was placed — try again." });
@@ -499,16 +513,17 @@ function Watchlist({ symbols, quotes, selected, marketOpen, onSelect, onChange }
 }) {
   const [adding, setAdding] = useState("");
 
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
-    const symbol = adding.trim().toUpperCase();
+  async function add(raw: string) {
+    const symbol = raw.trim().toUpperCase();
     if (!symbol) return;
-    const res = await fetch("/api/watchlist", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol }),
-    });
-    const data = await res.json();
-    if (data.ok) { onChange(data.watchlist); setAdding(""); }
+    try {
+      const res = await fetch("/api/watchlist", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol }),
+      });
+      const data = await res.json();
+      if (data.ok) { onChange(data.watchlist); setAdding(""); }
+    } catch { /* transient — user can retry */ }
   }
 
   async function remove(symbol: string) {
@@ -562,17 +577,13 @@ function Watchlist({ symbols, quotes, selected, marketOpen, onSelect, onChange }
           );
         })}
       </ul>
-      <form onSubmit={add} className="flex gap-2 border-t border-hairline p-3">
-        <input
-          value={adding} onChange={(e) => setAdding(e.target.value)}
-          placeholder="Add symbol — e.g. MSFT or SOL/USD"
-          className="w-full rounded-full border border-hairline bg-bg2 px-4 py-2 text-xs text-ink-1 outline-none focus:border-gold"
-          aria-label="Add symbol to watchlist"
-        />
-        <button type="submit" className="pressable rounded-full border border-hairline px-4 text-xs text-ink-2 hover:text-ink-1">
+      <div className="flex gap-2 border-t border-hairline p-3">
+        <SymbolInput value={adding} onChange={setAdding} onSubmit={add} />
+        <button type="button" onClick={() => add(adding)}
+          className="pressable rounded-full border border-hairline px-4 text-xs text-ink-2 hover:text-ink-1">
           Add
         </button>
-      </form>
+      </div>
     </section>
   );
 }
