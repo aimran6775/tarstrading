@@ -24,7 +24,7 @@ export default async function AcademyHome() {
   return (
     <div className="flex min-h-screen flex-col">
       <AppNav active="academy" />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-10 md:px-8">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-24 pt-10 md:pb-10 md:px-8">
         <p className="kicker mb-3">The academy</p>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <h1 className="display text-4xl text-ink-1 md:text-5xl">

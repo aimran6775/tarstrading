@@ -58,7 +58,7 @@ export default function TarsChat({ userName }: { userName: string }) {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-5 py-8 md:px-0">
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-5 pb-24 pt-8 md:pb-8 md:px-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <OrbAvatar thinking={thinking} />

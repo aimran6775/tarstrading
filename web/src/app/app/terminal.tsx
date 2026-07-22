@@ -4,11 +4,12 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import HoldButton from "@/components/hold-button";
+import AppNav from "@/components/app-nav";
 import type { ChartBar } from "@/components/price-chart";
 
 const PriceChart = dynamic(() => import("@/components/price-chart"), {
   ssr: false,
-  loading: () => <div className="skeleton m-4 h-[404px]" />,
+  loading: () => <div className="skeleton m-4 h-[300px] md:h-[404px]" />,
 });
 
 /*
@@ -56,9 +57,18 @@ function TerminalInner({ userName }: { userName: string }) {
   const [bars, setBars] = useState<ChartBar[]>([]);
   const [barsError, setBarsError] = useState<string | null>(null);
   const [rail, setRail] = useState<"watch" | "positions" | "orders">("watch");
+  const [chartHeight, setChartHeight] = useState(420);
+
 
   const watchlistRef = useRef<string[]>([]);
   const positionsRef = useRef<Position[]>([]);
+
+  useEffect(() => {
+    const fit = () => setChartHeight(window.innerWidth < 768 ? 300 : 420);
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
 
   // ---------- data loops ----------
   const loadAccount = useCallback(async () => {
@@ -131,40 +141,21 @@ function TerminalInner({ userName }: { userName: string }) {
   const dayPnL = account ? account.equity - account.dayStartEquity : 0;
   const openOrders = orders.filter((o) => o.status === "accepted");
 
+  const equityStrip = account ? (
+    <div className="flex items-baseline gap-2 tnum" aria-label="Account equity and day change">
+      <span className="text-sm font-semibold text-ink-1">{usd(account.equity, 0)}</span>
+      <span className={`text-xs ${dayPnL > 0 ? "text-gain" : dayPnL < 0 ? "text-loss" : "text-ink-3"}`}>
+        {pct(account.dayStartEquity > 0 ? dayPnL / account.dayStartEquity : 0)}
+      </span>
+      {marketOpen === false && (
+        <span className="hidden text-[11px] text-ink-4 md:inline">· closed</span>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="glass sticky top-0 z-50 flex items-center justify-between px-4 py-2.5 md:px-6">
-        <div className="flex items-center gap-3">
-          <span className="font-display text-sm font-bold tracking-[0.08em] text-ink-1">TARS</span>
-          <span className="sim-mark" title="All capital on Tars is simulated — no real money.">SIMULATED</span>
-          <nav className="ml-2 hidden gap-1 sm:flex">
-            <span className="rounded-full bg-bg3 px-3.5 py-1.5 text-xs font-medium text-ink-1">Terminal</span>
-            <a href="/app/academy" className="pressable rounded-full px-3.5 py-1.5 text-xs font-medium text-ink-3 hover:text-ink-1">Academy</a>
-            <a href="/app/agents" className="pressable rounded-full px-3.5 py-1.5 text-xs font-medium text-ink-3 hover:text-ink-1">Agents</a>
-            <a href="/app/tars" className="pressable rounded-full px-3.5 py-1.5 text-xs font-medium text-ink-3 hover:text-ink-1">Tars</a>
-          </nav>
-          {marketOpen === false && (
-            <span className="hidden text-[11px] text-ink-4 sm:inline">US market closed</span>
-          )}
-        </div>
-        <div className="flex items-center gap-4">
-          {account && (
-            <div className="hidden items-baseline gap-3 sm:flex">
-              <span className="tnum text-sm font-semibold text-ink-1">{usd(account.equity, 0)}</span>
-              <span className={`tnum text-xs ${dayPnL > 0 ? "text-gain" : dayPnL < 0 ? "text-loss" : "text-ink-3"}`}>
-                {pct(account.dayStartEquity > 0 ? dayPnL / account.dayStartEquity : 0)}
-              </span>
-            </div>
-          )}
-          <ThemeToggle />
-          <button
-            onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.push("/"); }}
-            className="pressable rounded-full border border-hairline px-3 py-1.5 text-xs text-ink-2 hover:text-ink-1"
-          >
-            Log out
-          </button>
-        </div>
-      </header>
+      <AppNav active="terminal" right={equityStrip} />
 
       {welcome && (
         <p className="mx-4 mt-4 rounded-lg border border-gold/25 bg-gold/8 px-4 py-2.5 text-sm text-gold md:mx-6">
@@ -172,7 +163,7 @@ function TerminalInner({ userName }: { userName: string }) {
         </p>
       )}
 
-      <main className="grid flex-1 gap-4 p-4 md:grid-cols-[1fr_340px] md:p-6">
+      <main className="grid flex-1 gap-4 p-4 pb-20 md:grid-cols-[1fr_340px] md:p-6 md:pb-6">
         {/* ---------- left: chart + ticket ---------- */}
         <div className="flex min-w-0 flex-col gap-4">
           <section className="panel overflow-hidden">
@@ -211,7 +202,7 @@ function TerminalInner({ userName }: { userName: string }) {
             </div>
 
             {barsError ? (
-              <div className="flex h-[420px] flex-col items-center justify-center gap-3 px-6 text-center">
+              <div className="flex h-[300px] flex-col items-center justify-center gap-3 px-6 text-center md:h-[420px]">
                 <p className="text-sm text-ink-2">{barsError}</p>
                 <button
                   onClick={() => setTimeframe((t) => t)}
@@ -221,9 +212,9 @@ function TerminalInner({ userName }: { userName: string }) {
                 </button>
               </div>
             ) : bars.length ? (
-              <PriceChart bars={bars} height={420} />
+              <PriceChart bars={bars} height={chartHeight} />
             ) : (
-              <div className="skeleton m-4 h-[404px]" />
+              <div className="skeleton m-4 h-[300px] md:h-[404px]" />
             )}
           </section>
 
@@ -529,7 +520,7 @@ function Watchlist({ symbols, quotes, selected, marketOpen, onSelect, onChange }
                 )}
                 <button
                   onClick={(e) => { e.stopPropagation(); remove(s); }}
-                  className="pressable w-5 text-ink-4 opacity-0 transition-opacity hover:text-loss group-hover:opacity-100"
+                  className="pressable flex h-9 w-9 items-center justify-center text-ink-4 hover:text-loss"
                   aria-label={`Remove ${s} from watchlist`}
                 >
                   ×
@@ -681,29 +672,3 @@ function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: () => voi
   );
 }
 
-function ThemeToggle() {
-  const [theme, setTheme] = useState<string | null>(null);
-  useEffect(() => {
-    setTheme(document.documentElement.dataset.theme ?? "auto");
-  }, []);
-  function cycle() {
-    const next = theme === "dark" ? "light" : theme === "light" ? "auto" : "dark";
-    setTheme(next);
-    if (next === "auto") {
-      delete document.documentElement.dataset.theme;
-      localStorage.removeItem("tars-theme");
-    } else {
-      document.documentElement.dataset.theme = next;
-      localStorage.setItem("tars-theme", next);
-    }
-  }
-  return (
-    <button
-      onClick={cycle}
-      className="pressable rounded-full border border-hairline px-3 py-1.5 text-xs text-ink-2 hover:text-ink-1"
-      title="Theme: dark → light → auto"
-    >
-      {theme === "dark" ? "Dark" : theme === "light" ? "Light" : "Auto"}
-    </button>
-  );
-}

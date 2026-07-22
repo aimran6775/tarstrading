@@ -41,7 +41,7 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-10 md:px-0">
+    <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-24 pt-10 md:pb-10 md:px-0">
       <p className="kicker mb-4">
         <Link href="/app/academy" className="hover:underline">{track.title}</Link>
         {" "}· {lessonNumber} of {trackSize}
