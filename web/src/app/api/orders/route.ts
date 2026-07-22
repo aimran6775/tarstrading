@@ -7,9 +7,9 @@ import { desc, eq } from "drizzle-orm";
 export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
-  const orders = db.select().from(schema.orders)
+  const orders = await db.select().from(schema.orders)
     .where(eq(schema.orders.userId, user.id))
-    .orderBy(desc(schema.orders.createdAt)).limit(100).all();
+    .orderBy(desc(schema.orders.createdAt)).limit(100);
   return NextResponse.json({ ok: true, orders });
 }
 

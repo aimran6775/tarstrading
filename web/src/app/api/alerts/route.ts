@@ -7,9 +7,9 @@ import { desc, eq } from "drizzle-orm";
 export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
-  const alerts = db.select().from(schema.priceAlerts)
+  const alerts = await db.select().from(schema.priceAlerts)
     .where(eq(schema.priceAlerts.userId, user.id))
-    .orderBy(desc(schema.priceAlerts.createdAt)).all();
+    .orderBy(desc(schema.priceAlerts.createdAt));
   return NextResponse.json({ ok: true, alerts });
 }
 
@@ -33,6 +33,6 @@ export async function POST(request: Request) {
     id: randomUUID(), userId: user.id, symbol, price, direction: direction as "above" | "below",
     triggeredAt: null, createdAt: Date.now(),
   };
-  db.insert(schema.priceAlerts).values(row).run();
+  await db.insert(schema.priceAlerts).values(row);
   return NextResponse.json({ ok: true, alert: row }, { status: 201 });
 }

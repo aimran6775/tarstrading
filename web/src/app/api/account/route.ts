@@ -12,13 +12,13 @@ export async function GET() {
   // the user sees is always the account after the market moved.
   await reconcile(user.id);
 
-  const account = db.select().from(schema.accounts)
-    .where(eq(schema.accounts.userId, user.id)).get();
-  const positions = db.select().from(schema.positions)
-    .where(eq(schema.positions.userId, user.id)).all();
-  const watchlist = db.select().from(schema.watchlistItems)
+  const [account] = await db.select().from(schema.accounts)
+    .where(eq(schema.accounts.userId, user.id));
+  const positions = await db.select().from(schema.positions)
+    .where(eq(schema.positions.userId, user.id));
+  const watchlist = await db.select().from(schema.watchlistItems)
     .where(eq(schema.watchlistItems.userId, user.id))
-    .orderBy(asc(schema.watchlistItems.rank)).all();
+    .orderBy(asc(schema.watchlistItems.rank));
 
   return NextResponse.json({
     ok: true,

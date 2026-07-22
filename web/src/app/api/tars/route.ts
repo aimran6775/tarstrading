@@ -7,8 +7,8 @@ export async function GET() {
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
   return NextResponse.json({
     ok: true,
-    messages: history(user.id, 200),
-    memory: memoryOf(user.id),
+    messages: await history(user.id, 200),
+    memory: await memoryOf(user.id),
     brain: brainStatus(),
   });
 }
@@ -50,6 +50,6 @@ export async function POST(request: Request) {
 export async function DELETE() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
-  clearConversation(user.id);
+  await clearConversation(user.id);
   return NextResponse.json({ ok: true });
 }

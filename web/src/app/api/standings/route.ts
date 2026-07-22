@@ -7,7 +7,9 @@ export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
 
-  const achievements = computeAchievements(user.id);
-  const leaderboard = getLeaderboard(user.id);
+  const [achievements, leaderboard] = await Promise.all([
+    computeAchievements(user.id),
+    getLeaderboard(user.id),
+  ]);
   return NextResponse.json({ ok: true, achievements, leaderboard });
 }

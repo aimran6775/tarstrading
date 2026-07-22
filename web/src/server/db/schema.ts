@@ -1,69 +1,77 @@
-import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, bigint, doublePrecision, index } from "drizzle-orm/pg-core";
 
 /*
-  Tars Trading data model. Money is stored as floating dollars for the
-  simulator (this is simulated capital — auditability beats precision here,
-  and every mutation goes through the exchange, never raw SQL).
-  All timestamps are unix epoch milliseconds.
+  Tars Trading data model — Postgres (Supabase).
+
+  Two deliberate type choices carried over from the SQLite phase:
+  - Money and quantities are `double precision`. This is SIMULATED capital;
+    every mutation goes through the exchange, never raw SQL, and floats keep
+    all the arithmetic in the app as plain JS numbers (no string-decimal
+    churn). If this ever settles real money, move these to `numeric`.
+  - Timestamps are unix epoch MILLISECONDS in `bigint` (mode: number). ms
+    overflows int32, and values stay well under 2^53 so JS numbers are exact.
 */
 
-export const users = sqliteTable("users", {
+/** Epoch-milliseconds column as a JS number. */
+const epochMs = (name: string) => bigint(name, { mode: "number" });
+
+export const users = pgTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
 });
 
-export const sessions = sqliteTable("sessions", {
+export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
-  expiresAt: integer("expires_at").notNull(),
+  expiresAt: epochMs("expires_at").notNull(),
 }, (t) => [index("sessions_user").on(t.userId)]);
 
 /** One simulated account per user. Everyone starts with $100,000. */
-export const accounts = sqliteTable("accounts", {
+export const accounts = pgTable("accounts", {
   userId: text("user_id").primaryKey().references(() => users.id),
-  cash: real("cash").notNull(),
+  cash: doublePrecision("cash").notNull(),
   /** Sum of |position value| at last mark. Derived but cached for speed. */
-  equity: real("equity").notNull(),
-  dayStartEquity: real("day_start_equity").notNull(),
+  equity: doublePrecision("equity").notNull(),
+  dayStartEquity: doublePrecision("day_start_equity").notNull(),
   dayStamp: text("day_stamp").notNull(),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
 });
 
-export const positions = sqliteTable("positions", {
+export const positions = pgTable("positions", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
   symbol: text("symbol").notNull(),
-  qty: real("qty").notNull(),
-  avgEntryPrice: real("avg_entry_price").notNull(),
-  updatedAt: integer("updated_at").notNull(),
+  qty: doublePrecision("qty").notNull(),
+  avgEntryPrice: doublePrecision("avg_entry_price").notNull(),
+  updatedAt: epochMs("updated_at").notNull(),
 }, (t) => [index("positions_user").on(t.userId)]);
 
 export type OrderStatus = "accepted" | "filled" | "canceled" | "rejected";
 export type OrderSide = "buy" | "sell";
 export type OrderType = "market" | "limit" | "stop";
 
-export const orders = sqliteTable("orders", {
+export const orders = pgTable("orders", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
   symbol: text("symbol").notNull(),
   side: text("side").$type<OrderSide>().notNull(),
   type: text("type").$type<OrderType>().notNull(),
-  qty: real("qty").notNull(),
-  limitPrice: real("limit_price"),
-  stopPrice: real("stop_price"),
+  qty: doublePrecision("qty").notNull(),
+  limitPrice: doublePrecision("limit_price"),
+  stopPrice: doublePrecision("stop_price"),
   status: text("status").$type<OrderStatus>().notNull(),
-  filledPrice: real("filled_price"),
-  filledAt: integer("filled_at"),
+  filledPrice: doublePrecision("filled_price"),
+  filledAt: epochMs("filled_at"),
   /** Set when an agent placed this order — every agent action is tagged. */
   agentId: text("agent_id"),
   rejectReason: text("reject_reason"),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
 }, (t) => [index("orders_user").on(t.userId), index("orders_status").on(t.status)]);
 
-export const watchlistItems = sqliteTable("watchlist_items", {
+export const watchlistItems = pgTable("watchlist_items", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
   symbol: text("symbol").notNull(),
@@ -71,85 +79,85 @@ export const watchlistItems = sqliteTable("watchlist_items", {
 }, (t) => [index("watchlist_user").on(t.userId)]);
 
 /** Agents run exactly the rules the user programs — nothing hidden. */
-export const agents = sqliteTable("agents", {
+export const agents = pgTable("agents", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
   name: text("name").notNull(),
   emoji: text("emoji").notNull().default("🤖"),
   /** JSON: { universe: string[], entry: Rule[], exit: Rule[] } */
   strategy: text("strategy").notNull(),
-  allocation: real("allocation").notNull(),
+  allocation: doublePrecision("allocation").notNull(),
   /** Max drawdown fraction (e.g. 0.15) before auto-halt. */
-  maxDrawdown: real("max_drawdown").notNull().default(0.2),
+  maxDrawdown: doublePrecision("max_drawdown").notNull().default(0.2),
   status: text("status").$type<"draft" | "backtested" | "running" | "paused" | "killed">().notNull(),
   /** JSON backtest result — an agent must pass an honest backtest to run. */
   backtest: text("backtest"),
   /** Peak book value reached while running — drives drawdown-FROM-PEAK. */
-  peakValue: real("peak_value"),
-  createdAt: integer("created_at").notNull(),
+  peakValue: doublePrecision("peak_value"),
+  createdAt: epochMs("created_at").notNull(),
 }, (t) => [index("agents_user").on(t.userId)]);
 
-export const agentActivity = sqliteTable("agent_activity", {
+export const agentActivity = pgTable("agent_activity", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
   agentId: text("agent_id").notNull().references(() => agents.id),
   agentName: text("agent_name").notNull(),
   text: text("text").notNull(),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
 }, (t) => [index("activity_user").on(t.userId)]);
 
-export const equityHistory = sqliteTable("equity_history", {
+export const equityHistory = pgTable("equity_history", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
-  time: integer("time").notNull(),
-  equity: real("equity").notNull(),
+  time: epochMs("time").notNull(),
+  equity: doublePrecision("equity").notNull(),
 }, (t) => [index("equity_user_time").on(t.userId, t.time)]);
 
-export const journalEntries = sqliteTable("journal_entries", {
+export const journalEntries = pgTable("journal_entries", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
   symbol: text("symbol").notNull(),
   side: text("side").notNull(),
-  qty: real("qty").notNull(),
-  entryPrice: real("entry_price").notNull(),
-  exitPrice: real("exit_price"),
-  pnl: real("pnl"),
+  qty: doublePrecision("qty").notNull(),
+  entryPrice: doublePrecision("entry_price").notNull(),
+  exitPrice: doublePrecision("exit_price"),
+  pnl: doublePrecision("pnl"),
   thesis: text("thesis"),
   agentId: text("agent_id"),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
 }, (t) => [index("journal_user").on(t.userId)]);
 
-export const lessonProgress = sqliteTable("lesson_progress", {
+export const lessonProgress = pgTable("lesson_progress", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
   lessonId: text("lesson_id").notNull(),
-  completedAt: integer("completed_at").notNull(),
+  completedAt: epochMs("completed_at").notNull(),
   xp: integer("xp").notNull(),
 }, (t) => [index("progress_user").on(t.userId)]);
 
-export const chatMessages = sqliteTable("chat_messages", {
+export const chatMessages = pgTable("chat_messages", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
   role: text("role").$type<"user" | "tars">().notNull(),
   text: text("text").notNull(),
-  createdAt: integer("created_at").notNull(),
+  createdAt: epochMs("created_at").notNull(),
 }, (t) => [index("chat_user_time").on(t.userId, t.createdAt)]);
 
 /** Tars's long-term memory of each trader: a distilled, evolving summary. */
-export const tarsMemory = sqliteTable("tars_memory", {
+export const tarsMemory = pgTable("tars_memory", {
   userId: text("user_id").primaryKey().references(() => users.id),
   summary: text("summary").notNull(),
   messageCount: integer("message_count").notNull().default(0),
-  updatedAt: integer("updated_at").notNull(),
+  updatedAt: epochMs("updated_at").notNull(),
 });
 
-export const priceAlerts = sqliteTable("price_alerts", {
+export const priceAlerts = pgTable("price_alerts", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
   symbol: text("symbol").notNull(),
   /** Fire when price crosses this level in `direction`. */
-  price: real("price").notNull(),
+  price: doublePrecision("price").notNull(),
   direction: text("direction").$type<"above" | "below">().notNull(),
-  triggeredAt: integer("triggered_at"),
-  createdAt: integer("created_at").notNull(),
+  triggeredAt: epochMs("triggered_at"),
+  createdAt: epochMs("created_at").notNull(),
 }, (t) => [index("alerts_user").on(t.userId)]);

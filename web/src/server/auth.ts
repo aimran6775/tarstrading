@@ -41,42 +41,41 @@ export async function createUser(email: string, name: string, password: string) 
   if (password.length < 8) throw new Error("weak-password");
   if (!name.trim()) throw new Error("missing-name");
 
-  const existing = db.select().from(schema.users)
-    .where(eq(schema.users.email, normalized)).get();
+  const [existing] = await db.select().from(schema.users)
+    .where(eq(schema.users.email, normalized));
   if (existing) throw new Error("email-taken");
 
   const now = Date.now();
   const userId = randomUUID();
-  db.insert(schema.users).values({
+  await db.insert(schema.users).values({
     id: userId, email: normalized, name: name.trim(),
     passwordHash: hashPassword(password), createdAt: now,
-  }).run();
+  });
 
   // The $100k moment: every new trader starts with the same simulated stake.
-  db.insert(schema.accounts).values({
+  await db.insert(schema.accounts).values({
     userId, cash: STARTING_CASH, equity: STARTING_CASH,
     dayStartEquity: STARTING_CASH,
     dayStamp: new Date().toISOString().slice(0, 10),
     createdAt: now,
-  }).run();
-
-  const defaults = ["AAPL", "NVDA", "TSLA", "SPY", "BTC/USD", "ETH/USD"];
-  defaults.forEach((symbol, rank) => {
-    db.insert(schema.watchlistItems)
-      .values({ id: randomUUID(), userId, symbol, rank }).run();
   });
 
-  db.insert(schema.equityHistory)
-    .values({ id: randomUUID(), userId, time: now, equity: STARTING_CASH }).run();
+  const defaults = ["AAPL", "NVDA", "TSLA", "SPY", "BTC/USD", "ETH/USD"];
+  await db.insert(schema.watchlistItems).values(
+    defaults.map((symbol, rank) => ({ id: randomUUID(), userId, symbol, rank })),
+  );
+
+  await db.insert(schema.equityHistory)
+    .values({ id: randomUUID(), userId, time: now, equity: STARTING_CASH });
 
   return userId;
 }
 
 export async function startSession(userId: string) {
   const token = randomBytes(32).toString("hex");
-  db.insert(schema.sessions).values({
+  await db.insert(schema.sessions).values({
     id: token, userId, expiresAt: Date.now() + SESSION_TTL_MS,
-  }).run();
+  });
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
@@ -87,7 +86,7 @@ export async function startSession(userId: string) {
 export async function endSession() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) db.delete(schema.sessions).where(eq(schema.sessions.id, token)).run();
+  if (token) await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
   jar.delete(SESSION_COOKIE);
 }
 
@@ -97,13 +96,13 @@ export async function currentUser(): Promise<SessionUser | null> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const row = db.select({
+  const [row] = await db.select({
     id: schema.users.id, email: schema.users.email, name: schema.users.name,
   })
     .from(schema.sessions)
     .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
     .where(and(eq(schema.sessions.id, token), gt(schema.sessions.expiresAt, Date.now())))
-    .get();
+    .limit(1);
   return row ?? null;
 }
 
@@ -113,9 +112,9 @@ export async function requireUser(): Promise<SessionUser> {
   return user;
 }
 
-export function loginWithPassword(email: string, password: string): string {
-  const user = db.select().from(schema.users)
-    .where(eq(schema.users.email, email.trim().toLowerCase())).get();
+export async function loginWithPassword(email: string, password: string): Promise<string> {
+  const [user] = await db.select().from(schema.users)
+    .where(eq(schema.users.email, email.trim().toLowerCase()));
   // Always run a scrypt comparison — constant work whether or not the email
   // exists — so response time doesn't leak account membership.
   const ok = verifyPassword(password, user ? user.passwordHash : DUMMY_HASH);
@@ -138,6 +137,6 @@ export function rateLimit(key: string, max: number, windowMs: number): boolean {
 }
 
 /** Sweep expired sessions — called opportunistically on login. */
-export function purgeExpiredSessions() {
-  db.delete(schema.sessions).where(lt(schema.sessions.expiresAt, Date.now())).run();
+export async function purgeExpiredSessions() {
+  await db.delete(schema.sessions).where(lt(schema.sessions.expiresAt, Date.now()));
 }

@@ -10,7 +10,7 @@ export async function DELETE(
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
   const { id } = await params;
-  db.delete(schema.priceAlerts).where(and(
-    eq(schema.priceAlerts.id, id), eq(schema.priceAlerts.userId, user.id))).run();
+  await db.delete(schema.priceAlerts).where(and(
+    eq(schema.priceAlerts.id, id), eq(schema.priceAlerts.userId, user.id)));
   return NextResponse.json({ ok: true });
 }

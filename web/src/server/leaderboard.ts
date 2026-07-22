@@ -21,16 +21,15 @@ export type Rank = {
 export type Standings = { top: Rank[]; you: Rank | null; totalTraders: number };
 
 /** Top `limit` traders by return, plus the caller's own row if off the board. */
-export function getLeaderboard(userId: string, limit = 20): Standings {
-  const rows = db.select({
+export async function getLeaderboard(userId: string, limit = 20): Promise<Standings> {
+  const rows = await db.select({
     id: schema.accounts.userId,
     equity: schema.accounts.equity,
     name: schema.users.name,
   })
     .from(schema.accounts)
     .innerJoin(schema.users, eq(schema.accounts.userId, schema.users.id))
-    .orderBy(desc(schema.accounts.equity))
-    .all();
+    .orderBy(desc(schema.accounts.equity));
 
   const ranked: Rank[] = rows.map((r, i) => ({
     rank: i + 1,

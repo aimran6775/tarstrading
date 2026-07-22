@@ -16,8 +16,8 @@ export default async function AcademyHome() {
   const user = await currentUser();
   if (!user) redirect("/login");
 
-  const rows = db.select().from(schema.lessonProgress)
-    .where(eq(schema.lessonProgress.userId, user.id)).all();
+  const rows = await db.select().from(schema.lessonProgress)
+    .where(eq(schema.lessonProgress.userId, user.id));
   const done = new Set(rows.map((r) => r.lessonId));
   const xp = rows.reduce((s, r) => s + r.xp, 0);
   const next = tracks.flatMap((t) => t.lessons).find((l) => !done.has(l.id));

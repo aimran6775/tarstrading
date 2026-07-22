@@ -9,6 +9,6 @@ export async function DELETE(
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
   const { id } = await params;
-  const canceled = cancelOrder(user.id, id);
+  const canceled = await cancelOrder(user.id, id);
   return NextResponse.json({ ok: canceled }, { status: canceled ? 200 : 409 });
 }

@@ -13,9 +13,9 @@ export type TriggeredAlert = { id: string; symbol: string; price: number; direct
 
 /** Check a user's active alerts against fresh quotes. Marks any that crossed
     and returns them so the caller can notify. */
-export function checkAlerts(userId: string, quotes: Quote[]): TriggeredAlert[] {
-  const active = db.select().from(schema.priceAlerts)
-    .where(and(eq(schema.priceAlerts.userId, userId), isNull(schema.priceAlerts.triggeredAt))).all();
+export async function checkAlerts(userId: string, quotes: Quote[]): Promise<TriggeredAlert[]> {
+  const active = await db.select().from(schema.priceAlerts)
+    .where(and(eq(schema.priceAlerts.userId, userId), isNull(schema.priceAlerts.triggeredAt)));
   if (!active.length) return [];
 
   const priceOf = new Map(quotes.map((q) => [q.symbol, q.price]));
@@ -27,7 +27,7 @@ export function checkAlerts(userId: string, quotes: Quote[]): TriggeredAlert[] {
     if (px == null) continue;
     const crossed = a.direction === "above" ? px >= a.price : px <= a.price;
     if (crossed) {
-      db.update(schema.priceAlerts).set({ triggeredAt: now }).where(eq(schema.priceAlerts.id, a.id)).run();
+      await db.update(schema.priceAlerts).set({ triggeredAt: now }).where(eq(schema.priceAlerts.id, a.id));
       fired.push({ id: a.id, symbol: a.symbol, price: a.price, direction: a.direction });
     }
   }

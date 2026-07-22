@@ -7,12 +7,12 @@ export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
 
-  const history = db.select().from(schema.equityHistory)
+  const history = await db.select().from(schema.equityHistory)
     .where(eq(schema.equityHistory.userId, user.id))
-    .orderBy(asc(schema.equityHistory.time)).limit(5000).all();
-  const journal = db.select().from(schema.journalEntries)
+    .orderBy(asc(schema.equityHistory.time)).limit(5000);
+  const journal = await db.select().from(schema.journalEntries)
     .where(eq(schema.journalEntries.userId, user.id))
-    .orderBy(desc(schema.journalEntries.createdAt)).limit(20).all();
+    .orderBy(desc(schema.journalEntries.createdAt)).limit(20);
 
   return NextResponse.json({
     ok: true,

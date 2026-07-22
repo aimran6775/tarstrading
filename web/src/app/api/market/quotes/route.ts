@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
   const quotes = await getQuotes(symbols);
   // Price alerts ride the poll the terminal already runs — no extra requests.
-  const triggered = checkAlerts(user.id, quotes);
+  const triggered = await checkAlerts(user.id, quotes);
   return NextResponse.json({
     ok: true,
     quotes,

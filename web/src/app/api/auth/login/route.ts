@@ -9,8 +9,8 @@ export async function POST(request: Request) {
   }
   try {
     const { email, password } = await request.json();
-    const userId = loginWithPassword(String(email ?? ""), String(password ?? ""));
-    purgeExpiredSessions();
+    const userId = await loginWithPassword(String(email ?? ""), String(password ?? ""));
+    await purgeExpiredSessions();
     await startSession(userId);
     return NextResponse.json({ ok: true });
   } catch {

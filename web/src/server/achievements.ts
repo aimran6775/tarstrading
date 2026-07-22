@@ -34,21 +34,18 @@ function longestWinStreak(pnls: number[]): number {
   return best;
 }
 
-export function computeAchievements(userId: string): { badges: Badge[]; earned: number; total: number } {
-  const filled = db.select().from(schema.orders)
-    .where(and(eq(schema.orders.userId, userId), eq(schema.orders.status, "filled"))).all();
-  const journal = db.select().from(schema.journalEntries)
-    .where(eq(schema.journalEntries.userId, userId)).all();
-  const lessons = db.select().from(schema.lessonProgress)
-    .where(eq(schema.lessonProgress.userId, userId)).all();
-  const agents = db.select().from(schema.agents)
-    .where(eq(schema.agents.userId, userId)).all();
-  const chats = db.select().from(schema.chatMessages)
-    .where(eq(schema.chatMessages.userId, userId)).all();
-  const alerts = db.select().from(schema.priceAlerts)
-    .where(eq(schema.priceAlerts.userId, userId)).all();
-  const account = db.select().from(schema.accounts)
-    .where(eq(schema.accounts.userId, userId)).get();
+export async function computeAchievements(userId: string): Promise<{ badges: Badge[]; earned: number; total: number }> {
+  const [filled, journal, lessons, agents, chats, alerts, accountRows] = await Promise.all([
+    db.select().from(schema.orders)
+      .where(and(eq(schema.orders.userId, userId), eq(schema.orders.status, "filled"))),
+    db.select().from(schema.journalEntries).where(eq(schema.journalEntries.userId, userId)),
+    db.select().from(schema.lessonProgress).where(eq(schema.lessonProgress.userId, userId)),
+    db.select().from(schema.agents).where(eq(schema.agents.userId, userId)),
+    db.select().from(schema.chatMessages).where(eq(schema.chatMessages.userId, userId)),
+    db.select().from(schema.priceAlerts).where(eq(schema.priceAlerts.userId, userId)),
+    db.select().from(schema.accounts).where(eq(schema.accounts.userId, userId)),
+  ]);
+  const account = accountRows[0];
 
   const fills = filled.length;
   const closed = journal.filter((j) => j.pnl != null).sort((a, b) => a.createdAt - b.createdAt);

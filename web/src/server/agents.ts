@@ -238,20 +238,20 @@ export async function backtest(strategy: Strategy): Promise<BacktestResult | nul
 
 type AgentRow = typeof schema.agents.$inferSelect;
 
-function narrate(userId: string, agent: AgentRow, text: string) {
-  db.insert(schema.agentActivity).values({
+async function narrate(userId: string, agent: AgentRow, text: string) {
+  await db.insert(schema.agentActivity).values({
     id: randomUUID(), userId, agentId: agent.id, agentName: agent.name,
     text, createdAt: Date.now(),
-  }).run();
+  });
 }
 
 /** Agent's holdings per symbol, derived from its tagged filled orders. */
-function agentHoldings(userId: string, agentId: string): Map<string, { qty: number; cost: number }> {
-  const rows = db.select().from(schema.orders).where(and(
+async function agentHoldings(userId: string, agentId: string): Promise<Map<string, { qty: number; cost: number }>> {
+  const rows = await db.select().from(schema.orders).where(and(
     eq(schema.orders.userId, userId),
     eq(schema.orders.agentId, agentId),
     eq(schema.orders.status, "filled"),
-  )).all();
+  ));
   const holdings = new Map<string, { qty: number; cost: number }>();
   for (const o of rows) {
     const h = holdings.get(o.symbol) ?? { qty: 0, cost: 0 };
@@ -265,11 +265,11 @@ function agentHoldings(userId: string, agentId: string): Map<string, { qty: numb
 
 /** Realized + unrealized P&L of the agent's book, for the drawdown guard. */
 export async function agentPnL(userId: string, agentId: string): Promise<number> {
-  const rows = db.select().from(schema.orders).where(and(
+  const rows = await db.select().from(schema.orders).where(and(
     eq(schema.orders.userId, userId),
     eq(schema.orders.agentId, agentId),
     eq(schema.orders.status, "filled"),
-  )).all();
+  ));
   let cash = 0;
   const qty = new Map<string, number>();
   for (const o of rows) {
@@ -307,10 +307,10 @@ export async function tickAgents(userId: string): Promise<number> {
 }
 
 async function runTick(userId: string): Promise<number> {
-  const running = db.select().from(schema.agents).where(and(
+  const running = await db.select().from(schema.agents).where(and(
     eq(schema.agents.userId, userId),
     eq(schema.agents.status, "running"),
-  )).all();
+  ));
   let actions = 0;
 
   for (const agent of running) {
@@ -323,18 +323,18 @@ async function runTick(userId: string): Promise<number> {
     const book = agent.allocation + pnl;
     const peak = Math.max(agent.peakValue ?? agent.allocation, book);
     if (peak !== agent.peakValue) {
-      db.update(schema.agents).set({ peakValue: peak }).where(eq(schema.agents.id, agent.id)).run();
+      await db.update(schema.agents).set({ peakValue: peak }).where(eq(schema.agents.id, agent.id));
     }
     const drawdown = peak > 0 ? (peak - book) / peak : 0;
     if (drawdown > agent.maxDrawdown) {
-      db.update(schema.agents).set({ status: "killed" }).where(eq(schema.agents.id, agent.id)).run();
-      narrate(userId, agent,
+      await db.update(schema.agents).set({ status: "killed" }).where(eq(schema.agents.id, agent.id));
+      await narrate(userId, agent,
         `Halted itself: drawdown ${(drawdown * 100).toFixed(1)}% from its peak breached the ${(agent.maxDrawdown * 100).toFixed(0)}% limit. Positions kept — closing them is your call.`);
       actions++;
       continue;
     }
 
-    const holdings = agentHoldings(userId, agent.id);
+    const holdings = await agentHoldings(userId, agent.id);
     const perSymbolBudget = agent.allocation / strategy.universe.length;
 
     for (const symbol of strategy.universe) {
@@ -356,14 +356,14 @@ async function runTick(userId: string): Promise<number> {
           : Math.floor(perSymbolBudget / quote.price);
         if (qty > 0) {
           const order = await placeOrder(userId, { symbol, side: "buy", type: "market", qty, agentId: agent.id });
-          narrate(userId, agent, order.status === "filled"
+          await narrate(userId, agent, order.status === "filled"
             ? `Entered ${symbol}: ${qty} @ ${order.filledPrice?.toFixed(2)}. Thesis: ${strategy.entry.map((r) => `${describeIndicator(r.lhs)} ${COMPARATOR_TEXT[r.comparator]} ${describeIndicator(r.rhs)}`).join(" and ")}.`
             : `Tried to enter ${symbol} but the order ${order.status}: ${order.rejectReason ?? "resting"}.`);
           actions++;
         }
       } else if (held > 1e-9 && strategy.exit.some((r) => ruleFires(r, closes, i))) {
         const order = await placeOrder(userId, { symbol, side: "sell", type: "market", qty: held, agentId: agent.id });
-        narrate(userId, agent, order.status === "filled"
+        await narrate(userId, agent, order.status === "filled"
           ? `Exited ${symbol}: ${held} @ ${order.filledPrice?.toFixed(2)}. An exit rule fired — no second-guessing.`
           : `Tried to exit ${symbol} but the order ${order.status}: ${order.rejectReason ?? "resting"}.`);
         actions++;
@@ -373,8 +373,8 @@ async function runTick(userId: string): Promise<number> {
   return actions;
 }
 
-export function recentActivity(userId: string, limit = 40) {
+export async function recentActivity(userId: string, limit = 40) {
   return db.select().from(schema.agentActivity)
     .where(eq(schema.agentActivity.userId, userId))
-    .orderBy(desc(schema.agentActivity.createdAt)).limit(limit).all();
+    .orderBy(desc(schema.agentActivity.createdAt)).limit(limit);
 }

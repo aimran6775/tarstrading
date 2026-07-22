@@ -15,9 +15,20 @@ import { getQuote, getQuotes, isUSMarketOpen } from "./market";
   - buying-power and inventory checks reject bad orders with plain reasons
   All simulated. No real money anywhere. Orders are the ONLY thing that
   mutates cash/positions.
+
+  Concurrency: on SQLite a synchronous transaction serialized everything.
+  On Postgres we take a row lock on the user's account (SELECT … FOR UPDATE)
+  at the top of every settling transaction, so all of a user's concurrent
+  order placement and reconciliation serialize on that one row — N pending
+  buys can't collectively overspend and a resting sell can't be double-sold.
+  Quote fetches (network) always happen BEFORE the transaction opens, so we
+  never hold a row lock across I/O.
 */
 
 const SLIPPAGE = 0.0005;
+
+/** Any drizzle executor — the base db or a transaction handle. */
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type PlaceOrderInput = {
   symbol: string;
@@ -37,14 +48,14 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
   const now = Date.now();
   const id = randomUUID();
 
-  const reject = (reason: string): PlacedOrder => {
+  const reject = async (reason: string): Promise<PlacedOrder> => {
     const row = {
       id, userId, symbol, side: input.side, type: input.type, qty: input.qty,
       limitPrice: input.limitPrice ?? null, stopPrice: input.stopPrice ?? null,
       status: "rejected" as const, filledPrice: null, filledAt: null,
       agentId: input.agentId ?? null, rejectReason: reason, createdAt: now,
     };
-    db.insert(schema.orders).values(row).run();
+    await db.insert(schema.orders).values(row);
     return row;
   };
 
@@ -56,8 +67,7 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
   if (input.type === "stop" && !(input.stopPrice && input.stopPrice > 0))
     return reject("Stop orders need a stop price.");
 
-  // The one await: fetch the quote BEFORE the transaction. Everything after is
-  // synchronous, so no other request can interleave between check and settle.
+  // Fetch the quote BEFORE the transaction — never hold a lock across network.
   const quote = await getQuote(symbol);
   if (!quote) return reject(`No market data for ${symbol}.`);
 
@@ -70,16 +80,26 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
   };
   const venueOpen = isCrypto || isUSMarketOpen();
 
-  // Atomic check → insert → (maybe) settle. Accounts for capital and inventory
-  // already committed to resting orders, so N pending buys can't collectively
-  // overspend and a resting sell can't be double-sold.
-  const result = db.transaction((): PlacedOrder => {
-    const resting = db.select().from(schema.orders).where(and(
-      eq(schema.orders.userId, userId), eq(schema.orders.status, "accepted"))).all();
+  // Atomic check → insert → (maybe) settle, serialized per user by the account
+  // row lock. Accounts for capital and inventory already committed to resting
+  // orders.
+  return db.transaction(async (tx): Promise<PlacedOrder> => {
+    // Lock the account row for this user — the per-user serialization point.
+    const [account] = await tx.select().from(schema.accounts)
+      .where(eq(schema.accounts.userId, userId)).for("update");
+
+    const resting = await tx.select().from(schema.orders).where(and(
+      eq(schema.orders.userId, userId), eq(schema.orders.status, "accepted")));
+
+    const rejectIn = async (reason: string): Promise<PlacedOrder> => {
+      const r = { ...row, status: "rejected" as const, rejectReason: reason };
+      await tx.insert(schema.orders).values(r);
+      return r;
+    };
 
     if (input.side === "sell") {
-      const pos = db.select().from(schema.positions)
-        .where(and(eq(schema.positions.userId, userId), eq(schema.positions.symbol, symbol))).get();
+      const [pos] = await tx.select().from(schema.positions)
+        .where(and(eq(schema.positions.userId, userId), eq(schema.positions.symbol, symbol)));
       const lockedForSale = resting
         .filter((o) => o.side === "sell" && o.symbol === symbol)
         .reduce((s, o) => s + o.qty, 0);
@@ -88,8 +108,6 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
         return rejectIn("You can't sell more than you hold (some may be committed to resting orders).");
       }
     } else {
-      const account = db.select().from(schema.accounts)
-        .where(eq(schema.accounts.userId, userId)).get();
       const estPrice = input.type === "limit" ? input.limitPrice! : quote.price * (1 + SLIPPAGE);
       const reservedByResting = resting
         .filter((o) => o.side === "buy")
@@ -100,26 +118,17 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
       }
     }
 
-    db.insert(schema.orders).values(row).run();
+    await tx.insert(schema.orders).values(row);
     if (venueOpen) {
-      const filled = tryFill(row, quote.price);
+      const filled = await tryFill(tx, row, quote.price);
       if (filled) return { ...row, ...filled };
     }
     return row;
   });
-
-  return result;
-
-  // reject that writes inside the surrounding transaction.
-  function rejectIn(reason: string): PlacedOrder {
-    const r = { ...row, status: "rejected" as const, rejectReason: reason };
-    db.insert(schema.orders).values(r).run();
-    return r;
-  }
 }
 
 /** Attempt to fill an accepted order against a price. Returns fill patch or null. */
-function tryFill(order: PlacedOrder, price: number): { status: "filled"; filledPrice: number; filledAt: number } | null {
+async function tryFill(tx: Tx, order: PlacedOrder, price: number): Promise<{ status: "filled"; filledPrice: number; filledAt: number } | null> {
   let fillPrice: number | null = null;
   const slip = order.side === "buy" ? 1 + SLIPPAGE : 1 - SLIPPAGE;
 
@@ -138,78 +147,92 @@ function tryFill(order: PlacedOrder, price: number): { status: "filled"; filledP
   }
   if (fillPrice == null) return null;
 
-  settle(order, fillPrice);
+  await settle(tx, order, fillPrice);
   const patch = { status: "filled" as const, filledPrice: fillPrice, filledAt: Date.now() };
-  db.update(schema.orders).set(patch).where(eq(schema.orders.id, order.id)).run();
+  await tx.update(schema.orders).set(patch).where(eq(schema.orders.id, order.id));
   return patch;
 }
 
 /** Apply a fill to cash + positions + journal. The only money mutation path. */
-function settle(order: PlacedOrder, fillPrice: number) {
+async function settle(tx: Tx, order: PlacedOrder, fillPrice: number) {
   const { userId, symbol, qty } = order;
-  const account = db.select().from(schema.accounts).where(eq(schema.accounts.userId, userId)).get();
+  const [account] = await tx.select().from(schema.accounts).where(eq(schema.accounts.userId, userId));
   if (!account) return;
-  const pos = db.select().from(schema.positions)
-    .where(and(eq(schema.positions.userId, userId), eq(schema.positions.symbol, symbol))).get();
+  const [pos] = await tx.select().from(schema.positions)
+    .where(and(eq(schema.positions.userId, userId), eq(schema.positions.symbol, symbol)));
   const now = Date.now();
 
   if (order.side === "buy") {
-    db.update(schema.accounts)
+    await tx.update(schema.accounts)
       .set({ cash: account.cash - fillPrice * qty })
-      .where(eq(schema.accounts.userId, userId)).run();
+      .where(eq(schema.accounts.userId, userId));
     if (pos) {
       const newQty = pos.qty + qty;
       const blended = (pos.avgEntryPrice * pos.qty + fillPrice * qty) / newQty;
-      db.update(schema.positions)
+      await tx.update(schema.positions)
         .set({ qty: newQty, avgEntryPrice: blended, updatedAt: now })
-        .where(eq(schema.positions.id, pos.id)).run();
+        .where(eq(schema.positions.id, pos.id));
     } else {
-      db.insert(schema.positions).values({
+      await tx.insert(schema.positions).values({
         id: randomUUID(), userId, symbol, qty, avgEntryPrice: fillPrice, updatedAt: now,
-      }).run();
+      });
     }
   } else {
-    db.update(schema.accounts)
+    await tx.update(schema.accounts)
       .set({ cash: account.cash + fillPrice * qty })
-      .where(eq(schema.accounts.userId, userId)).run();
+      .where(eq(schema.accounts.userId, userId));
     if (pos) {
       const remaining = pos.qty - qty;
       // Realized P&L → journal, every close is a learning artifact.
-      db.insert(schema.journalEntries).values({
+      await tx.insert(schema.journalEntries).values({
         id: randomUUID(), userId, symbol, side: "sell", qty,
         entryPrice: pos.avgEntryPrice, exitPrice: fillPrice,
         pnl: (fillPrice - pos.avgEntryPrice) * qty,
         thesis: null, agentId: order.agentId, createdAt: now,
-      }).run();
+      });
       if (remaining > 1e-9) {
-        db.update(schema.positions)
+        await tx.update(schema.positions)
           .set({ qty: remaining, updatedAt: now })
-          .where(eq(schema.positions.id, pos.id)).run();
+          .where(eq(schema.positions.id, pos.id));
       } else {
-        db.delete(schema.positions).where(eq(schema.positions.id, pos.id)).run();
+        await tx.delete(schema.positions).where(eq(schema.positions.id, pos.id));
       }
     }
   }
 }
 
-export function cancelOrder(userId: string, orderId: string): boolean {
-  const order = db.select().from(schema.orders)
-    .where(and(eq(schema.orders.id, orderId), eq(schema.orders.userId, userId))).get();
+export async function cancelOrder(userId: string, orderId: string): Promise<boolean> {
+  const [order] = await db.select().from(schema.orders)
+    .where(and(eq(schema.orders.id, orderId), eq(schema.orders.userId, userId)));
   if (!order || order.status !== "accepted") return false;
-  db.update(schema.orders).set({ status: "canceled" }).where(eq(schema.orders.id, orderId)).run();
+  await db.update(schema.orders).set({ status: "canceled" }).where(eq(schema.orders.id, orderId));
   return true;
 }
 
 /** Re-check resting orders + mark equity. Called on quote refresh / cron. */
 export async function reconcile(userId: string) {
-  const resting = db.select().from(schema.orders)
-    .where(and(eq(schema.orders.userId, userId), eq(schema.orders.status, "accepted"))).all();
+  const resting = await db.select().from(schema.orders)
+    .where(and(eq(schema.orders.userId, userId), eq(schema.orders.status, "accepted")));
 
+  // Fetch every quote first (network), then settle any fills in one locked
+  // transaction so we don't hold the account lock across I/O.
+  const priced: Array<{ order: PlacedOrder; price: number }> = [];
   for (const order of resting) {
     const isCrypto = order.symbol.includes("/");
     if (!isCrypto && !isUSMarketOpen()) continue;
     const quote = await getQuote(order.symbol);
-    if (quote) tryFill(order, quote.price);
+    if (quote) priced.push({ order, price: quote.price });
+  }
+
+  if (priced.length) {
+    await db.transaction(async (tx) => {
+      // Lock + re-read so a concurrent placeOrder can't fill the same order twice.
+      await tx.select().from(schema.accounts).where(eq(schema.accounts.userId, userId)).for("update");
+      for (const { order, price } of priced) {
+        const [fresh] = await tx.select().from(schema.orders).where(eq(schema.orders.id, order.id));
+        if (fresh && fresh.status === "accepted") await tryFill(tx, fresh, price);
+      }
+    });
   }
 
   await markEquity(userId);
@@ -217,10 +240,10 @@ export async function reconcile(userId: string) {
 
 /** Mark account equity to current quotes; roll the day anchor when it changes. */
 export async function markEquity(userId: string) {
-  const account = db.select().from(schema.accounts).where(eq(schema.accounts.userId, userId)).get();
+  const [account] = await db.select().from(schema.accounts).where(eq(schema.accounts.userId, userId));
   if (!account) return;
-  const positions = db.select().from(schema.positions)
-    .where(eq(schema.positions.userId, userId)).all();
+  const positions = await db.select().from(schema.positions)
+    .where(eq(schema.positions.userId, userId));
 
   let value = 0;
   if (positions.length) {
@@ -234,18 +257,18 @@ export async function markEquity(userId: string) {
   const today = new Date().toISOString().slice(0, 10);
   const rolled = account.dayStamp !== today;
 
-  db.update(schema.accounts).set({
+  await db.update(schema.accounts).set({
     equity,
     dayStartEquity: rolled ? equity : account.dayStartEquity,
     dayStamp: today,
-  }).where(eq(schema.accounts.userId, userId)).run();
+  }).where(eq(schema.accounts.userId, userId));
 
   // Append to the equity curve at most once per minute.
-  const last = db.select().from(schema.equityHistory)
+  const [last] = await db.select().from(schema.equityHistory)
     .where(eq(schema.equityHistory.userId, userId))
-    .orderBy(desc(schema.equityHistory.time)).limit(1).get();
+    .orderBy(desc(schema.equityHistory.time)).limit(1);
   if (!last || Date.now() - last.time > 60_000) {
-    db.insert(schema.equityHistory)
-      .values({ id: randomUUID(), userId, time: Date.now(), equity }).run();
+    await db.insert(schema.equityHistory)
+      .values({ id: randomUUID(), userId, time: Date.now(), equity });
   }
 }

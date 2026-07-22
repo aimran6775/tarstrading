@@ -11,14 +11,20 @@ export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
 
-  const hasTrade = !!db.select().from(schema.orders)
-    .where(and(eq(schema.orders.userId, user.id), eq(schema.orders.status, "filled"))).get();
-  const hasLesson = !!db.select().from(schema.lessonProgress)
-    .where(eq(schema.lessonProgress.userId, user.id)).get();
-  const hasChat = !!db.select().from(schema.chatMessages)
-    .where(and(eq(schema.chatMessages.userId, user.id), eq(schema.chatMessages.role, "user"))).get();
-  const hasAgent = !!db.select().from(schema.agents)
-    .where(eq(schema.agents.userId, user.id)).get();
+  const [trades, lessons, chats, agents] = await Promise.all([
+    db.select({ id: schema.orders.id }).from(schema.orders)
+      .where(and(eq(schema.orders.userId, user.id), eq(schema.orders.status, "filled"))).limit(1),
+    db.select({ id: schema.lessonProgress.id }).from(schema.lessonProgress)
+      .where(eq(schema.lessonProgress.userId, user.id)).limit(1),
+    db.select({ id: schema.chatMessages.id }).from(schema.chatMessages)
+      .where(and(eq(schema.chatMessages.userId, user.id), eq(schema.chatMessages.role, "user"))).limit(1),
+    db.select({ id: schema.agents.id }).from(schema.agents)
+      .where(eq(schema.agents.userId, user.id)).limit(1),
+  ]);
+  const hasTrade = trades.length > 0;
+  const hasLesson = lessons.length > 0;
+  const hasChat = chats.length > 0;
+  const hasAgent = agents.length > 0;
 
   return NextResponse.json({
     ok: true,

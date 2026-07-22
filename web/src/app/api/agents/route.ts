@@ -8,9 +8,9 @@ import { recentActivity, describeStrategy, agentPnL, type Strategy } from "@/ser
 export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
-  const agents = db.select().from(schema.agents)
+  const agents = await db.select().from(schema.agents)
     .where(eq(schema.agents.userId, user.id))
-    .orderBy(desc(schema.agents.createdAt)).all();
+    .orderBy(desc(schema.agents.createdAt));
   const enriched = await Promise.all(agents.map(async (a) => ({
     ...a,
     strategy: JSON.parse(a.strategy),
@@ -20,7 +20,7 @@ export async function GET() {
     pnl: (a.status === "running" || a.status === "paused" || a.status === "killed")
       ? await agentPnL(user.id, a.id) : 0,
   })));
-  return NextResponse.json({ ok: true, agents: enriched, activity: recentActivity(user.id) });
+  return NextResponse.json({ ok: true, agents: enriched, activity: await recentActivity(user.id) });
 }
 
 const VALID_KINDS = new Set(["price", "sma", "ema", "rsi", "constant"]);
@@ -77,6 +77,6 @@ export async function POST(request: Request) {
     allocation, maxDrawdown,
     status: "draft" as const, backtest: null, createdAt: Date.now(),
   };
-  db.insert(schema.agents).values(agent).run();
+  await db.insert(schema.agents).values(agent);
   return NextResponse.json({ ok: true, id: agent.id }, { status: 201 });
 }

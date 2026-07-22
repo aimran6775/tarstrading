@@ -12,15 +12,15 @@ export async function POST(request: Request) {
   if (!/^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/.test(clean)) {
     return NextResponse.json({ ok: false, error: "That doesn't look like a symbol." }, { status: 400 });
   }
-  const existing = db.select().from(schema.watchlistItems)
+  const existing = await db.select().from(schema.watchlistItems)
     .where(eq(schema.watchlistItems.userId, user.id))
-    .orderBy(asc(schema.watchlistItems.rank)).all();
+    .orderBy(asc(schema.watchlistItems.rank));
   if (existing.some((w) => w.symbol === clean)) {
     return NextResponse.json({ ok: true, watchlist: existing.map((w) => w.symbol) });
   }
-  db.insert(schema.watchlistItems).values({
+  await db.insert(schema.watchlistItems).values({
     id: randomUUID(), userId: user.id, symbol: clean, rank: existing.length,
-  }).run();
+  });
   return NextResponse.json({ ok: true, watchlist: [...existing.map((w) => w.symbol), clean] });
 }
 
@@ -28,9 +28,9 @@ export async function DELETE(request: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
   const { symbol } = await request.json();
-  db.delete(schema.watchlistItems).where(and(
+  await db.delete(schema.watchlistItems).where(and(
     eq(schema.watchlistItems.userId, user.id),
     eq(schema.watchlistItems.symbol, String(symbol ?? "").toUpperCase()),
-  )).run();
+  ));
   return NextResponse.json({ ok: true });
 }
