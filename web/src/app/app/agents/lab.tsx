@@ -50,12 +50,9 @@ export default function AgentLab() {
 
   useEffect(() => {
     load();
-    // The desk tick: while this page is open, the analysts work.
-    const tick = setInterval(async () => {
-      await fetch("/api/agents/tick", { method: "POST" });
-      load();
-    }, 30_000);
-    return () => clearInterval(tick);
+    // The desk tick fires app-wide from AppNav; here we just refresh the view.
+    const id = setInterval(load, 15_000);
+    return () => clearInterval(id);
   }, [load]);
 
   async function act(id: string, action: string) {
@@ -166,6 +163,7 @@ function AgentCard({ agent, busy, onAction, onDelete }: {
   onAction: (a: string) => void; onDelete: () => void;
 }) {
   const bt = agent.backtest;
+  const [confirmDelete, setConfirmDelete] = useState(false);
   return (
     <section className={`card p-5 ${agent.status === "killed" ? "opacity-70" : ""}`}>
       <div className="flex items-start justify-between gap-3">
@@ -223,10 +221,21 @@ function AgentCard({ agent, busy, onAction, onDelete }: {
           </button>
         )}
         {agent.status !== "running" && agent.status !== "killed" && (
-          <button disabled={busy} onClick={onDelete}
-            className="pressable rounded-full px-3 py-2 text-xs text-ink-4 hover:text-loss disabled:opacity-50">
-            Delete
-          </button>
+          confirmDelete ? (
+            <span className="flex items-center gap-1.5">
+              <button disabled={busy} onClick={onDelete}
+                className="pressable rounded-full bg-loss/15 px-3 py-2 text-xs font-medium text-loss disabled:opacity-50">
+                Delete for good
+              </button>
+              <button onClick={() => setConfirmDelete(false)}
+                className="pressable rounded-full px-2 py-2 text-xs text-ink-4">Keep</button>
+            </span>
+          ) : (
+            <button disabled={busy} onClick={() => setConfirmDelete(true)}
+              className="pressable rounded-full px-3 py-2 text-xs text-ink-4 hover:text-loss disabled:opacity-50">
+              Delete
+            </button>
+          )
         )}
       </div>
 
@@ -326,6 +335,13 @@ function Builder({ onDone }: { onDone: () => void }) {
   const [universe, setUniverse] = useState("AAPL");
   const [allocation, setAllocation] = useState(5000);
   const [maxDD, setMaxDD] = useState(20);
+  const [cash, setCash] = useState<number | null>(null);
+  useEffect(() => {
+    fetch("/api/account").then((r) => r.ok ? r.json() : null).then((d) => {
+      if (d?.ok) setCash(d.account?.cash ?? null);
+    }).catch(() => {});
+  }, []);
+  const overCash = cash != null && allocation > cash;
   const [entry, setEntry] = useState<RuleDraft[]>([defaultEntry]);
   const [exit, setExit] = useState<RuleDraft[]>([defaultExit]);
   const [error, setError] = useState<string | null>(null);
@@ -379,9 +395,14 @@ function Builder({ onDone }: { onDone: () => void }) {
         </label>
       </div>
 
+      {overCash && (
+        <p className="mt-4 text-sm text-warning">
+          Allocation exceeds your {usd(cash!)} of simulated cash. Lower it, or fund the desk with a few winning trades first.
+        </p>
+      )}
       {error && <p role="alert" className="mt-4 text-sm text-loss">{error}</p>}
 
-      <button disabled={busy} onClick={hire}
+      <button disabled={busy || overCash} onClick={hire}
         className="pressable cta-gold mt-5 rounded-full px-8 py-3 text-sm font-semibold disabled:opacity-50">
         {busy ? "Hiring…" : "Hire agent (starts as draft)"}
       </button>

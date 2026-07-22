@@ -35,6 +35,14 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
       if (d?.ok) setXp(d.xp);
     }).catch(() => {});
   }, []);
+  // The desk tick runs wherever you are in the app, not just on the Agents
+  // page — your analysts work while you read a lesson or chat with Tars.
+  useEffect(() => {
+    const tick = () => fetch("/api/agents/tick", { method: "POST" }).catch(() => {});
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, []);
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/");

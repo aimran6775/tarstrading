@@ -27,6 +27,8 @@ export default function TarsChat({ userName }: { userName: string }) {
   const [thinking, setThinking] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
+  const sending = useRef(false);
+  const [elapsed, setElapsed] = useState(0);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/tars");
@@ -37,10 +39,17 @@ export default function TarsChat({ userName }: { userName: string }) {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, thinking]);
+  useEffect(() => {
+    if (!thinking) { setElapsed(0); return; }
+    const t0 = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [thinking]);
 
   async function send(text?: string) {
     const clean = (text ?? draft).trim();
-    if (!clean || thinking) return;
+    if (!clean || sending.current) return;
+    sending.current = true;
     setDraft("");
     setThinking(true);
     // Optimistic append — the room answers at the speed of thought.
@@ -52,6 +61,7 @@ export default function TarsChat({ userName }: { userName: string }) {
       });
       const data = await res.json();
       setThinking(false);
+      sending.current = false;
       if (data.ok) {
         setMessages((m) => [...m, { id: `tars-${Date.now()}`, role: "tars", text: data.reply, createdAt: Date.now() }]);
         load(); // refresh canonical history + memory
@@ -61,6 +71,7 @@ export default function TarsChat({ userName }: { userName: string }) {
       }
     } catch {
       setThinking(false);
+      sending.current = false;
       setMessages((m) => [...m, { id: `err-${Date.now()}`, role: "tars",
         text: "We lost the connection mid-thought. Check your network and ask again.", createdAt: Date.now() }]);
     }
@@ -74,7 +85,7 @@ export default function TarsChat({ userName }: { userName: string }) {
           <div>
             <h1 className="font-display text-lg font-bold text-ink-1">Tars</h1>
             <p className="text-[11px] text-ink-4">
-              {thinking ? "thinking…" : "mentor · not a tipster"}
+              {thinking ? `thinking${elapsed > 2 ? ` · ${elapsed}s` : "…"}` : "mentor · not a tipster"}
               {brain && brain.provider !== "scripted" && (
                 <span className="tnum"> · {brain.model.split("/").pop()}</span>
               )}
@@ -106,7 +117,7 @@ export default function TarsChat({ userName }: { userName: string }) {
         </div>
       )}
 
-      <div className="mt-6 flex flex-1 flex-col gap-5">
+      <div className="mt-6 flex flex-1 flex-col gap-5 overflow-y-auto" aria-live="polite">
         {messages.length === 0 && (
           <div className="flex flex-col items-center gap-5 py-16 text-center">
             <OrbAvatar thinking={false} size={56} />
@@ -155,11 +166,13 @@ export default function TarsChat({ userName }: { userName: string }) {
         onSubmit={(e) => { e.preventDefault(); send(); }}
         className="glass sticky bottom-0 mt-8 flex items-center gap-2 rounded-full border border-hairline p-2"
       >
-        <input
+        <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Ask Tars…"
-          className="w-full bg-transparent px-4 py-2 text-[15px] text-ink-1 outline-none placeholder:text-ink-4"
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+          placeholder="Ask Tars…  (Shift+Enter for a new line)"
+          rows={1}
+          className="max-h-32 w-full resize-none bg-transparent px-4 py-2 text-[15px] text-ink-1 outline-none placeholder:text-ink-4"
           aria-label="Message Tars"
         />
         <button type="submit" disabled={!draft.trim() || thinking}

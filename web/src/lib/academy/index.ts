@@ -28,6 +28,16 @@ export function nextLesson(id: string): Lesson | null {
   return i >= 0 && i < flat.length - 1 ? flat[i + 1] : null;
 }
 
+/** The next lesson plus whether it begins a new track (so the CTA can say so). */
+export function nextLessonInfo(id: string): { lesson: Lesson; newTrack: string | null } | null {
+  const next = nextLesson(id);
+  if (!next) return null;
+  const cur = findLesson(id);
+  const nxt = findLesson(next.id);
+  const newTrack = cur && nxt && cur.track.id !== nxt.track.id ? nxt.track.title : null;
+  return { lesson: next, newTrack };
+}
+
 export const totalXP = allLessons.reduce((sum, l) => sum + l.xp, 0);
 
 export type { Lesson, Track, Section } from "./types";

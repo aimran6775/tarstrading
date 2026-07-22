@@ -1,6 +1,6 @@
 import { currentUser } from "@/server/auth";
 import { redirect, notFound } from "next/navigation";
-import { findLesson, nextLesson } from "@/lib/academy";
+import { findLesson, nextLessonInfo } from "@/lib/academy";
 import AppNav from "@/components/app-nav";
 import LessonReader from "./reader";
 
@@ -18,7 +18,7 @@ export default async function LessonPage(props: { params: Promise<{ lessonId: st
   const found = findLesson(lessonId);
   if (!found) notFound();
 
-  const next = nextLesson(lessonId);
+  const next = nextLessonInfo(lessonId);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -28,7 +28,8 @@ export default async function LessonPage(props: { params: Promise<{ lessonId: st
         lesson={found.lesson}
         lessonNumber={found.index + 1}
         trackSize={found.track.lessons.length}
-        nextLessonId={next?.id ?? null}
+        nextLessonId={next?.lesson.id ?? null}
+        nextTrackTitle={next?.newTrack ?? null}
       />
     </div>
   );

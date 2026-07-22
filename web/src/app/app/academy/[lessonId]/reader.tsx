@@ -18,15 +18,17 @@ const reveal = {
   transition: { duration: 0.5, ease: [0.32, 0.72, 0, 1] as const },
 };
 
-export default function LessonReader({ track, lesson, lessonNumber, trackSize, nextLessonId }: {
+export default function LessonReader({ track, lesson, lessonNumber, trackSize, nextLessonId, nextTrackTitle }: {
   track: { id: string; title: string; accent: string };
   lesson: Lesson;
   lessonNumber: number;
   trackSize: number;
   nextLessonId: string | null;
+  nextTrackTitle?: string | null;
 }) {
   const quizCount = lesson.sections.filter((s) => s.kind === "quiz").length;
   const [correct, setCorrect] = useState(0);
+  const [answered, setAnswered] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [xpTotal, setXpTotal] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -60,7 +62,10 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
       <div className="mt-10 flex flex-col gap-8">
         {lesson.sections.map((section, i) => (
           <motion.div key={i} {...reveal}>
-            <SectionView section={section} onQuiz={(right) => right && setCorrect((c) => c + 1)} />
+            <SectionView section={section}
+              onAnswered={() => setAnswered((a) => a + 1)}
+              onCorrect={() => setCorrect((c) => c + 1)}
+              onReset={(wasRight) => { setAnswered((a) => Math.max(0, a - 1)); if (wasRight) setCorrect((c) => Math.max(0, c - 1)); }} />
           </motion.div>
         ))}
       </div>
@@ -73,7 +78,7 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
             {nextLessonId ? (
               <Link href={`/app/academy/${nextLessonId}`}
                 className="pressable cta-gold rounded-full px-8 py-3.5 text-base font-semibold">
-                Next lesson
+                {nextTrackTitle ? `Start next track: ${nextTrackTitle}` : "Next lesson"}
               </Link>
             ) : (
               <Link href="/app" className="pressable cta-gold rounded-full px-8 py-3.5 text-base font-semibold">
@@ -84,11 +89,11 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
         ) : (
           <div className="flex flex-col items-center gap-3 text-center">
             {quizCount > 0 && (
-              <p className="tnum text-xs text-ink-4">{correct} of {quizCount} checks answered correctly</p>
+              <p className="tnum text-xs text-ink-4">{correct} of {quizCount} checks correct · {answered}/{quizCount} answered</p>
             )}
-            <button onClick={complete} disabled={saving}
-              className="pressable cta-gold rounded-full px-8 py-3.5 text-base font-semibold disabled:opacity-60">
-              {saving ? "Banking XP…" : `Complete lesson · +${lesson.xp} XP`}
+            <button onClick={complete} disabled={saving || answered < quizCount}
+              className="pressable cta-gold rounded-full px-8 py-3.5 text-base font-semibold disabled:opacity-40">
+              {saving ? "Banking XP…" : answered < quizCount ? `Answer the ${quizCount - answered} check${quizCount - answered > 1 ? "s" : ""} to finish` : `Complete lesson · +${lesson.xp} XP`}
             </button>
             {saveError && <p role="alert" className="text-xs text-loss">Couldn&apos;t save your progress. Try again.</p>}
             <Link href="/app/academy" className="text-xs text-ink-3 hover:text-ink-1">
@@ -101,7 +106,10 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
   );
 }
 
-function SectionView({ section, onQuiz }: { section: Section; onQuiz: (right: boolean) => void }) {
+function SectionView({ section, onAnswered, onCorrect, onReset }: {
+  section: Section;
+  onAnswered: () => void; onCorrect: () => void; onReset: (wasRight: boolean) => void;
+}) {
   switch (section.kind) {
     case "prose":
       return <p className="text-[17px] leading-[1.65] text-ink-2">{section.text}</p>;
@@ -125,7 +133,7 @@ function SectionView({ section, onQuiz }: { section: Section; onQuiz: (right: bo
       );
 
     case "quiz":
-      return <Quiz section={section} onAnswer={onQuiz} />;
+      return <Quiz section={section} onAnswered={onAnswered} onCorrect={onCorrect} onReset={onReset} />;
 
     case "desk":
       return (
@@ -141,12 +149,22 @@ function SectionView({ section, onQuiz }: { section: Section; onQuiz: (right: bo
   }
 }
 
-function Quiz({ section, onAnswer }: {
+function Quiz({ section, onAnswered, onCorrect, onReset }: {
   section: Extract<Section, { kind: "quiz" }>;
-  onAnswer: (right: boolean) => void;
+  onAnswered: () => void; onCorrect: () => void; onReset: (wasRight: boolean) => void;
 }) {
   const [picked, setPicked] = useState<number | null>(null);
   const answered = picked !== null;
+
+  function pick(i: number) {
+    setPicked(i);
+    onAnswered();
+    if (i === section.answer) onCorrect();
+  }
+  function retry() {
+    onReset(picked === section.answer);
+    setPicked(null);
+  }
 
   return (
     <div className="card p-5">
@@ -160,7 +178,7 @@ function Quiz({ section, onAnswer }: {
             <button
               key={i}
               disabled={answered}
-              onClick={() => { setPicked(i); onAnswer(i === section.answer); }}
+              onClick={() => pick(i)}
               className={`pressable rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
                 !answered
                   ? "border-hairline text-ink-2 hover:border-ink-4 hover:text-ink-1"
@@ -177,9 +195,14 @@ function Quiz({ section, onAnswer }: {
         })}
       </div>
       {answered && (
-        <p className={`mt-3 text-sm leading-relaxed ${picked === section.answer ? "text-gain" : "text-ink-2"}`}>
-          {picked === section.answer ? "Right. " : "Not quite. "}{section.explain}
-        </p>
+        <div className="mt-3 flex items-start justify-between gap-3">
+          <p className={`text-sm leading-relaxed ${picked === section.answer ? "text-gain" : "text-ink-2"}`}>
+            {picked === section.answer ? "Right. " : "Not quite. "}{section.explain}
+          </p>
+          {picked !== section.answer && (
+            <button onClick={retry} className="pressable shrink-0 text-xs text-gold hover:underline">Try again</button>
+          )}
+        </div>
       )}
     </div>
   );
