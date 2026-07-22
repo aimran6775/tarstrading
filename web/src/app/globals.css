@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+/*
+  Tars Trading — design tokens (web port of TarsTheme).
+  One material system: void → panel → card → raised → glass.
+  Color is meaning: green/red = P&L, amber = simulated badge,
+  blue = interactive/Tars, purple = agents. Everything else is ink.
+  Dark is canonical; light is first-class, not an afterthought.
+*/
+
+:root {
+  /* Surfaces — violet-tinted rise so dark feels lit, not painted gray */
+  --bg0: oklch(0.13 0.02 275);
+  --bg1: oklch(0.17 0.025 275);
+  --bg2: oklch(0.21 0.03 275);
+  --bg3: oklch(0.26 0.035 275);
+  --glass: oklch(0.17 0.025 275 / 0.72);
+
+  /* Ink */
+  --ink-1: oklch(0.95 0.01 260);
+  --ink-2: oklch(0.70 0.02 260);
+  --ink-3: oklch(0.52 0.02 260);
+  --ink-4: oklch(0.40 0.02 260);
+  --hairline: oklch(1 0 0 / 0.08);
+  --hairline-strong: oklch(1 0 0 / 0.16);
+  --top-light: linear-gradient(to bottom, oklch(1 0 0 / 0.10), oklch(1 0 0 / 0.03));
+
+  /* Meaning */
+  --gain: oklch(0.75 0.17 160);
+  --loss: oklch(0.68 0.19 20);
+  --accent: oklch(0.68 0.16 262);
+  --amber: oklch(0.80 0.16 75);
+  --warning: oklch(0.75 0.17 55);
+  --agent: oklch(0.68 0.18 300);
+  --on-fill: oklch(0.13 0.02 275);
+
+  /* Motion */
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-instant: 140ms;
+  --dur-snappy: 220ms;
+  --dur-spatial: 380ms;
+  --dur-grand: 640ms;
+
+  /* Shape */
+  --r-s: 8px;
+  --r-m: 14px;
+  --r-l: 22px;
+}
+
+/* Light theme — graphite, not gray office paper */
+:root[data-theme="light"] {
+  --bg0: oklch(0.97 0.005 260);
+  --bg1: oklch(1 0 0);
+  --bg2: oklch(0.955 0.008 262);
+  --bg3: oklch(0.92 0.012 262);
+  --glass: oklch(1 0 0 / 0.72);
+
+  --ink-1: oklch(0.22 0.02 270);
+  --ink-2: oklch(0.45 0.02 265);
+  --ink-3: oklch(0.60 0.015 262);
+  --ink-4: oklch(0.72 0.01 262);
+  --hairline: oklch(0 0 0 / 0.08);
+  --hairline-strong: oklch(0 0 0 / 0.16);
+  --top-light: linear-gradient(to bottom, oklch(1 0 0 / 0.9), oklch(1 0 0 / 0.4));
+
+  --gain: oklch(0.58 0.15 160);
+  --loss: oklch(0.55 0.19 22);
+  --accent: oklch(0.55 0.17 262);
+  --amber: oklch(0.66 0.15 70);
+  --warning: oklch(0.62 0.16 55);
+  --agent: oklch(0.55 0.19 300);
+  --on-fill: oklch(0.99 0 0);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+    --bg0: oklch(0.97 0.005 260);
+    --bg1: oklch(1 0 0);
+    --bg2: oklch(0.955 0.008 262);
+    --bg3: oklch(0.92 0.012 262);
+    --glass: oklch(1 0 0 / 0.72);
+    --ink-1: oklch(0.22 0.02 270);
+    --ink-2: oklch(0.45 0.02 265);
+    --ink-3: oklch(0.60 0.015 262);
+    --ink-4: oklch(0.72 0.01 262);
+    --hairline: oklch(0 0 0 / 0.08);
+    --hairline-strong: oklch(0 0 0 / 0.16);
+    --top-light: linear-gradient(to bottom, oklch(1 0 0 / 0.9), oklch(1 0 0 / 0.4));
+    --gain: oklch(0.58 0.15 160);
+    --loss: oklch(0.55 0.19 22);
+    --accent: oklch(0.55 0.17 262);
+    --amber: oklch(0.66 0.15 70);
+    --warning: oklch(0.62 0.16 55);
+    --agent: oklch(0.55 0.19 300);
+    --on-fill: oklch(0.99 0 0);
+  }
+}
+
+@theme inline {
+  --color-bg0: var(--bg0);
+  --color-bg1: var(--bg1);
+  --color-bg2: var(--bg2);
+  --color-bg3: var(--bg3);
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-accent: var(--accent);
+  --color-amber: var(--amber);
+  --color-warning: var(--warning);
+  --color-agent: var(--agent);
+  --color-onfill: var(--on-fill);
+  --color-hairline: var(--hairline);
+  --radius-s: var(--r-s);
+  --radius-m: var(--r-m);
+  --radius-l: var(--r-l);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html, body {
+  background: var(--bg0);
+  color: var(--ink-1);
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Numerals never jitter: every changing number is tabular */
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Panel — the workhorse opaque surface */
+.panel {
+  background: var(--bg1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-m);
+}
+
+/* Card — raised, catches a top-light on its upper edge (depth by light) */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--hairline);
+  border-top-color: oklch(1 0 0 / 0.14);
+  border-radius: var(--r-m);
+}
+:root[data-theme="light"] .card { border-top-color: oklch(0 0 0 / 0.06); }
+
+/* Glass — floats over content; content scrolls under it */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid var(--hairline);
+}
+
+/* Press feedback — physical key travel */
+.pressable {
+  transition: transform var(--dur-instant) var(--ease-spring),
+              filter var(--dur-instant) var(--ease-spring);
+}
+.pressable:active { transform: scale(0.97); filter: brightness(0.94); }
+
+/* The simulated-money badge glow */
+@keyframes breathe {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.badge-dot { animation: breathe 2.2s ease-in-out infinite; }
+
+/* Skeletons, never spinners */
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+.skeleton {
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--bg3) 40%, oklch(1 0 0 / 0.10) 50%, var(--bg3) 60%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-dot { animation: none; opacity: 1; }
+  .skeleton { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+::selection { background: oklch(from var(--accent) l c h / 0.35); }
