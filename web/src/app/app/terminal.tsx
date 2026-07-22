@@ -79,6 +79,22 @@ function TerminalInner({ userName }: { userName: string }) {
     return () => window.removeEventListener("resize", fit);
   }, []);
 
+  // Terminal hotkeys (ignored while typing or with a modifier held — ⌘K owns that).
+  useEffect(() => {
+    const TF: Record<string, Timeframe> = { "1": "1D", "2": "1W", "3": "1M", "4": "3M", "5": "1Y", "6": "5Y" };
+    const RAIL: Record<string, "watch" | "positions" | "orders" | "alerts" | "perf"> =
+      { w: "watch", p: "positions", o: "orders", a: "alerts", e: "perf" };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      const el = document.activeElement;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) return;
+      if (TF[ev.key]) setTimeframe(TF[ev.key]);
+      else if (RAIL[ev.key.toLowerCase()]) setRail(RAIL[ev.key.toLowerCase()]);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // ---------- data loops ----------
   const loadAccount = useCallback(async () => {
     try {
@@ -518,6 +534,7 @@ function Watchlist({ symbols, quotes, selected, marketOpen, onSelect, onChange }
   onChange: (w: string[]) => void;
 }) {
   const [adding, setAdding] = useState("");
+  const [view, setView] = useState<"list" | "heat">("list");
 
   async function add(raw: string) {
     const symbol = raw.trim().toUpperCase();
@@ -544,8 +561,49 @@ function Watchlist({ symbols, quotes, selected, marketOpen, onSelect, onChange }
     <section className="panel overflow-hidden">
       <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
         <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Watchlist</h2>
-        {marketOpen === false && <span className="text-[10px] text-ink-4">Last session</span>}
+        <div className="flex items-center gap-2">
+          {marketOpen === false && <span className="text-[10px] text-ink-4">Last session</span>}
+          <div className="flex rounded-full border border-hairline bg-bg2 p-0.5">
+            {(["list", "heat"] as const).map((v) => (
+              <button key={v} onClick={() => setView(v)}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-medium capitalize ${
+                  view === v ? "bg-bg3 text-ink-1" : "text-ink-4"
+                }`}
+                aria-pressed={view === v}>
+                {v === "heat" ? "Heatmap" : "List"}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {view === "heat" ? (
+        <div className="grid grid-cols-2 gap-1.5 p-2 sm:grid-cols-3">
+          {symbols.map((s) => {
+            const q = quotes.get(s);
+            const chg = q?.changePercent ?? 0;
+            // Intensity saturates at ±3%; green up, red down, neutral bg when flat/unknown.
+            const mag = Math.min(Math.abs(chg) / 0.03, 1);
+            const bg = !q ? "var(--bg2)"
+              : chg >= 0 ? `oklch(from var(--gain) l c h / ${(0.10 + mag * 0.32).toFixed(2)})`
+              : `oklch(from var(--loss) l c h / ${(0.10 + mag * 0.32).toFixed(2)})`;
+            return (
+              <button key={s} onClick={() => onSelect(s)}
+                style={{ backgroundColor: bg }}
+                className={`flex flex-col items-start gap-0.5 rounded-lg px-3 py-2.5 text-left transition-transform hover:scale-[1.02] ${
+                  s === selected ? "ring-1 ring-gold" : ""
+                }`}>
+                <span className="text-xs font-semibold text-ink-1">{s}</span>
+                {q ? (
+                  <span className={`tnum text-[11px] ${chg > 0 ? "text-gain" : chg < 0 ? "text-loss" : "text-ink-3"}`}>
+                    {pct(chg)}
+                  </span>
+                ) : <span className="skeleton h-3 w-10" />}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
       <ul>
         {symbols.map((s) => {
           const q = quotes.get(s);
@@ -583,6 +641,7 @@ function Watchlist({ symbols, quotes, selected, marketOpen, onSelect, onChange }
           );
         })}
       </ul>
+      )}
       <div className="flex gap-2 border-t border-hairline p-3">
         <SymbolInput value={adding} onChange={setAdding} onSubmit={add} />
         <button type="button" onClick={() => add(adding)}
