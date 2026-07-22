@@ -100,6 +100,11 @@ function bootstrap(sqlite: Database.Database) {
     user_id TEXT PRIMARY KEY REFERENCES users(id),
     summary TEXT NOT NULL, message_count INTEGER NOT NULL DEFAULT 0,
     updated_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS price_alerts (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
+    symbol TEXT NOT NULL, price REAL NOT NULL, direction TEXT NOT NULL,
+    triggered_at INTEGER, created_at INTEGER NOT NULL);
+  CREATE INDEX IF NOT EXISTS alerts_user ON price_alerts(user_id);
   `);
   // Additive migrations for existing databases (SQLite has no ADD COLUMN IF
   // NOT EXISTS, so we probe and ignore the duplicate-column error).

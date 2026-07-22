@@ -64,12 +64,13 @@ function TerminalInner({ userName }: { userName: string }) {
   const [reloadNonce, setReloadNonce] = useState(0);
   const [accountError, setAccountError] = useState(false);
   const [quotesStale, setQuotesStale] = useState(false);
-  const [rail, setRail] = useState<"watch" | "positions" | "orders" | "perf">(initialPerf ? "perf" : "watch");
+  const [rail, setRail] = useState<"watch" | "positions" | "orders" | "perf" | "alerts">(initialPerf ? "perf" : "watch");
   const [chartHeight, setChartHeight] = useState(420);
 
 
   const watchlistRef = useRef<string[]>([]);
   const positionsRef = useRef<Position[]>([]);
+  const toast = useToast();
 
   useEffect(() => {
     const fit = () => setChartHeight(window.innerWidth < 768 ? 300 : 420);
@@ -113,6 +114,10 @@ function TerminalInner({ userName }: { userName: string }) {
         });
         setMarketOpen(data.marketOpen);
         setQuotesStale(false);
+        for (const t of (data.triggered ?? []) as { symbol: string; price: number; direction: string }[]) {
+          toast({ kind: "info", title: `Alert · ${t.symbol}`,
+            body: `Crossed ${t.direction} ${usd(t.price)}` });
+        }
       } else setQuotesStale(true);
     } catch { setQuotesStale(true); }
   }, []);
@@ -259,7 +264,7 @@ function TerminalInner({ userName }: { userName: string }) {
         {/* ---------- right rail ---------- */}
         <aside className="flex min-w-0 flex-col gap-4">
           <nav className="flex gap-1 rounded-full border border-hairline bg-bg1 p-1">
-            {([["watch", "Watch"], ["positions", `Positions${positions.length ? ` · ${positions.length}` : ""}`], ["orders", `Orders${openOrders.length ? ` · ${openOrders.length}` : ""}`], ["perf", "Perf"]] as const).map(([key, label]) => (
+            {([["watch", "Watch"], ["positions", `Pos${positions.length ? ` ${positions.length}` : ""}`], ["orders", `Ord${openOrders.length ? ` ${openOrders.length}` : ""}`], ["alerts", "Alerts"], ["perf", "Perf"]] as const).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setRail(key)}
@@ -293,6 +298,7 @@ function TerminalInner({ userName }: { userName: string }) {
           {rail === "orders" && (
             <Orders orders={orders} onCanceled={refreshAfterTrade} />
           )}
+          {rail === "alerts" && <Alerts symbol={symbol} quote={quote} />}
           {rail === "perf" && <Performance />}
         </aside>
       </main>
@@ -714,6 +720,119 @@ function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: () => voi
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+type Alert = {
+  id: string; symbol: string; price: number; direction: "above" | "below";
+  triggeredAt: number | null; createdAt: number;
+};
+
+/** Price alerts — set a level on the current symbol; the quote poll fires it
+    and toasts app-wide. TradingView's Ctrl+A, made simple. */
+function Alerts({ symbol, quote }: { symbol: string; quote: Quote | undefined }) {
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [price, setPrice] = useState("");
+  const [direction, setDirection] = useState<"above" | "below">("above");
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/alerts");
+      const data = await res.json();
+      if (data.ok) setAlerts(data.alerts);
+    } catch { /* transient */ }
+  }, []);
+  useEffect(() => { load(); const id = setInterval(load, 20_000); return () => clearInterval(id); }, [load]);
+
+  // Default the level + direction to the current price when the symbol changes.
+  useEffect(() => {
+    if (quote) {
+      setPrice(quote.price.toFixed(2));
+      setDirection("above");
+    }
+  }, [symbol, quote?.price]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function add() {
+    const p = Number(price);
+    if (!(p > 0)) return;
+    try {
+      const res = await fetch("/api/alerts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol, price: p, direction }),
+      });
+      if ((await res.json()).ok) load();
+    } catch { /* transient */ }
+  }
+  async function remove(id: string) {
+    try { await fetch(`/api/alerts/${id}`, { method: "DELETE" }); } finally { load(); }
+  }
+
+  const active = alerts.filter((a) => a.triggeredAt == null);
+  const fired = alerts.filter((a) => a.triggeredAt != null);
+
+  return (
+    <section className="panel overflow-hidden">
+      <div className="border-b border-hairline px-4 py-3">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Alerts · {symbol}</h2>
+      </div>
+
+      {/* Quick-set for the current symbol */}
+      <div className="flex flex-col gap-2 border-b border-hairline p-3">
+        <div className="flex rounded-full border border-hairline bg-bg2 p-0.5">
+          {(["above", "below"] as const).map((d) => (
+            <button key={d} onClick={() => setDirection(d)}
+              className={`flex-1 rounded-full py-1.5 text-xs font-medium capitalize ${
+                direction === d ? "bg-bg3 text-ink-1" : "text-ink-3"
+              }`}>
+              {d}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))}
+            inputMode="decimal" placeholder="Price"
+            className="tnum w-full rounded-full border border-hairline bg-bg2 px-4 py-2 text-xs text-ink-1 outline-none focus:border-gold"
+            aria-label="Alert price" />
+          <button onClick={add}
+            className="pressable rounded-full border border-hairline px-4 text-xs text-ink-2 hover:text-ink-1">
+            Set
+          </button>
+        </div>
+      </div>
+
+      {active.length === 0 && fired.length === 0 ? (
+        <p className="px-5 py-8 text-center text-xs text-ink-4">
+          No alerts yet. Set a level above or below and we&apos;ll ping you when price crosses it.
+        </p>
+      ) : (
+        <ul className="max-h-[360px] overflow-y-auto">
+          {active.map((a) => (
+            <li key={a.id} className="flex items-center justify-between border-b border-hairline px-4 py-2.5 text-xs last:border-0">
+              <span className="text-ink-1">
+                {a.symbol} <span className="text-ink-4">{a.direction}</span>{" "}
+                <span className="tnum">{usd(a.price)}</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="tnum text-[10px] uppercase tracking-[0.15em] text-gold">armed</span>
+                <button onClick={() => remove(a.id)} className="pressable text-ink-4 hover:text-loss" aria-label="Remove alert">×</button>
+              </div>
+            </li>
+          ))}
+          {fired.map((a) => (
+            <li key={a.id} className="flex items-center justify-between border-b border-hairline px-4 py-2.5 text-xs last:border-0 opacity-60">
+              <span className="text-ink-2">
+                {a.symbol} crossed <span className="text-ink-3">{a.direction}</span>{" "}
+                <span className="tnum">{usd(a.price)}</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="tnum text-[10px] uppercase tracking-[0.15em] text-gain">fired</span>
+                <button onClick={() => remove(a.id)} className="pressable text-ink-4 hover:text-loss" aria-label="Remove alert">×</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

@@ -142,3 +142,14 @@ export const tarsMemory = sqliteTable("tars_memory", {
   messageCount: integer("message_count").notNull().default(0),
   updatedAt: integer("updated_at").notNull(),
 });
+
+export const priceAlerts = sqliteTable("price_alerts", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  symbol: text("symbol").notNull(),
+  /** Fire when price crosses this level in `direction`. */
+  price: real("price").notNull(),
+  direction: text("direction").$type<"above" | "below">().notNull(),
+  triggeredAt: integer("triggered_at"),
+  createdAt: integer("created_at").notNull(),
+}, (t) => [index("alerts_user").on(t.userId)]);
