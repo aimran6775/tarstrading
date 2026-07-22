@@ -1,21 +1,34 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Archivo, IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+/*
+  Type system: departure-board display (Archivo, wide + heavy), terminal
+  numerals (IBM Plex Mono — the face with actual terminal heritage), and a
+  quiet humanist body (Instrument Sans).
+*/
+
+const archivo = Archivo({
+  variable: "--font-archivo",
   subsets: ["latin"],
+  axes: ["wdth"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
+const instrument = Instrument_Sans({
+  variable: "--font-instrument",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Tars Trading — learn markets, trade simulated, train agents",
+  title: "Tars Trading — a flight simulator for markets",
   description:
-    "The terminal that teaches. $100,000 in simulated money, a full markets academy, and AI trading agents you program yourself. No real money — that's the point.",
+    "Learn to trade before you trade. $100,000 in simulated capital, real market data, an academy that starts at zero, and trading agents you program yourself.",
 };
 
 /** Applies the saved theme before first paint — no flash of wrong theme. */
@@ -35,7 +48,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${archivo.variable} ${plexMono.variable} ${instrument.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />

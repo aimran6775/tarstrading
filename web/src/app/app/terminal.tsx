@@ -92,11 +92,8 @@ function TerminalInner({ userName }: { userName: string }) {
       {/* Simulated badge — always visible, never diluted */}
       <div className="glass sticky top-0 z-50 flex items-center justify-between px-4 py-2.5 md:px-8">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-ink-1">Tars Trading</span>
-          <span className="inline-flex items-center gap-2 rounded-full border border-amber/40 bg-amber/10 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-amber">
-            <span className="badge-dot h-1.5 w-1.5 rounded-full bg-amber" />
-            SIMULATED · NO REAL MONEY
-          </span>
+          <span className="font-display text-sm font-bold tracking-[0.08em] text-ink-1">TARS</span>
+          <span className="sim-mark" title="All capital on Tars is simulated — no real money.">SIMULATED</span>
           {marketOpen === false && (
             <span className="hidden rounded-full border border-hairline bg-bg2 px-3 py-1 text-[11px] text-ink-3 sm:inline">
               US market closed
@@ -132,7 +129,7 @@ function TerminalInner({ userName }: { userName: string }) {
             </p>
           )}
           {welcome && (
-            <p className="mt-3 inline-block rounded-full border border-gain/30 bg-gain/10 px-4 py-1.5 text-sm text-gain">
+            <p className="mt-3 inline-block rounded-full border border-gold/30 bg-gold/10 px-4 py-1.5 text-sm text-gold">
               Your simulated $100,000 is live. Spend it on lessons, not luck.
             </p>
           )}

@@ -1,98 +1,94 @@
 @import "tailwindcss";
 
 /*
-  Tars Trading — design tokens (web port of TarsTheme).
-  One material system: void → panel → card → raised → glass.
-  Color is meaning: green/red = P&L, amber = simulated badge,
-  blue = interactive/Tars, purple = agents. Everything else is ink.
-  Dark is canonical; light is first-class, not an afterthought.
+  Tars Trading — palette v2: "after-hours trading floor".
+  One accent: tape gold — the phosphor amber of terminal heritage. It is also
+  the simulated-money color, so the brand itself carries the honesty.
+  Green/red belong to P&L only. Violet belongs to agents only.
+  Dark is the canonical room; light is glass daylight, cool and crisp — never cream.
 */
 
 :root {
-  /* Surfaces — violet-tinted rise so dark feels lit, not painted gray */
-  --bg0: oklch(0.13 0.02 275);
-  --bg1: oklch(0.17 0.025 275);
-  --bg2: oklch(0.21 0.03 275);
-  --bg3: oklch(0.26 0.035 275);
-  --glass: oklch(0.17 0.025 275 / 0.72);
+  /* Surfaces — midnight indigo, lit from the screen */
+  --bg0: oklch(0.135 0.022 278);
+  --bg1: oklch(0.17 0.026 278);
+  --bg2: oklch(0.21 0.03 278);
+  --bg3: oklch(0.265 0.034 278);
+  --glass: oklch(0.15 0.024 278 / 0.68);
 
   /* Ink */
-  --ink-1: oklch(0.95 0.01 260);
-  --ink-2: oklch(0.70 0.02 260);
-  --ink-3: oklch(0.52 0.02 260);
-  --ink-4: oklch(0.40 0.02 260);
+  --ink-1: oklch(0.95 0.008 264);
+  --ink-2: oklch(0.71 0.018 264);
+  --ink-3: oklch(0.53 0.02 264);
+  --ink-4: oklch(0.40 0.02 264);
   --hairline: oklch(1 0 0 / 0.08);
   --hairline-strong: oklch(1 0 0 / 0.16);
-  --top-light: linear-gradient(to bottom, oklch(1 0 0 / 0.10), oklch(1 0 0 / 0.03));
 
-  /* Meaning */
-  --gain: oklch(0.75 0.17 160);
-  --loss: oklch(0.68 0.19 20);
-  --accent: oklch(0.68 0.16 262);
-  --amber: oklch(0.80 0.16 75);
-  --warning: oklch(0.75 0.17 55);
-  --agent: oklch(0.68 0.18 300);
-  --on-fill: oklch(0.13 0.02 275);
+  /* Tape gold — the one accent. Brand, CTA, and the simulated marker. */
+  --gold: oklch(0.83 0.114 84);
+  --gold-deep: oklch(0.70 0.13 78);
+  --on-gold: oklch(0.17 0.03 80);
 
-  /* Motion */
+  /* Meaning — P&L only */
+  --gain: oklch(0.76 0.155 158);
+  --loss: oklch(0.67 0.185 22);
+  /* Agents only */
+  --agent: oklch(0.70 0.16 300);
+
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
   --dur-instant: 140ms;
   --dur-snappy: 220ms;
   --dur-spatial: 380ms;
-  --dur-grand: 640ms;
+  --dur-grand: 700ms;
 
-  /* Shape */
   --r-s: 8px;
   --r-m: 14px;
   --r-l: 22px;
 }
 
-/* Light theme — graphite, not gray office paper */
+/* Light — glass daylight. Cool, crisp, architectural. */
 :root[data-theme="light"] {
-  --bg0: oklch(0.97 0.005 260);
+  --bg0: oklch(0.975 0.004 250);
   --bg1: oklch(1 0 0);
-  --bg2: oklch(0.955 0.008 262);
-  --bg3: oklch(0.92 0.012 262);
-  --glass: oklch(1 0 0 / 0.72);
+  --bg2: oklch(0.955 0.006 252);
+  --bg3: oklch(0.925 0.009 252);
+  --glass: oklch(1 0 0 / 0.7);
 
-  --ink-1: oklch(0.22 0.02 270);
-  --ink-2: oklch(0.45 0.02 265);
-  --ink-3: oklch(0.60 0.015 262);
-  --ink-4: oklch(0.72 0.01 262);
+  --ink-1: oklch(0.24 0.022 274);
+  --ink-2: oklch(0.46 0.02 268);
+  --ink-3: oklch(0.60 0.016 264);
+  --ink-4: oklch(0.72 0.012 264);
   --hairline: oklch(0 0 0 / 0.08);
   --hairline-strong: oklch(0 0 0 / 0.16);
-  --top-light: linear-gradient(to bottom, oklch(1 0 0 / 0.9), oklch(1 0 0 / 0.4));
 
-  --gain: oklch(0.58 0.15 160);
-  --loss: oklch(0.55 0.19 22);
-  --accent: oklch(0.55 0.17 262);
-  --amber: oklch(0.66 0.15 70);
-  --warning: oklch(0.62 0.16 55);
-  --agent: oklch(0.55 0.19 300);
-  --on-fill: oklch(0.99 0 0);
+  --gold: oklch(0.72 0.125 80);
+  --gold-deep: oklch(0.62 0.13 74);
+  --on-gold: oklch(0.99 0 0);
+
+  --gain: oklch(0.58 0.14 158);
+  --loss: oklch(0.55 0.18 24);
+  --agent: oklch(0.56 0.18 300);
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]):not([data-theme="light"]) {
-    --bg0: oklch(0.97 0.005 260);
+    --bg0: oklch(0.975 0.004 250);
     --bg1: oklch(1 0 0);
-    --bg2: oklch(0.955 0.008 262);
-    --bg3: oklch(0.92 0.012 262);
-    --glass: oklch(1 0 0 / 0.72);
-    --ink-1: oklch(0.22 0.02 270);
-    --ink-2: oklch(0.45 0.02 265);
-    --ink-3: oklch(0.60 0.015 262);
-    --ink-4: oklch(0.72 0.01 262);
+    --bg2: oklch(0.955 0.006 252);
+    --bg3: oklch(0.925 0.009 252);
+    --glass: oklch(1 0 0 / 0.7);
+    --ink-1: oklch(0.24 0.022 274);
+    --ink-2: oklch(0.46 0.02 268);
+    --ink-3: oklch(0.60 0.016 264);
+    --ink-4: oklch(0.72 0.012 264);
     --hairline: oklch(0 0 0 / 0.08);
     --hairline-strong: oklch(0 0 0 / 0.16);
-    --top-light: linear-gradient(to bottom, oklch(1 0 0 / 0.9), oklch(1 0 0 / 0.4));
-    --gain: oklch(0.58 0.15 160);
-    --loss: oklch(0.55 0.19 22);
-    --accent: oklch(0.55 0.17 262);
-    --amber: oklch(0.66 0.15 70);
-    --warning: oklch(0.62 0.16 55);
-    --agent: oklch(0.55 0.19 300);
-    --on-fill: oklch(0.99 0 0);
+    --gold: oklch(0.72 0.125 80);
+    --gold-deep: oklch(0.62 0.13 74);
+    --on-gold: oklch(0.99 0 0);
+    --gain: oklch(0.58 0.14 158);
+    --loss: oklch(0.55 0.18 24);
+    --agent: oklch(0.56 0.18 300);
   }
 }
 
@@ -105,21 +101,22 @@
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-ink-4: var(--ink-4);
+  --color-gold: var(--gold);
+  --color-gold-deep: var(--gold-deep);
+  --color-ongold: var(--on-gold);
   --color-gain: var(--gain);
   --color-loss: var(--loss);
-  --color-accent: var(--accent);
-  --color-amber: var(--amber);
-  --color-warning: var(--warning);
   --color-agent: var(--agent);
-  --color-onfill: var(--on-fill);
   --color-hairline: var(--hairline);
   --radius-s: var(--r-s);
   --radius-m: var(--r-m);
   --radius-l: var(--r-l);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-instrument), system-ui, sans-serif;
+  --font-display: var(--font-archivo), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 }
 
+html { scroll-behavior: smooth; }
 html, body {
   background: var(--bg0);
   color: var(--ink-1);
@@ -128,61 +125,94 @@ html, body {
   text-rendering: optimizeLegibility;
 }
 
-/* Numerals never jitter: every changing number is tabular */
-.tnum { font-variant-numeric: tabular-nums; }
+/* Departure-board display type: wide, tight, all business */
+.display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-stretch: 125%;
+  letter-spacing: -0.01em;
+  line-height: 0.98;
+  text-transform: uppercase;
+}
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
 
-/* Panel — the workhorse opaque surface */
+.tnum { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+
 .panel {
   background: var(--bg1);
   border: 1px solid var(--hairline);
   border-radius: var(--r-m);
 }
-
-/* Card — raised, catches a top-light on its upper edge (depth by light) */
 .card {
   background: var(--bg2);
   border: 1px solid var(--hairline);
-  border-top-color: oklch(1 0 0 / 0.14);
+  border-top-color: oklch(1 0 0 / 0.13);
   border-radius: var(--r-m);
 }
-:root[data-theme="light"] .card { border-top-color: oklch(0 0 0 / 0.06); }
+:root[data-theme="light"] .card { border-top-color: oklch(0 0 0 / 0.05); }
 
-/* Glass — floats over content; content scrolls under it */
 .glass {
   background: var(--glass);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border: 1px solid var(--hairline);
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  border-bottom: 1px solid var(--hairline);
 }
 
-/* Press feedback — physical key travel */
 .pressable {
   transition: transform var(--dur-instant) var(--ease-spring),
-              filter var(--dur-instant) var(--ease-spring);
+              filter var(--dur-instant) var(--ease-spring),
+              box-shadow var(--dur-snappy) var(--ease-spring);
 }
-.pressable:active { transform: scale(0.97); filter: brightness(0.94); }
+.pressable:active { transform: scale(0.97); filter: brightness(0.95); }
 
-/* The simulated-money badge glow */
-@keyframes breathe {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 1; }
+/* The gold CTA glow — earned by exactly one element per view */
+.cta-gold {
+  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
+  color: var(--on-gold);
+  box-shadow: 0 1px 0 oklch(1 0 0 / 0.25) inset, 0 12px 44px -12px var(--gold-deep);
 }
-.badge-dot { animation: breathe 2.2s ease-in-out infinite; }
+.cta-gold:hover { box-shadow: 0 1px 0 oklch(1 0 0 / 0.3) inset, 0 16px 56px -12px var(--gold-deep); }
 
-/* Skeletons, never spinners */
+/* The simulated marker — small, constant, never a banner */
+.sim-mark {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  color: var(--gold);
+  border: 1px solid oklch(from var(--gold) l c h / 0.35);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+/* Ticker tape */
+@keyframes tape-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.tape { animation: tape-scroll 42s linear infinite; }
+.tape:hover { animation-play-state: paused; }
+
 @keyframes shimmer {
   from { background-position: -200% 0; }
   to { background-position: 200% 0; }
 }
 .skeleton {
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--bg3) 40%, oklch(1 0 0 / 0.10) 50%, var(--bg3) 60%);
+  background: linear-gradient(90deg, var(--bg3) 40%, oklch(1 0 0 / 0.09) 50%, var(--bg3) 60%);
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
 
+/* Reveal-on-scroll primitives (driven by framer-motion; these are fallbacks) */
 @media (prefers-reduced-motion: reduce) {
-  .badge-dot { animation: none; opacity: 1; }
+  html { scroll-behavior: auto; }
+  .tape { animation: none; }
   .skeleton { animation: none; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -190,4 +220,10 @@ html, body {
   }
 }
 
-::selection { background: oklch(from var(--accent) l c h / 0.35); }
+::selection { background: oklch(from var(--gold) l c h / 0.32); }
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

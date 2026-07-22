@@ -41,7 +41,7 @@ export default function Login() {
             <input
               type="email" value={email} onChange={(e) => setEmail(e.target.value)}
               autoComplete="email" required
-              className="rounded-lg border border-hairline bg-bg1 px-3.5 py-3 text-ink-1 outline-none transition focus:border-accent"
+              className="rounded-lg border border-hairline bg-bg1 px-3.5 py-3 text-ink-1 outline-none transition focus:border-gold"
             />
           </label>
           <label className="flex flex-col gap-1.5">
@@ -49,7 +49,7 @@ export default function Login() {
             <input
               type="password" value={password} onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password" required
-              className="rounded-lg border border-hairline bg-bg1 px-3.5 py-3 text-ink-1 outline-none transition focus:border-accent"
+              className="rounded-lg border border-hairline bg-bg1 px-3.5 py-3 text-ink-1 outline-none transition focus:border-gold"
             />
           </label>
 
@@ -61,13 +61,13 @@ export default function Login() {
 
           <button
             type="submit" disabled={busy}
-            className="pressable mt-2 rounded-full bg-accent px-6 py-3.5 text-base font-semibold text-onfill disabled:opacity-60"
+            className="pressable cta-gold mt-2 rounded-full px-6 py-3.5 text-base font-semibold disabled:opacity-60"
           >
             {busy ? "Logging in…" : "Log in"}
           </button>
           <p className="text-center text-xs text-ink-3">
             New here?{" "}
-            <Link href="/join" className="text-accent hover:underline">Start with $100,000</Link>
+            <Link href="/join" className="text-gold hover:underline">Start with $100,000</Link>
           </p>
         </form>
       </div>

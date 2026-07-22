@@ -35,11 +35,8 @@ export default function Join() {
     <main className="flex min-h-screen items-center justify-center px-6">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-amber/40 bg-amber/10 px-4 py-1.5 text-xs font-semibold tracking-[0.2em] text-amber">
-            <span className="badge-dot h-1.5 w-1.5 rounded-full bg-amber" />
-            SIMULATED
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-ink-1">
+          <p className="kicker mb-5">Simulated capital</p>
+          <h1 className="display text-3xl text-ink-1 md:text-4xl">
             Your <span className="tnum">$100,000</span> is waiting
           </h1>
           <p className="mt-2 text-sm text-ink-2">
@@ -61,13 +58,13 @@ export default function Join() {
           <button
             type="submit"
             disabled={busy}
-            className="pressable mt-2 rounded-full bg-accent px-6 py-3.5 text-base font-semibold text-onfill disabled:opacity-60"
+            className="pressable cta-gold mt-2 rounded-full px-6 py-3.5 text-base font-semibold disabled:opacity-60"
           >
             {busy ? "Opening your account…" : "Open my account"}
           </button>
           <p className="text-center text-xs text-ink-3">
             Already trading?{" "}
-            <Link href="/login" className="text-accent hover:underline">Log in</Link>
+            <Link href="/login" className="text-gold hover:underline">Log in</Link>
           </p>
         </form>
       </div>
@@ -88,7 +85,7 @@ function Field(props: {
         onChange={(e) => props.onChange(e.target.value)}
         autoComplete={props.autoComplete}
         required
-        className="rounded-lg border border-hairline bg-bg1 px-3.5 py-3 text-ink-1 outline-none transition focus:border-accent"
+        className="rounded-lg border border-hairline bg-bg1 px-3.5 py-3 text-ink-1 outline-none transition focus:border-gold"
       />
       {props.hint && <span className="text-xs text-ink-4">{props.hint}</span>}
     </label>
