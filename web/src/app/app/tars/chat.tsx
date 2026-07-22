@@ -54,21 +54,38 @@ export default function TarsChat({ userName }: { userName: string }) {
     setThinking(true);
     // Optimistic append — the room answers at the speed of thought.
     setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", text: clean, createdAt: Date.now() }]);
+    const replyId = `tars-${Date.now()}`;
     try {
       const res = await fetch("/api/tars", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: clean }),
       });
-      const data = await res.json();
-      setThinking(false);
+      if (!res.ok || !res.body) throw new Error("stream failed");
+      // First token flips 'thinking' off and mounts the reply bubble; the
+      // rest stream straight into it.
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      let mounted = false;
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        if (!mounted) {
+          mounted = true;
+          setThinking(false);
+          setMessages((m) => [...m, { id: replyId, role: "tars", text: acc, createdAt: Date.now() }]);
+        } else {
+          setMessages((m) => m.map((msg) => (msg.id === replyId ? { ...msg, text: acc } : msg)));
+        }
+      }
       sending.current = false;
-      if (data.ok) {
-        setMessages((m) => [...m, { id: `tars-${Date.now()}`, role: "tars", text: data.reply, createdAt: Date.now() }]);
-        load(); // refresh canonical history + memory
-      } else {
+      setThinking(false);
+      if (!mounted) {
         setMessages((m) => [...m, { id: `err-${Date.now()}`, role: "tars",
           text: "I couldn't answer that one — something failed on my end. Try again in a moment.", createdAt: Date.now() }]);
       }
+      load(); // refresh canonical history + memory (incl. distilled notes)
     } catch {
       setThinking(false);
       sending.current = false;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/server/auth";
-import { converse, history, memoryOf, clearConversation, brainStatus } from "@/server/tars";
+import { converse, converseStream, history, memoryOf, clearConversation, brainStatus } from "@/server/tars";
 
 export async function GET() {
   const user = await currentUser();
@@ -16,11 +16,35 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
-  const { text } = await request.json();
-  const clean = String(text ?? "").trim().slice(0, 2000);
+  let body: { text?: unknown; stream?: unknown };
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ ok: false, error: "Bad request." }, { status: 400 }); }
+  const clean = String(body.text ?? "").trim().slice(0, 2000);
   if (!clean) return NextResponse.json({ ok: false, error: "Say something." }, { status: 400 });
-  const reply = await converse(user.id, user.name, clean);
-  return NextResponse.json({ ok: true, reply });
+
+  // Non-streaming path (kept for simple clients / tests).
+  if (body.stream === false) {
+    const reply = await converse(user.id, user.name, clean);
+    return NextResponse.json({ ok: true, reply });
+  }
+
+  // Streaming path: plain text chunks as the model produces them.
+  const encoder = new TextEncoder();
+  const gen = converseStream(user.id, user.name, clean);
+  const stream = new ReadableStream({
+    async pull(controller) {
+      try {
+        const { value, done } = await gen.next();
+        if (done) { controller.close(); return; }
+        controller.enqueue(encoder.encode(value));
+      } catch {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" },
+  });
 }
 
 export async function DELETE() {
