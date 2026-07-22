@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import HoldButton from "@/components/hold-button";
 import AppNav from "@/components/app-nav";
+import GettingStarted from "@/components/getting-started";
 import type { ChartBar } from "@/components/price-chart";
 
 const PriceChart = dynamic(() => import("@/components/price-chart"), {
@@ -45,6 +46,7 @@ function TerminalInner({ userName }: { userName: string }) {
   const search = useSearchParams();
   const welcome = search.get("welcome") === "1";
   const initialSymbol = (search.get("symbol") || "AAPL").toUpperCase();
+  const initialPerf = search.get("perf") === "1";
 
   const [account, setAccount] = useState<Account | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -60,7 +62,7 @@ function TerminalInner({ userName }: { userName: string }) {
   const [reloadNonce, setReloadNonce] = useState(0);
   const [accountError, setAccountError] = useState(false);
   const [quotesStale, setQuotesStale] = useState(false);
-  const [rail, setRail] = useState<"watch" | "positions" | "orders" | "perf">("watch");
+  const [rail, setRail] = useState<"watch" | "positions" | "orders" | "perf">(initialPerf ? "perf" : "watch");
   const [chartHeight, setChartHeight] = useState(420);
 
 
@@ -168,6 +170,8 @@ function TerminalInner({ userName }: { userName: string }) {
   return (
     <div className="flex min-h-screen flex-col">
       <AppNav active="terminal" right={equityStrip} />
+
+      <GettingStarted />
 
       {welcome && (
         <p className="mx-4 mt-4 rounded-lg border border-gold/25 bg-gold/8 px-4 py-2.5 text-sm text-gold md:mx-6">

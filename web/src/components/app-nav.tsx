@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ThemeToggle from "./theme-toggle";
+import CommandPalette from "./command-palette";
 
 /*
   The authenticated shell: a sticky top header (wordmark, simulated marker,
@@ -50,6 +51,7 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
 
   return (
     <>
+      <CommandPalette />
       <header className="glass sticky top-0 z-50 flex items-center justify-between px-4 py-2.5 md:px-6">
         <div className="flex items-center gap-3">
           <Link href="/app" className="font-display text-sm font-bold tracking-[0.08em] text-ink-1">TARS</Link>
@@ -68,6 +70,12 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
           </nav>
         </div>
         <div className="flex items-center gap-2 md:gap-3">
+          <button
+            onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+            className="pressable hidden items-center gap-1.5 rounded-full border border-hairline px-3 py-1.5 text-[11px] text-ink-4 hover:text-ink-2 md:flex"
+            aria-label="Open command palette">
+            <span>Search</span><span className="tnum rounded bg-bg3 px-1.5 py-0.5">⌘K</span>
+          </button>
           {xp != null && xp > 0 && (
             <span className="tnum hidden rounded-full bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold sm:inline"
               title="Academy XP earned">{xp} XP</span>
