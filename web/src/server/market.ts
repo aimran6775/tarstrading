@@ -31,12 +31,21 @@ export const hasLiveData = KEY.length > 0;
 
 // ---------- rate limiter (token bucket: 5/min, leave 1 in reserve) ----------
 const stamps: number[] = [];
+
+/** Take a token if one is free right now. Never waits. */
+function tryTakeToken(): boolean {
+  const now = Date.now();
+  while (stamps.length && now - stamps[0] > 60_000) stamps.shift();
+  if (stamps.length < 4) { stamps.push(now); return true; }
+  return false;
+}
+
+/** Wait for a token — background warmers only, NEVER request handlers. */
 async function takeToken() {
   for (;;) {
+    if (tryTakeToken()) return;
     const now = Date.now();
-    while (stamps.length && now - stamps[0] > 60_000) stamps.shift();
-    if (stamps.length < 4) { stamps.push(now); return; }
-    await new Promise((r) => setTimeout(r, 61_000 - (now - stamps[0])));
+    await new Promise((r) => setTimeout(r, Math.max(1_000, 61_000 - (now - stamps[0]))));
   }
 }
 
@@ -59,7 +68,6 @@ async function massive<T>(path: string, params: Record<string, string> = {}): Pr
   const url = new URL(BASE + path);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   url.searchParams.set("apiKey", KEY);
-  await takeToken();
   const res = await fetch(url, { cache: "no-store" });
   if (res.status === 401 || res.status === 403) throw new Error("market-unauthorized");
   if (res.status === 429) throw new Error("market-rate-limited");
@@ -67,31 +75,54 @@ async function massive<T>(path: string, params: Record<string, string> = {}): Pr
   return res.json() as Promise<T>;
 }
 
+// In-flight background warmers, deduped per cache key.
+const warming = new Map<string, Promise<void>>();
+function warm(key: string, job: () => Promise<void>) {
+  if (warming.has(key)) return;
+  warming.set(key, job().catch(() => {}).finally(() => warming.delete(key)));
+}
+
 type PrevReply = { results?: { o: number; c: number; t: number }[] };
 type AggsReply = { results?: { t: number; o: number; h: number; l: number; c: number; v: number }[] };
 
+async function fetchQuote(symbol: string): Promise<Quote | null> {
+  const reply = await massive<PrevReply>(`/v2/aggs/ticker/${massiveTicker(symbol)}/prev`);
+  const bar = reply.results?.[0];
+  if (!bar) return null;
+  const quote: Quote = {
+    symbol,
+    price: bar.c,
+    previousClose: bar.o,
+    changePercent: bar.o > 0 ? bar.c / bar.o - 1 : 0,
+    asOf: bar.t,
+  };
+  store(`q:${symbol}`, quote);
+  return quote;
+}
+
+/**
+ * Never blocks on the rate limiter: cache hit wins; a free token fetches
+ * inline (fast); otherwise a background warmer is scheduled and the caller
+ * gets null NOW — the UI shows an honest gap and the next poll fills it.
+ * A request handler must never hang on a token bucket.
+ */
 export async function getQuote(symbol: string): Promise<Quote | null> {
   const key = `q:${symbol}`;
   const hit = cached<Quote>(key, 5 * 60_000);
   if (hit) return hit;
   if (!hasLiveData) return demoQuote(symbol);
-  try {
-    const reply = await massive<PrevReply>(`/v2/aggs/ticker/${massiveTicker(symbol)}/prev`);
-    const bar = reply.results?.[0];
-    if (!bar) return null;
-    const quote: Quote = {
-      symbol,
-      price: bar.c,
-      previousClose: bar.o,
-      changePercent: bar.o > 0 ? bar.c / bar.o - 1 : 0,
-      asOf: bar.t,
-    };
-    store(key, quote);
-    return quote;
-  } catch {
-    // One bad symbol never sinks a batch — callers get null and show a gap.
-    return null;
+  if (tryTakeToken()) {
+    try {
+      return await fetchQuote(symbol);
+    } catch {
+      return null; // one bad symbol never sinks a batch
+    }
   }
+  warm(key, async () => {
+    await takeToken();
+    await fetchQuote(symbol);
+  });
+  return null;
 }
 
 export async function getQuotes(symbols: string[]): Promise<Quote[]> {
@@ -117,6 +148,7 @@ export async function getBars(symbol: string, timeframe: Timeframe): Promise<Bar
   const hit = cached<BarPoint[]>(key, 30 * 60_000);
   if (hit) return hit;
   if (!hasLiveData) return demoBars(symbol, timeframe);
+  if (!tryTakeToken()) throw new Error("market-rate-limited");
   const { mult, span, days } = TF[timeframe];
   const to = new Date();
   const from = new Date(to.getTime() - days * 86_400_000);
