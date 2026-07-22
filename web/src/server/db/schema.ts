@@ -84,6 +84,8 @@ export const agents = sqliteTable("agents", {
   status: text("status").$type<"draft" | "backtested" | "running" | "paused" | "killed">().notNull(),
   /** JSON backtest result — an agent must pass an honest backtest to run. */
   backtest: text("backtest"),
+  /** Peak book value reached while running — drives drawdown-FROM-PEAK. */
+  peakValue: real("peak_value"),
   createdAt: integer("created_at").notNull(),
 }, (t) => [index("agents_user").on(t.userId)]);
 

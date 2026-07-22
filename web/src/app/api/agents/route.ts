@@ -38,6 +38,13 @@ function sanitizeStrategy(raw: unknown): Strategy | null {
       const rule = r as Strategy["entry"][number];
       if (!rule?.lhs || !rule?.rhs || !VALID_KINDS.has(rule.lhs.kind) || !VALID_KINDS.has(rule.rhs.kind)) return null;
       if (!VALID_COMPARATORS.has(rule.comparator)) return null;
+      // Periods must be sane integers; constants must be finite numbers.
+      for (const ref of [rule.lhs, rule.rhs] as Array<{ kind: string; period?: number; value?: number }>) {
+        if (["sma", "ema", "rsi"].includes(ref.kind)) {
+          if (!Number.isInteger(ref.period) || ref.period! < 2 || ref.period! > 200) return null;
+        }
+        if (ref.kind === "constant" && !Number.isFinite(ref.value)) return null;
+      }
       out.push(rule);
     }
     return out;

@@ -316,12 +316,20 @@ async function runTick(userId: string): Promise<number> {
   for (const agent of running) {
     const strategy = JSON.parse(agent.strategy) as Strategy;
 
-    // Drawdown guard first — even your best analyst doesn't lose unsupervised.
+    // Drawdown-FROM-PEAK guard: book value = allocation + realized/unrealized
+    // P&L; we track the high-water mark and halt on the fall from it, so an
+    // agent that ran up then gave it back still trips the limit.
     const pnl = await agentPnL(userId, agent.id);
-    if (pnl < -agent.maxDrawdown * agent.allocation) {
+    const book = agent.allocation + pnl;
+    const peak = Math.max(agent.peakValue ?? agent.allocation, book);
+    if (peak !== agent.peakValue) {
+      db.update(schema.agents).set({ peakValue: peak }).where(eq(schema.agents.id, agent.id)).run();
+    }
+    const drawdown = peak > 0 ? (peak - book) / peak : 0;
+    if (drawdown > agent.maxDrawdown) {
       db.update(schema.agents).set({ status: "killed" }).where(eq(schema.agents.id, agent.id)).run();
       narrate(userId, agent,
-        `Halted itself: drawdown ${(100 * -pnl / agent.allocation).toFixed(1)}% breached the ${(agent.maxDrawdown * 100).toFixed(0)}% limit. Positions kept — closing them is your call.`);
+        `Halted itself: drawdown ${(drawdown * 100).toFixed(1)}% from its peak breached the ${(agent.maxDrawdown * 100).toFixed(0)}% limit. Positions kept — closing them is your call.`);
       actions++;
       continue;
     }

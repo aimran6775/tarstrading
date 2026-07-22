@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createUser, startSession } from "@/server/auth";
+import { createUser, startSession, rateLimit } from "@/server/auth";
 
 const ERRORS: Record<string, string> = {
   "invalid-email": "That email doesn't look right.",
@@ -9,6 +9,10 @@ const ERRORS: Record<string, string> = {
 };
 
 export async function POST(request: Request) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  if (!rateLimit(`signup:${ip}`, 5, 10 * 60_000)) {
+    return NextResponse.json({ ok: false, error: "Too many sign-ups from here. Wait a bit." }, { status: 429 });
+  }
   try {
     const { email, name, password } = await request.json();
     const userId = await createUser(String(email ?? ""), String(name ?? ""), String(password ?? ""));

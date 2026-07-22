@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
+import ThemeToggle from "./theme-toggle";
 
 const OrbitalMarket = dynamic(() => import("./orbital-market"), {
   ssr: false,
@@ -25,7 +26,7 @@ const TAPE = [
   ["META", "+0.91"], ["GOOG", "+0.22"], ["AMD", "-1.05"], ["NFLX", "+0.47"],
 ] as const;
 
-const reveal = {
+const revealMotion = {
   initial: { opacity: 0, y: 28 },
   whileInView: { opacity: 1, y: 0 },
   viewport: { once: true, margin: "-80px" },
@@ -33,6 +34,7 @@ const reveal = {
 };
 
 export default function Landing() {
+  const reduced = useReducedMotion();
   return (
     <main className="flex min-h-screen flex-col">
       <header className="glass fixed inset-x-0 top-0 z-50 flex items-center justify-between px-5 py-3 md:px-10">
@@ -43,6 +45,7 @@ export default function Landing() {
           </span>
         </div>
         <nav className="flex items-center gap-2">
+          <ThemeToggle />
           <Link href="/login" className="pressable rounded-full px-4 py-2 text-sm text-ink-2 hover:text-ink-1">
             Log in
           </Link>
@@ -62,13 +65,13 @@ export default function Landing() {
 
         <div className="relative z-10 px-5 pb-16 pt-28 md:px-10 md:pb-20">
           <motion.p
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 0.9 }}
+            initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 0.9 }}
             className="kicker mb-5"
           >
             A flight simulator for markets
           </motion.p>
           <motion.h1
-            initial={{ opacity: 0, y: 34 }} animate={{ opacity: 1, y: 0 }}
+            initial={reduced ? false : { opacity: 0, y: 34 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.45, duration: 0.9, ease: [0.32, 0.72, 0, 1] }}
             className="display max-w-5xl text-[clamp(2.6rem,9.5vw,7.5rem)] leading-[0.97] text-ink-1"
           >
@@ -77,7 +80,7 @@ export default function Landing() {
             <span className="text-gold">before you trade.</span>
           </motion.h1>
           <motion.p
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            initial={reduced ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7, duration: 0.8, ease: [0.32, 0.72, 0, 1] }}
             className="mt-6 max-w-xl text-lg leading-relaxed text-ink-2"
           >
@@ -86,7 +89,7 @@ export default function Landing() {
             agents you program yourself. Every fill is practice. That&apos;s the point.
           </motion.p>
           <motion.div
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            initial={reduced ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9, duration: 0.7, ease: [0.32, 0.72, 0, 1] }}
             className="mt-9 flex flex-wrap items-center gap-4"
           >
@@ -114,7 +117,7 @@ export default function Landing() {
 
       {/* ---------- SCENE 1: The terminal ---------- */}
       <section id="terminal" className="mx-auto w-full max-w-6xl px-5 py-28 md:px-10 md:py-40">
-        <motion.div {...reveal}>
+        <motion.div {...(reduced ? { initial: false } : revealMotion)}>
           <p className="kicker mb-4">01 · The terminal</p>
           <h2 className="display max-w-3xl text-4xl text-ink-1 md:text-6xl">
             Real prices. Honest fills.
@@ -126,7 +129,7 @@ export default function Landing() {
           </p>
         </motion.div>
 
-        <motion.div {...reveal} className="card mt-12 overflow-hidden"
+        <motion.div {...(reduced ? { initial: false } : revealMotion)} className="card mt-12 overflow-hidden"
           style={{ transformPerspective: 1200 }}>
           <div className="flex items-center justify-between border-b border-hairline px-5 py-3">
             <span className="tnum text-xs text-ink-3">AAPL · Apple Inc.</span>
@@ -152,7 +155,7 @@ export default function Landing() {
       {/* ---------- SCENE 2: The academy ---------- */}
       <section className="border-t border-hairline">
         <div className="mx-auto grid w-full max-w-6xl gap-12 px-5 py-28 md:grid-cols-2 md:px-10 md:py-40">
-          <motion.div {...reveal}>
+          <motion.div {...(reduced ? { initial: false } : revealMotion)}>
             <p className="kicker mb-4">02 · The academy</p>
             <h2 className="display text-4xl text-ink-1 md:text-6xl">
               Zero to Greeks.
@@ -163,7 +166,7 @@ export default function Landing() {
               XP — never in dollars you don&apos;t have yet.
             </p>
           </motion.div>
-          <motion.div {...reveal} className="flex flex-col gap-3">
+          <motion.div {...(reduced ? { initial: false } : revealMotion)} className="flex flex-col gap-3">
             {[
               ["Foundations", "What a market actually is", 100],
               ["Reading price", "Candles, volume, structure", 64],
@@ -194,7 +197,7 @@ export default function Landing() {
       {/* ---------- SCENE 3: Agents ---------- */}
       <section className="border-t border-hairline">
         <div className="mx-auto w-full max-w-6xl px-5 py-28 md:px-10 md:py-40">
-          <motion.div {...reveal}>
+          <motion.div {...(reduced ? { initial: false } : revealMotion)}>
             <p className="kicker mb-4">03 · The agent lab</p>
             <h2 className="display max-w-3xl text-4xl text-ink-1 md:text-6xl">
               Program a trader.
@@ -208,7 +211,7 @@ export default function Landing() {
             </p>
           </motion.div>
 
-          <motion.div {...reveal} className="mt-12 grid gap-4 md:grid-cols-3">
+          <motion.div {...(reduced ? { initial: false } : revealMotion)} className="mt-12 grid gap-4 md:grid-cols-3">
             {[
               ["Golden Cross", "🥇", "Buys strength, exits weakness. In-sample 71% — out-of-sample 58%. It tells you both.", "running"],
               ["Mean Reverter", "🧲", "Fades panic. Halted itself after a 12% drawdown, exactly as programmed.", "halted"],
@@ -234,15 +237,15 @@ export default function Landing() {
       {/* ---------- FINAL CTA ---------- */}
       <section className="border-t border-hairline">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-5 py-28 text-center md:py-40">
-          <motion.p {...reveal} className="kicker mb-6">Your opening balance</motion.p>
-          <motion.p {...reveal} className="display tnum text-6xl text-ink-1 md:text-8xl">
+          <motion.p {...(reduced ? { initial: false } : revealMotion)} className="kicker mb-6">Your opening balance</motion.p>
+          <motion.p {...(reduced ? { initial: false } : revealMotion)} className="display tnum text-6xl text-ink-1 md:text-8xl">
             $100,000
           </motion.p>
-          <motion.p {...reveal} className="mt-4 max-w-md text-base text-ink-2">
+          <motion.p {...(reduced ? { initial: false } : revealMotion)} className="mt-4 max-w-md text-base text-ink-2">
             Simulated capital. Real market data. Real skill — the only thing
             here that transfers to the real world.
           </motion.p>
-          <motion.div {...reveal} className="mt-10">
+          <motion.div {...(reduced ? { initial: false } : revealMotion)} className="mt-10">
             <Link href="/join" className="pressable cta-gold rounded-full px-10 py-4 text-base font-semibold">
               Open your account
             </Link>

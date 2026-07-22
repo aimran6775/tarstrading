@@ -101,6 +101,9 @@ function bootstrap(sqlite: Database.Database) {
     summary TEXT NOT NULL, message_count INTEGER NOT NULL DEFAULT 0,
     updated_at INTEGER NOT NULL);
   `);
+  // Additive migrations for existing databases (SQLite has no ADD COLUMN IF
+  // NOT EXISTS, so we probe and ignore the duplicate-column error).
+  try { sqlite.exec("ALTER TABLE agents ADD COLUMN peak_value REAL"); } catch { /* already there */ }
 }
 
 function getDb(): DrizzleDb {

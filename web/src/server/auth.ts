@@ -2,7 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { randomBytes, scryptSync, timingSafeEqual, randomUUID } from "crypto";
 import { db, schema } from "./db";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, lt } from "drizzle-orm";
 
 /*
   Auth: scrypt-hashed passwords + opaque session tokens in an httpOnly cookie.
@@ -25,8 +25,15 @@ export function verifyPassword(password: string, stored: string): boolean {
   const [salt, hash] = stored.split(":");
   if (!salt || !hash) return false;
   const candidate = scryptSync(password, salt, 64);
-  return timingSafeEqual(candidate, Buffer.from(hash, "hex"));
+  const expected = Buffer.from(hash, "hex");
+  // Guard the length (corruption/migration) so timingSafeEqual can't throw.
+  if (candidate.length !== expected.length) return false;
+  return timingSafeEqual(candidate, expected);
 }
+
+// A throwaway hash so a login for a non-existent email still does scrypt work,
+// removing the timing oracle that reveals which emails are registered.
+const DUMMY_HASH = hashPassword("tars-decoy-password");
 
 export async function createUser(email: string, name: string, password: string) {
   const normalized = email.trim().toLowerCase();
@@ -109,8 +116,28 @@ export async function requireUser(): Promise<SessionUser> {
 export function loginWithPassword(email: string, password: string): string {
   const user = db.select().from(schema.users)
     .where(eq(schema.users.email, email.trim().toLowerCase())).get();
-  if (!user || !verifyPassword(password, user.passwordHash)) {
-    throw new Error("bad-credentials");
-  }
+  // Always run a scrypt comparison — constant work whether or not the email
+  // exists — so response time doesn't leak account membership.
+  const ok = verifyPassword(password, user ? user.passwordHash : DUMMY_HASH);
+  if (!user || !ok) throw new Error("bad-credentials");
   return user.id;
+}
+
+// ---- in-memory auth throttle (per key: IP or email). Swap for Redis at scale. ----
+const attempts = new Map<string, { count: number; resetAt: number }>();
+export function rateLimit(key: string, max: number, windowMs: number): boolean {
+  const now = Date.now();
+  const rec = attempts.get(key);
+  if (!rec || now > rec.resetAt) {
+    attempts.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (rec.count >= max) return false;
+  rec.count++;
+  return true;
+}
+
+/** Sweep expired sessions — called opportunistically on login. */
+export function purgeExpiredSessions() {
+  db.delete(schema.sessions).where(lt(schema.sessions.expiresAt, Date.now())).run();
 }
