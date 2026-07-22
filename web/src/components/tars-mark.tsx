@@ -7,26 +7,33 @@ import { useId } from "react";
   brand line — "a flight simulator for markets" — literal, in the one accent
   the product owns: tape gold. Drawn in theme tokens so it reverses cleanly on
   dark or light; the center reference doubles as a candlestick tick.
+
+  Pass `animate` at a brand moment (auth, error, a hero) and it boots like the
+  real instrument: bezel draws in, horizon rolls level, reference lights up.
+  Reduced-motion is respected in globals.css.
 */
-export default function TarsMark({ size = 28, className }: { size?: number; className?: string }) {
+export default function TarsMark({
+  size = 28, className, animate = false,
+}: { size?: number; className?: string; animate?: boolean }) {
   // Strip colons React's useId emits — they break url(#id) refs in SVG.
   const clip = "tars-" + useId().replace(/:/g, "");
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none"
-      className={className} role="img" aria-label="Tars">
-      <circle cx="32" cy="32" r="26" stroke="var(--gold)" strokeWidth="2.4" />
+      className={`${animate ? "tars-anim " : ""}${className ?? ""}`.trim() || undefined}
+      role="img" aria-label="Tars">
+      <circle className="tm-ring" cx="32" cy="32" r="26" stroke="var(--gold)" strokeWidth="2.4" />
       <clipPath id={clip}><circle cx="32" cy="32" r="24.6" /></clipPath>
-      <g clipPath={`url(#${clip})`}>
+      <g className="tm-h" clipPath={`url(#${clip})`}>
         {/* the climbing horizon and its lit "ground" */}
         <path d="M4 40 L60 24 L60 60 L4 60 Z" fill="var(--gold)" fillOpacity="0.16" />
         <line x1="4" y1="40" x2="60" y2="24" stroke="var(--gold)" strokeWidth="2.4" />
       </g>
       {/* aircraft reference marks — also read as a candlestick tick */}
-      <g stroke="var(--ink-1)" strokeWidth="2.6" strokeLinecap="round">
+      <g className="tm-tick" stroke="var(--ink-1)" strokeWidth="2.6" strokeLinecap="round">
         <line x1="20" y1="33" x2="27" y2="33" />
         <line x1="37" y1="33" x2="44" y2="33" />
       </g>
-      <circle cx="32" cy="33" r="2.6" fill="var(--gold)" />
+      <circle className="tm-core" cx="32" cy="33" r="2.6" fill="var(--gold)" />
     </svg>
   );
 }
