@@ -137,6 +137,53 @@ export const lessonProgress = pgTable("lesson_progress", {
   xp: integer("xp").notNull(),
 }, (t) => [index("progress_user").on(t.userId)]);
 
+/*
+  ---------- The learning backbone ----------
+  Completion is EARNED, not clicked: XP banks only when the server re-grades the
+  submitted quiz answers and they all pass. Every submission is logged so we can
+  see which checks trip learners up. The daily streak and spaced-repetition
+  schedule live here (not localStorage) so they survive a device change.
+*/
+
+/** One row per quiz answered — the raw material for "which checks are hard".
+    `tries` counts attempts before the final answer; `correct` is the last pick. */
+export const quizAttempts = pgTable("quiz_attempts", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  lessonId: text("lesson_id").notNull(),
+  quizIndex: integer("quiz_index").notNull(),
+  choice: integer("choice").notNull(),
+  correct: integer("correct").notNull(),
+  tries: integer("tries").notNull().default(1),
+  createdAt: epochMs("created_at").notNull(),
+}, (t) => [index("quiz_attempts_lesson").on(t.lessonId), index("quiz_attempts_user").on(t.userId)]);
+
+/** The practice streak — server-side so it follows the learner across devices.
+    `day` is a YYYY-MM-DD string; bumping is idempotent within a day. */
+export const practiceStreaks = pgTable("practice_streaks", {
+  userId: text("user_id").primaryKey().references(() => users.id),
+  day: text("day").notNull(),
+  current: integer("current").notNull().default(0),
+  longest: integer("longest").notNull().default(0),
+  updatedAt: epochMs("updated_at").notNull(),
+});
+
+/** Leitner spaced-repetition schedule, one row per (user, flashcard). `box`
+    1→5 controls the interval; a correct recall promotes, a miss resets to 1. */
+export const cardReviews = pgTable("card_reviews", {
+  userId: text("user_id").notNull().references(() => users.id),
+  /** Stable hash of the card's front text — same term across stages = one row. */
+  cardKey: text("card_key").notNull(),
+  box: integer("box").notNull().default(1),
+  dueAt: epochMs("due_at").notNull(),
+  reps: integer("reps").notNull().default(0),
+  lapses: integer("lapses").notNull().default(0),
+  updatedAt: epochMs("updated_at").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.cardKey] }),
+  index("card_reviews_due").on(t.userId, t.dueAt),
+]);
+
 export const chatMessages = pgTable("chat_messages", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),

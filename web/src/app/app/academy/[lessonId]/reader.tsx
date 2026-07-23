@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import type { Lesson, Section } from "@/lib/academy/types";
+import { cardKey } from "@/lib/academy/srs";
 import LessonChart from "@/components/academy/charts";
 import LessonCalc from "@/components/academy/calculators";
 import Flashcards from "@/components/academy/flashcards";
@@ -14,7 +15,9 @@ import PayoffDiagram from "@/components/academy/payoff";
 /*
   The lesson reader. Reading measure capped at 68ch, quizzes are interactive
   and honest (wrong answers explain, not shame), the desk section deep-links
-  into the terminal, and completion banks XP.
+  into the terminal. Completion is EARNED: you must pass every check, and the
+  server re-grades the answers before it banks a single point of XP. Flashcard
+  recalls quietly feed the spaced-repetition schedule.
 */
 
 const reveal = {
@@ -24,6 +27,17 @@ const reveal = {
   transition: { duration: 0.5, ease: [0.32, 0.72, 0, 1] as const },
 };
 
+type QuizResult = { choice: number; correct: boolean; tries: number };
+
+/** Fire-and-forget: record a flashcard recall against the SRS schedule. */
+function recordReview(front: string, got: boolean) {
+  fetch("/api/academy/reviews", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cardKey: cardKey(front), got }),
+  }).catch(() => { /* schedule is best-effort; a lost recall is harmless */ });
+}
+
 export default function LessonReader({ track, lesson, lessonNumber, trackSize, nextLessonId, nextTrackTitle }: {
   track: { id: string; title: string; accent: string };
   lesson: Lesson;
@@ -32,9 +46,18 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
   nextLessonId: string | null;
   nextTrackTitle?: string | null;
 }) {
-  const quizCount = lesson.sections.filter((s) => s.kind === "quiz").length;
-  const [correct, setCorrect] = useState(0);
-  const [answered, setAnswered] = useState(0);
+  // Map each section to its quiz ordinal (null when it isn't a quiz) so the
+  // reader and the server agree on answer order.
+  const quizIndexOf = useMemo(() => {
+    let n = 0;
+    return lesson.sections.map((s) => (s.kind === "quiz" ? n++ : null));
+  }, [lesson.sections]);
+  const quizCount = quizIndexOf.filter((q) => q !== null).length;
+
+  const [results, setResults] = useState<Record<number, QuizResult>>({});
+  const passedCount = Object.values(results).filter((r) => r.correct).length;
+  const allPassed = passedCount >= quizCount;
+
   const [completed, setCompleted] = useState(false);
   const [xpTotal, setXpTotal] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -42,14 +65,18 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
 
   async function complete() {
     setSaving(true); setSaveError(false);
+    const answers = Array.from({ length: quizCount }, (_, i) => ({
+      choice: results[i]?.choice ?? -1,
+      tries: results[i]?.tries ?? 1,
+    }));
     try {
       const res = await fetch("/api/academy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lessonId: lesson.id }),
+        body: JSON.stringify({ lessonId: lesson.id, answers }),
       });
       const data = await res.json();
-      if (data.ok) { setCompleted(true); setXpTotal(data.xp); }
+      if (data.ok && data.passed) { setCompleted(true); setXpTotal(data.xp); }
       else setSaveError(true);
     } catch { setSaveError(true); }
     finally { setSaving(false); }
@@ -69,9 +96,9 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
         {lesson.sections.map((section, i) => (
           <motion.div key={i} {...reveal}>
             <SectionView section={section}
-              onAnswered={() => setAnswered((a) => a + 1)}
-              onCorrect={() => setCorrect((c) => c + 1)}
-              onReset={(wasRight) => { setAnswered((a) => Math.max(0, a - 1)); if (wasRight) setCorrect((c) => Math.max(0, c - 1)); }} />
+              quizIndex={quizIndexOf[i]}
+              onQuizResult={(qi, r) => setResults((prev) => ({ ...prev, [qi]: r }))}
+              onRate={recordReview} />
           </motion.div>
         ))}
       </div>
@@ -95,11 +122,13 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
         ) : (
           <div className="flex flex-col items-center gap-3 text-center">
             {quizCount > 0 && (
-              <p className="tnum text-xs text-ink-4">{correct} of {quizCount} checks correct · {answered}/{quizCount} answered</p>
+              <p className="tnum text-xs text-ink-4">{passedCount} of {quizCount} checks passed</p>
             )}
-            <button onClick={complete} disabled={saving || answered < quizCount}
+            <button onClick={complete} disabled={saving || !allPassed}
               className="pressable cta-gold rounded-full px-8 py-3.5 text-base font-semibold disabled:opacity-40">
-              {saving ? "Banking XP…" : answered < quizCount ? `Answer the ${quizCount - answered} check${quizCount - answered > 1 ? "s" : ""} to finish` : `Complete lesson · +${lesson.xp} XP`}
+              {saving ? "Banking XP…"
+                : !allPassed ? `Pass the ${quizCount - passedCount} check${quizCount - passedCount > 1 ? "s" : ""} to finish`
+                : `Complete lesson · +${lesson.xp} XP`}
             </button>
             {saveError && <p role="alert" className="text-xs text-loss">Couldn&apos;t save your progress. Try again.</p>}
             <Link href="/app/academy" className="text-xs text-ink-3 hover:text-ink-1">
@@ -112,9 +141,11 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
   );
 }
 
-function SectionView({ section, onAnswered, onCorrect, onReset }: {
+function SectionView({ section, quizIndex, onQuizResult, onRate }: {
   section: Section;
-  onAnswered: () => void; onCorrect: () => void; onReset: (wasRight: boolean) => void;
+  quizIndex: number | null;
+  onQuizResult: (quizIndex: number, result: QuizResult) => void;
+  onRate: (front: string, got: boolean) => void;
 }) {
   switch (section.kind) {
     case "prose":
@@ -145,7 +176,7 @@ function SectionView({ section, onAnswered, onCorrect, onReset }: {
       return <LessonCalc tool={section.tool} title={section.title} />;
 
     case "flashcards":
-      return <Flashcards title={section.title} cards={section.cards} />;
+      return <Flashcards title={section.title} cards={section.cards} onRate={onRate} />;
 
     case "game":
       return <LessonGame variant={section.variant} title={section.title} />;
@@ -165,7 +196,7 @@ function SectionView({ section, onAnswered, onCorrect, onReset }: {
       );
 
     case "quiz":
-      return <Quiz section={section} onAnswered={onAnswered} onCorrect={onCorrect} onReset={onReset} />;
+      return <Quiz section={section} quizIndex={quizIndex ?? 0} onResult={onQuizResult} />;
 
     case "desk":
       return (
@@ -181,21 +212,23 @@ function SectionView({ section, onAnswered, onCorrect, onReset }: {
   }
 }
 
-function Quiz({ section, onAnswered, onCorrect, onReset }: {
+function Quiz({ section, quizIndex, onResult }: {
   section: Extract<Section, { kind: "quiz" }>;
-  onAnswered: () => void; onCorrect: () => void; onReset: (wasRight: boolean) => void;
+  quizIndex: number;
+  onResult: (quizIndex: number, result: QuizResult) => void;
 }) {
   const [picked, setPicked] = useState<number | null>(null);
+  const [tries, setTries] = useState(0);
   const answered = picked !== null;
 
   function pick(i: number) {
+    const attempt = tries + 1;
+    setTries(attempt);
     setPicked(i);
-    onAnswered();
-    if (i === section.answer) onCorrect();
+    onResult(quizIndex, { choice: i, correct: i === section.answer, tries: attempt });
   }
   function retry() {
-    onReset(picked === section.answer);
-    setPicked(null);
+    setPicked(null); // keep `tries` — the struggle is the signal
   }
 
   return (
@@ -227,7 +260,7 @@ function Quiz({ section, onAnswered, onCorrect, onReset }: {
         })}
       </div>
       {answered && (
-        <div className="mt-3 flex items-start justify-between gap-3">
+        <div className="mt-3 flex items-start justify-between gap-3" aria-live="polite">
           <p className={`text-sm leading-relaxed ${picked === section.answer ? "text-gain" : "text-ink-2"}`}>
             {picked === section.answer ? "Right. " : "Not quite. "}{section.explain}
           </p>

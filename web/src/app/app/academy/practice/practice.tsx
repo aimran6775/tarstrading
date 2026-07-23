@@ -5,12 +5,13 @@ import Link from "next/link";
 import Flashcards from "@/components/academy/flashcards";
 import LessonGame from "@/components/academy/games";
 import { allTerms, GAMES, type Term } from "@/lib/academy/practice";
+import { cardKey } from "@/lib/academy/srs";
 
 /*
   The Practice hub — everything the ten stages taught, recycled forever.
-  Flashcards (spaced-ish review across all terms or one stage), an arcade of
-  the same drills the lessons use, and a local daily streak so coming back
-  feels rewarded. No new content: it all derives from the stages.
+  Flashcards are scheduled by spaced repetition (due cards surface first), an
+  arcade replays the same drills the lessons use, and a server-side daily
+  streak rewards coming back. No new content: it all derives from the stages.
 */
 
 const SESSION = 12;
@@ -24,9 +25,7 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-type Streak = { last: string; streak: number };
-const today = () => new Date().toDateString();
-const yesterday = () => new Date(Date.now() - 86_400_000).toDateString();
+type ReviewMap = Record<string, { box: number; dueAt: number }>;
 
 export default function Practice() {
   const terms = useMemo(() => allTerms(), []);
@@ -40,35 +39,73 @@ export default function Practice() {
   const [stageId, setStageId] = useState<string>("all");
   const [session, setSession] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [reviews, setReviews] = useState<ReviewMap>({});
+  const [dueCount, setDueCount] = useState<number | null>(null);
   const [playedGame, setPlayedGame] = useState<number | null>(null);
 
+  // Load the server streak + spaced-repetition schedule on mount.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("tars-practice");
-      if (raw) setStreak((JSON.parse(raw) as Streak).streak ?? 0);
-    } catch { /* first visit */ }
-  }, []);
+    let alive = true;
+    (async () => {
+      try {
+        const [s, r] = await Promise.all([
+          fetch("/api/academy/streak").then((res) => res.json()),
+          fetch("/api/academy/reviews").then((res) => res.json()),
+        ]);
+        if (!alive) return;
+        if (s?.ok) setStreak(s.current ?? 0);
+        if (r?.ok) {
+          const map: ReviewMap = {};
+          for (const row of r.reviews as { cardKey: string; box: number; dueAt: number }[]) {
+            map[row.cardKey] = { box: row.box, dueAt: row.dueAt };
+          }
+          setReviews(map);
+          const now = Date.now();
+          setDueCount(terms.filter((t) => {
+            const rv = map[cardKey(t.front)];
+            return !rv || rv.dueAt <= now;
+          }).length);
+        }
+      } catch { /* offline — streak stays 0, deck stays unscheduled */ }
+    })();
+    return () => { alive = false; };
+  }, [terms]);
 
   function markPracticed() {
-    try {
-      const raw = localStorage.getItem("tars-practice");
-      const prev: Streak = raw ? JSON.parse(raw) : { last: "", streak: 0 };
-      if (prev.last === today()) return; // already counted today
-      const next: Streak = {
-        last: today(),
-        streak: prev.last === yesterday() ? prev.streak + 1 : 1,
-      };
-      localStorage.setItem("tars-practice", JSON.stringify(next));
-      setStreak(next.streak);
-    } catch { /* storage blocked — no streak, no harm */ }
+    fetch("/api/academy/streak", { method: "POST" })
+      .then((res) => res.json())
+      .then((d) => { if (d?.ok) setStreak(d.current ?? 0); })
+      .catch(() => { /* streak is best-effort */ });
+  }
+
+  function recordReview(front: string, got: boolean) {
+    const key = cardKey(front);
+    // Optimistic: promote/reset locally so a re-shuffle respects this recall.
+    setReviews((prev) => {
+      const box = got ? Math.min(5, (prev[key]?.box ?? 1) + 1) : 1;
+      return { ...prev, [key]: { box, dueAt: got ? Date.now() + box * 86_400_000 : Date.now() } };
+    });
+    fetch("/api/academy/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardKey: key, got }),
+    }).catch(() => { /* best-effort */ });
   }
 
   const pool: Term[] = stageId === "all" ? terms : terms.filter((t) => t.stageId === stageId);
-  const deck = useMemo(
-    () => shuffle(pool).slice(0, SESSION).map((t) => ({ front: t.front, back: t.back })),
-    // reshuffle when stage or session changes
-    [stageId, session], // eslint-disable-line react-hooks/exhaustive-deps
-  );
+
+  // Due (or never-seen) cards first, then the rest by nearest due date — so a
+  // session always drills what's slipping before what's fresh.
+  const deck = useMemo(() => {
+    const now = Date.now();
+    const withState = pool.map((t) => ({ t, r: reviews[cardKey(t.front)] }));
+    const due = shuffle(withState.filter((x) => !x.r || x.r.dueAt <= now));
+    const later = withState
+      .filter((x) => x.r && x.r.dueAt > now)
+      .sort((a, b) => (a.r!.dueAt - b.r!.dueAt));
+    return [...due, ...later].slice(0, SESSION).map((x) => ({ front: x.t.front, back: x.t.back }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stageId, session, reviews]);
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-24 pt-10 md:pb-10 md:px-0">
@@ -87,6 +124,9 @@ export default function Practice() {
       </div>
       <p className="mt-3 text-sm leading-relaxed text-ink-3">
         Every term and drill from the ten stages, on repeat. A few minutes a day is how it sticks.
+        {dueCount != null && dueCount > 0 && (
+          <> <span className="text-gold">{dueCount} card{dueCount === 1 ? "" : "s"} due</span> today.</>
+        )}
       </p>
 
       {/* mode switch */}
@@ -119,6 +159,7 @@ export default function Practice() {
             key={`${stageId}-${session}`}
             title={stageId === "all" ? "Mixed review" : stages.find(([id]) => id === stageId)?.[1]}
             cards={deck}
+            onRate={recordReview}
             onDone={markPracticed}
           />
 

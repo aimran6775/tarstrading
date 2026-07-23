@@ -12,7 +12,11 @@ import { motion, AnimatePresence } from "framer-motion";
 
 type Card = { front: string; back: string };
 
-export default function Flashcards({ title, cards, onDone }: { title?: string; cards: Card[]; onDone?: () => void }) {
+export default function Flashcards({ title, cards, onDone, onRate }: {
+  title?: string; cards: Card[]; onDone?: () => void;
+  /** Called on each self-rating — feeds the spaced-repetition schedule. */
+  onRate?: (front: string, got: boolean) => void;
+}) {
   const [queue, setQueue] = useState<number[]>(() => cards.map((_, i) => i));
   const [pos, setPos] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -28,6 +32,7 @@ export default function Flashcards({ title, cards, onDone }: { title?: string; c
   const learned = got.size;
 
   function rate(keep: boolean) {
+    onRate?.(cards[current].front, keep);
     const next = keep ? queue : [...queue, current];
     if (keep) setGot((g) => new Set(g).add(current));
     setQueue(next);
