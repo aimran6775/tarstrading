@@ -174,6 +174,19 @@ export default async function AcademyHome() {
           <span className="shrink-0 text-2xl text-ink-4">→</span>
         </Link>
 
+        {/* Historical replay — trade famous market moments blind */}
+        <Link href="/app/academy/replay"
+          className="pressable mt-6 flex items-center justify-between gap-4 rounded-2xl border border-hairline bg-bg1 p-5 transition-colors hover:border-agent/40 hover:bg-bg2/60">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">Trade history blind</p>
+            <h2 className="mt-1 font-display text-xl font-bold text-ink-1">Replay ⏪</h2>
+            <p className="mt-0.5 text-sm text-ink-3">
+              Step into the COVID crash, the 2022 bear, or the GameStop squeeze — one day at a time — and feel the decisions for real.
+            </p>
+          </div>
+          <span className="shrink-0 text-2xl text-ink-4">→</span>
+        </Link>
+
         {/* Practice hub — the endless review loop after (and during) the stages */}
         <Link href="/app/academy/practice"
           className="pressable mt-6 flex items-center justify-between gap-4 rounded-2xl border border-hairline bg-bg1 p-5 transition-colors hover:border-gold/40 hover:bg-bg2/60">

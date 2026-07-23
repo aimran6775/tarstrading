@@ -33,3 +33,4 @@ ALTER TABLE public.practice_streaks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.card_reviews     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.game_attempts    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mission_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.replay_results   ENABLE ROW LEVEL SECURITY;

@@ -184,6 +184,20 @@ export const cardReviews = pgTable("card_reviews", {
   index("card_reviews_due").on(t.userId, t.dueAt),
 ]);
 
+/** A historical-replay scenario a learner has played to the end — with how they
+    did (their return) vs. buy-and-hold. One row per (user, scenario); the best
+    attempt is kept. */
+export const replayResults = pgTable("replay_results", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  scenarioId: text("scenario_id").notNull(),
+  /** Player and benchmark returns as fractions (e.g. 0.12 = +12%). */
+  playerReturn: doublePrecision("player_return").notNull(),
+  buyHoldReturn: doublePrecision("buy_hold_return").notNull(),
+  completedAt: epochMs("completed_at").notNull(),
+  xp: integer("xp").notNull(),
+}, (t) => [index("replay_results_user").on(t.userId)]);
+
 /** A graded sim mission a learner has completed — process demonstrated with a
     real (simulated) trade, not just a quiz passed. One row per mission, once. */
 export const missionProgress = pgTable("mission_progress", {
