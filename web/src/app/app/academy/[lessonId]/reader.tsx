@@ -15,6 +15,7 @@ import { TiltSimulator, PreTradeChecklist } from "@/components/academy/psycholog
 import { RSIMeter, ForwardCurve, GreeksExplorer } from "@/components/academy/indicators";
 import { PortfolioHeat, CorrelationViz } from "@/components/academy/portfolio";
 import { GuidedTrade } from "@/components/academy/guided-trade";
+import LessonTutor from "@/components/academy/lesson-tutor";
 
 /*
   The lesson reader. Reading measure capped at 68ch, quizzes are interactive
@@ -167,6 +168,8 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
           </div>
         )}
       </div>
+
+      <LessonTutor lessonId={lesson.id} lessonTitle={lesson.title} />
     </main>
   );
 }

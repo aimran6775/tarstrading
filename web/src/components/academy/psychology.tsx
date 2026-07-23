@@ -114,7 +114,7 @@ export function PreTradeChecklist() {
                 ticked[i] ? "border-gain/50 bg-gain/8 text-ink-1" : "border-hairline text-ink-2 hover:border-ink-4"
               }`}>
               <span aria-hidden className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] ${
-                ticked[i] ? "border-transparent bg-gain text-ongain" : "border-ink-4 text-transparent"
+                ticked[i] ? "border-transparent bg-gain text-bg0" : "border-ink-4 text-transparent"
               }`}>✓</span>
               {c}
             </button>
