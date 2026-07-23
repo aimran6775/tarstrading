@@ -4,10 +4,11 @@ import { readingTrack } from "./stage2";
 import { ordersTrack } from "./stage3";
 import { riskStage } from "./stage4";
 import { edgeStage } from "./stage5";
+import { stocksStage } from "./stage6";
 import { optionsStage } from "./stage7";
+import { futuresStage } from "./stage8";
 import { aiStage } from "./stage9";
-import { stocksTrack } from "./content1";
-import { futuresTrack, fundTrack } from "./content2";
+import { fundStage } from "./stage10";
 
 /*
   The ten stages of the academy, in order. The rebuilt, fully-interactive
@@ -16,21 +17,20 @@ import { futuresTrack, fundTrack } from "./content2";
   are being upgraded to the same standard, stage by stage.
 */
 export const tracks: Track[] = [
-  marketsTrack,   // Stage 1  — interactive
-  readingTrack,   // Stage 2  — interactive
-  ordersTrack,    // Stage 3  — interactive
-  riskStage,      // Stage 4  — interactive
-  edgeStage,      // Stage 5  — interactive
-  stocksTrack,    // Stage 6
-  optionsStage,   // Stage 7  — interactive
-  futuresTrack,   // Stage 8
-  aiStage,        // Stage 9  — interactive
-  fundTrack,      // Stage 10
+  marketsTrack,   // Stage 1
+  readingTrack,   // Stage 2
+  ordersTrack,    // Stage 3
+  riskStage,      // Stage 4
+  edgeStage,      // Stage 5
+  stocksStage,    // Stage 6
+  optionsStage,   // Stage 7
+  futuresStage,   // Stage 8
+  aiStage,        // Stage 9
+  fundStage,      // Stage 10
 ];
 
-export const INTERACTIVE_IDS = new Set([
-  "s1-markets", "s2-reading", "s3-orders", "s4-risk", "s5-edge", "s7-options", "s9-ai",
-]);
+// Every stage is now the rebuilt, fully-interactive template.
+export const INTERACTIVE_IDS = new Set(tracks.map((t) => t.id));
 
 /** Map a concept → the lesson that teaches it, for contextual "Learn" links
     scattered through the app (terminal, ticket, assistant). */
