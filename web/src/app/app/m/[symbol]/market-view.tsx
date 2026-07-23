@@ -132,7 +132,9 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
 
   useEffect(() => {
     loadAccount().then(() => { loadQuotes(); loadOrders(); });
-    const q = setInterval(loadQuotes, 20_000);
+    // 4s poll: the server reads live websocket ticks from memory, so a fast
+    // poll costs nothing upstream and the tape actually moves.
+    const q = setInterval(loadQuotes, 4_000);
     const a = setInterval(loadAccount, 45_000);
     const o = setInterval(loadOrders, 45_000);
     return () => { clearInterval(q); clearInterval(a); clearInterval(o); };
@@ -223,11 +225,19 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
                   <span className={`tnum text-lg font-semibold ${chg > 0 ? "text-gain" : chg < 0 ? "text-loss" : "text-ink-3"}`}>
                     {chg > 0 ? "▲" : chg < 0 ? "▼" : ""} {pct(chg)}
                   </span>
-                  {Date.now() - quote.asOf > 5 * 60_000 && (
+                  {Date.now() - quote.asOf < 90_000 ? (
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-gain">
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-60" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-gain" />
+                      </span>
+                      Live
+                    </span>
+                  ) : Date.now() - quote.asOf > 5 * 60_000 ? (
                     <span className="text-[11px] text-ink-4">
                       as of {new Date(quote.asOf).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                     </span>
-                  )}
+                  ) : null}
                 </>
               ) : (
                 <span className="skeleton h-10 w-48" />

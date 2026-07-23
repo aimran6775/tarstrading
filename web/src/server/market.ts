@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { and, asc, eq, inArray, sql as dsql } from "drizzle-orm";
+import { livePrice } from "./live-feed";
 
 /*
   Market data service. Massive (formerly Polygon.io) proxied server-side ONLY —
@@ -175,6 +176,20 @@ async function fetchQuote(symbol: string): Promise<Quote | null> {
   return quote;
 }
 
+/** Overlay the freshest websocket tick on top of a baseline quote — price and
+    asOf go live, previousClose (and so day-change %) stays from the daily
+    tier, which is exactly the anchor a change number needs. */
+function withLive(q: Quote): Quote {
+  const t = livePrice(q.symbol);
+  if (!t) return q;
+  return {
+    ...q,
+    price: t.price,
+    changePercent: q.previousClose > 0 ? t.price / q.previousClose - 1 : q.changePercent,
+    asOf: t.at,
+  };
+}
+
 /**
  * Never blocks on the rate limiter: cache hit wins; a free token fetches
  * inline (fast); otherwise a background warmer is scheduled and the caller
@@ -183,13 +198,14 @@ async function fetchQuote(symbol: string): Promise<Quote | null> {
 export async function getQuote(symbol: string): Promise<Quote | null> {
   const key = `q:${symbol}`;
   const hit = cached<Quote>(key, QUOTE_TTL);
-  if (hit) return hit;                       // L1
-  if (!hasLiveData) return demoQuote(symbol);
+  if (hit) return withLive(hit);             // L1 (+ live tick overlay)
+  if (!hasLiveData) return withLive(demoQuote(symbol));
   const l2 = (await readQuoteCacheBatch([symbol])).get(symbol);
-  if (l2) { store(key, l2); return l2; }     // L2 (shared)
+  if (l2) { store(key, l2); return withLive(l2); } // L2 (shared)
   if (tryTakeToken()) {
     try {
-      return await fetchQuote(symbol);
+      const q = await fetchQuote(symbol);
+      return q ? withLive(q) : null;
     } catch {
       return null; // one bad symbol never sinks a batch
     }
@@ -206,17 +222,17 @@ export async function getQuotes(symbols: string[]): Promise<Quote[]> {
   const need: string[] = [];
   for (const s of symbols) {
     const l1 = cached<Quote>(`q:${s}`, QUOTE_TTL);
-    if (l1) out.push(l1); else need.push(s);
+    if (l1) out.push(withLive(l1)); else need.push(s);
   }
   if (!need.length) return out;
-  if (!hasLiveData) { for (const s of need) out.push(demoQuote(s)); return out; }
+  if (!hasLiveData) { for (const s of need) out.push(withLive(demoQuote(s))); return out; }
 
   // One batched L2 read for the whole watchlist instead of N round-trips.
   const l2 = await readQuoteCacheBatch(need);
   const miss: string[] = [];
   for (const s of need) {
     const q = l2.get(s);
-    if (q) { store(`q:${s}`, q); out.push(q); } else miss.push(s);
+    if (q) { store(`q:${s}`, q); out.push(withLive(q)); } else miss.push(s);
   }
   // Only genuine misses reach the upstream (rate-limited) path.
   for (const s of miss) {
