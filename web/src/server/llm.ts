@@ -1,95 +1,114 @@
 import "server-only";
 
 /*
-  The language-model client — one shared brain for the whole product (the
-  assistant, and any explainer text). Provider is auto-detected, Ollama first:
+  The language-model client — one shared brain for the whole product. EVERY
+  provider is spoken to through the SAME OpenAI-compatible `/v1/chat/completions`
+  shape, so what you run locally and what you run in the cloud are byte-for-byte
+  the same request — no behavior drift when you move to hosting.
 
-  - OLLAMA_URL set → local inference (default qwen2.5:7b-instruct). Free,
-    private, 24/7, no per-token cost — the primary path.
-  - HF_TOKEN set   → Hugging Face router (OpenAI-compatible). Used as a
-    FALLBACK if Ollama is configured but unreachable, or on its own.
-  - neither        → callers use their own scripted fallback.
+  Providers, in precedence order (first one CONFIGURED wins; on failure the
+  next is tried, so cloud-primary with a local/HF fallback just works):
 
-  callModel tries the chain in order, so during setup (Ollama not installed
-  yet) the app quietly uses HF, then switches to local the moment Ollama is up
-  — no redeploy, no config flip.
+  1. Cloud — any OpenAI-compatible endpoint: Groq, DeepInfra, Together,
+     Fireworks, OpenAI, etc. Set OPENAI_BASE_URL + OPENAI_API_KEY + OPENAI_MODEL.
+     This is what you'll host with; set it and local == cloud.
+  2. Ollama — local inference via its OpenAI-compatible /v1 endpoint. Free,
+     private, 24/7. Set OLLAMA_URL (+ OLLAMA_MODEL).
+  3. Hugging Face router — hosted open models. Set HF_TOKEN.
+  4. none — callers use their own scripted fallback.
 */
 
-const OLLAMA_URL = process.env.OLLAMA_URL ?? "";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "qwen2.5:7b-instruct";
-const HF_TOKEN = process.env.HF_TOKEN ?? "";
-const HF_MODEL = process.env.TARS_MODEL ?? "meta-llama/Llama-3.3-70B-Instruct";
-
 export type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
-export type Provider = "ollama" | "hf" | "scripted";
+export type ProviderName = "cloud" | "ollama" | "hf" | "scripted";
+export type ProviderStatus = { provider: ProviderName; model: string };
 
-export function brainStatus(): { provider: Provider; model: string } {
-  if (OLLAMA_URL) return { provider: "ollama", model: OLLAMA_MODEL };
-  if (HF_TOKEN) return { provider: "hf", model: HF_MODEL };
-  return { provider: "scripted", model: "rules" };
+type Provider = {
+  name: ProviderName;
+  /** OpenAI-compatible base, WITHOUT the trailing /chat/completions. */
+  baseUrl: string;
+  apiKey: string; // "" for keyless local Ollama
+  model: string;
+};
+
+const strip = (u: string) => u.replace(/\/$/, "");
+
+/** The configured providers, highest precedence first. */
+function providers(): Provider[] {
+  const list: Provider[] = [];
+  if (process.env.OPENAI_BASE_URL && process.env.OPENAI_API_KEY) {
+    list.push({
+      name: "cloud",
+      baseUrl: strip(process.env.OPENAI_BASE_URL),
+      apiKey: process.env.OPENAI_API_KEY,
+      model: process.env.OPENAI_MODEL ?? "llama-3.3-70b-versatile",
+    });
+  }
+  if (process.env.OLLAMA_URL) {
+    list.push({
+      name: "ollama",
+      baseUrl: `${strip(process.env.OLLAMA_URL)}/v1`,
+      apiKey: "",
+      model: process.env.OLLAMA_MODEL ?? "qwen2.5:7b-instruct",
+    });
+  }
+  if (process.env.HF_TOKEN) {
+    list.push({
+      name: "hf",
+      baseUrl: "https://router.huggingface.co/v1",
+      apiKey: process.env.HF_TOKEN,
+      model: process.env.TARS_MODEL ?? "meta-llama/Llama-3.3-70B-Instruct",
+    });
+  }
+  return list;
 }
 
-const base = (u: string) => u.replace(/\/$/, "");
-
-async function callOllama(messages: ChatMsg[], maxTokens: number): Promise<string | null> {
-  const res = await fetch(`${base(OLLAMA_URL)}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      messages,
-      stream: false,
-      options: { num_predict: maxTokens, temperature: 0.6 },
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
-  if (!res.ok) throw new Error(`ollama ${res.status}`);
-  const data = await res.json();
-  return data.message?.content ?? null;
+/** The active provider (first configured) — what the admin dashboard reports. */
+export function brainStatus(): ProviderStatus {
+  const p = providers()[0];
+  return p ? { provider: p.name, model: p.model } : { provider: "scripted", model: "rules" };
 }
 
-async function callHF(messages: ChatMsg[], maxTokens: number): Promise<string | null> {
-  const res = await fetch("https://router.huggingface.co/v1/chat/completions", {
+function headers(p: Provider): Record<string, string> {
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  if (p.apiKey) h.Authorization = `Bearer ${p.apiKey}`;
+  return h;
+}
+
+async function complete(p: Provider, messages: ChatMsg[], maxTokens: number): Promise<string | null> {
+  const res = await fetch(`${p.baseUrl}/chat/completions`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${HF_TOKEN}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: HF_MODEL, messages, max_tokens: maxTokens, temperature: 0.6 }),
+    headers: headers(p),
+    body: JSON.stringify({ model: p.model, messages, max_tokens: maxTokens, temperature: 0.6, stream: false }),
     signal: AbortSignal.timeout(60_000),
   });
-  if (!res.ok) throw new Error(`hf ${res.status}`);
+  if (!res.ok) throw new Error(`${p.name} ${res.status}`);
   const data = await res.json();
   return data.choices?.[0]?.message?.content ?? null;
 }
 
-/** Non-streaming completion. Tries Ollama, then HF; null if all fail. */
+/** Non-streaming completion. Tries providers in order; null if all fail. */
 export async function callModel(messages: ChatMsg[], maxTokens = 400): Promise<string | null> {
-  if (OLLAMA_URL) {
-    try { return await callOllama(messages, maxTokens); }
-    catch { /* fall through to HF during setup / on local outage */ }
-  }
-  if (HF_TOKEN) {
-    try { return await callHF(messages, maxTokens); }
-    catch { return null; }
+  for (const p of providers()) {
+    try {
+      const out = await complete(p, messages, maxTokens);
+      if (out != null) return out;
+    } catch { /* fall through to the next configured provider */ }
   }
   return null;
 }
 
-/** OpenAI-compatible SSE streaming. Returns null if no provider is configured.
-    Streams from Ollama when set, else HF. (No mid-stream failover — the caller
-    yields a scripted line if the stream dies.) */
+/** OpenAI-compatible SSE streaming from the primary provider. Null if none
+    configured. (No mid-stream failover — the caller yields a scripted line if
+    the stream dies.) */
 export function streamModel(messages: ChatMsg[]): AsyncGenerator<string> | null {
-  const useOllama = !!OLLAMA_URL;
-  const endpoint = useOllama
-    ? `${base(OLLAMA_URL)}/v1/chat/completions`
-    : HF_TOKEN ? "https://router.huggingface.co/v1/chat/completions" : null;
-  if (!endpoint) return null;
-  const model = useOllama ? OLLAMA_MODEL : HF_MODEL;
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (!useOllama && HF_TOKEN) headers.Authorization = `Bearer ${HF_TOKEN}`;
+  const p = providers()[0];
+  if (!p) return null;
 
   async function* gen(): AsyncGenerator<string> {
-    const res = await fetch(endpoint!, {
-      method: "POST", headers,
-      body: JSON.stringify({ model, messages, max_tokens: 600, temperature: 0.6, stream: true }),
+    const res = await fetch(`${p.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: headers(p),
+      body: JSON.stringify({ model: p.model, messages, max_tokens: 600, temperature: 0.6, stream: true }),
       signal: AbortSignal.timeout(90_000),
     });
     if (!res.ok || !res.body) throw new Error(`stream ${res.status}`);

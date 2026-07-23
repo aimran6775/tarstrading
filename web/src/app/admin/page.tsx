@@ -52,7 +52,7 @@ export default async function AdminOverview() {
     ["Quotes cached", quoteRows, "symbols warm"],
     ["Sessions", sessions, "currently valid"],
     ["Assistant · 24h", chats24, "messages"],
-    ["AI brain", brain.provider, brain.provider === "ollama" ? `local · ${brain.model}` : brain.provider === "hf" ? "hosted fallback" : "no model"],
+    ["AI brain", brain.provider, brain.provider === "cloud" ? brain.model : brain.provider === "ollama" ? `local · ${brain.model}` : brain.provider === "hf" ? "HF fallback" : "no model"],
     ["Live feed", feed.enabled ? (feed.stocks.authed || feed.crypto.authed ? "on" : "connecting") : "off", `${feed.symbolsTicking} symbols ticking`],
   ];
 
