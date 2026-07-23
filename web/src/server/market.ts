@@ -1,21 +1,23 @@
 import "server-only";
+import { randomUUID } from "crypto";
 import { db, schema } from "./db";
-import { inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql as dsql } from "drizzle-orm";
 
 /*
   Market data service. Massive (formerly Polygon.io) proxied server-side ONLY —
-  the API key never reaches the client. Free tier is 5 req/min EOD, so:
-  - token-bucket rate limiter (never 429 by design)
-  - TWO cache layers: L1 in-memory (per instance) + L2 Postgres quote_cache
-    (shared by every instance). L2 is the scaling fix: with many serverless
-    instances and 500+ users, upstream is hit at most once per symbol per TTL
-    FLEET-WIDE instead of once per instance.
-  - crypto pairs map to Massive's "X:BTCUSD" ticker form
-  - every payload carries `asOf` so the UI can be honest about staleness
+  the API key never reaches the client. Free tier is 5 req/min EOD, so the
+  architecture is "fetch once, keep forever":
+
+  - HISTORICAL BARS ARE STORED, NOT CACHED. Chart reads hit Postgres; only the
+    missing tail of a series ever goes upstream. After first backfill a symbol
+    costs ~zero API calls until new bars exist.
+  - Quotes: L1 in-memory (instance) → L2 Postgres quote_cache (fleet) → Massive.
+  - Every fresh quote is also appended to quote_history, so intraday charts get
+    denser over time even on an EOD data plan.
+  - Every upstream request is logged to api_calls — the admin dashboard's feed.
+  - Token bucket (never 429 by design); request handlers never block on it.
   Without a key, a deterministic demo market takes over (same shapes).
 */
-
-const QUOTE_TTL = 5 * 60_000;
 
 export type Quote = {
   symbol: string;
@@ -36,15 +38,24 @@ const BASE = "https://api.massive.com";
 const KEY = process.env.MASSIVE_API_KEY ?? "";
 export const hasLiveData = KEY.length > 0;
 
+const QUOTE_TTL = 5 * 60_000;
+
 // ---------- rate limiter (token bucket: 5/min, leave 1 in reserve) ----------
 const stamps: number[] = [];
 
 /** Take a token if one is free right now. Never waits. */
-function tryTakeToken(): boolean {
+export function tryTakeToken(): boolean {
   const now = Date.now();
   while (stamps.length && now - stamps[0] > 60_000) stamps.shift();
   if (stamps.length < 4) { stamps.push(now); return true; }
   return false;
+}
+
+/** Tokens currently free — the backfill worker only spends leftovers. */
+export function freeTokens(): number {
+  const now = Date.now();
+  while (stamps.length && now - stamps[0] > 60_000) stamps.shift();
+  return Math.max(0, 4 - stamps.length);
 }
 
 /** Wait for a token — background warmers only, NEVER request handlers. */
@@ -56,7 +67,7 @@ async function takeToken() {
   }
 }
 
-// ---------- cache ----------
+// ---------- L1 in-memory cache ----------
 const cache = new Map<string, { at: number; data: unknown }>();
 function cached<T>(key: string, ttlMs: number): T | undefined {
   const hit = cache.get(key);
@@ -70,6 +81,45 @@ function store(key: string, data: unknown) {
 function massiveTicker(symbol: string): string {
   return symbol.includes("/") ? "X:" + symbol.replace("/", "") : symbol;
 }
+
+// ---------- upstream, instrumented ----------
+async function logCall(endpoint: string, status: number, ms: number) {
+  try {
+    await db.insert(schema.apiCalls).values({
+      id: randomUUID(), provider: "massive", endpoint, status, ms, createdAt: Date.now(),
+    });
+  } catch { /* the ledger never breaks the request */ }
+}
+
+async function massive<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+  const url = new URL(BASE + path);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  url.searchParams.set("apiKey", KEY);
+  // Log the path only — never the key.
+  const t0 = Date.now();
+  let res: Response;
+  try {
+    res = await fetch(url, { cache: "no-store" });
+  } catch (e) {
+    void logCall(path, -1, Date.now() - t0);
+    throw e;
+  }
+  void logCall(path, res.status, Date.now() - t0);
+  if (res.status === 401 || res.status === 403) throw new Error("market-unauthorized");
+  if (res.status === 429) throw new Error("market-rate-limited");
+  if (!res.ok) throw new Error(`market-http-${res.status}`);
+  return res.json() as Promise<T>;
+}
+
+// In-flight background warmers, deduped per cache key.
+const warming = new Map<string, Promise<void>>();
+function warm(key: string, job: () => Promise<void>) {
+  if (warming.has(key)) return;
+  warming.set(key, job().catch(() => {}).finally(() => warming.delete(key)));
+}
+
+type PrevReply = { results?: { o: number; c: number; t: number }[] };
+type AggsReply = { results?: { t: number; o: number; h: number; l: number; c: number; v: number }[] };
 
 // ---------- L2: shared Postgres quote cache ----------
 function rowToQuote(r: typeof schema.quoteCache.$inferSelect): Quote {
@@ -90,7 +140,7 @@ async function readQuoteCacheBatch(symbols: string[]): Promise<Map<string, Quote
   } catch { return new Map(); } // cache is an optimization — never fail the request on it
 }
 
-/** Upsert a freshly fetched quote into the shared cache. */
+/** Upsert a freshly fetched quote into the shared cache + tick history. */
 async function writeQuoteCache(q: Quote): Promise<void> {
   try {
     const now = Date.now();
@@ -102,29 +152,12 @@ async function writeQuoteCache(q: Quote): Promise<void> {
         set: { price: q.price, previousClose: q.previousClose,
           changePercent: q.changePercent, asOf: q.asOf, updatedAt: now },
       });
+    // The tick log: intraday charts grow denser with every fresh quote.
+    await db.insert(schema.quoteHistory)
+      .values({ symbol: q.symbol, t: now, price: q.price })
+      .onConflictDoNothing();
   } catch { /* best-effort */ }
 }
-
-async function massive<T>(path: string, params: Record<string, string> = {}): Promise<T> {
-  const url = new URL(BASE + path);
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  url.searchParams.set("apiKey", KEY);
-  const res = await fetch(url, { cache: "no-store" });
-  if (res.status === 401 || res.status === 403) throw new Error("market-unauthorized");
-  if (res.status === 429) throw new Error("market-rate-limited");
-  if (!res.ok) throw new Error(`market-http-${res.status}`);
-  return res.json() as Promise<T>;
-}
-
-// In-flight background warmers, deduped per cache key.
-const warming = new Map<string, Promise<void>>();
-function warm(key: string, job: () => Promise<void>) {
-  if (warming.has(key)) return;
-  warming.set(key, job().catch(() => {}).finally(() => warming.delete(key)));
-}
-
-type PrevReply = { results?: { o: number; c: number; t: number }[] };
-type AggsReply = { results?: { t: number; o: number; h: number; l: number; c: number; v: number }[] };
 
 async function fetchQuote(symbol: string): Promise<Quote | null> {
   const reply = await massive<PrevReply>(`/v2/aggs/ticker/${massiveTicker(symbol)}/prev`);
@@ -146,7 +179,6 @@ async function fetchQuote(symbol: string): Promise<Quote | null> {
  * Never blocks on the rate limiter: cache hit wins; a free token fetches
  * inline (fast); otherwise a background warmer is scheduled and the caller
  * gets null NOW — the UI shows an honest gap and the next poll fills it.
- * A request handler must never hang on a token bucket.
  */
 export async function getQuote(symbol: string): Promise<Quote | null> {
   const key = `q:${symbol}`;
@@ -194,6 +226,8 @@ export async function getQuotes(symbols: string[]): Promise<Quote[]> {
   return out;
 }
 
+// ---------- the bar store: fetch once, keep forever ----------
+
 const TF: Record<Timeframe, { mult: number; span: string; days: number }> = {
   "1D": { mult: 5, span: "minute", days: 1 },
   "1W": { mult: 30, span: "minute", days: 7 },
@@ -203,25 +237,148 @@ const TF: Record<Timeframe, { mult: number; span: string; days: number }> = {
   "5Y": { mult: 1, span: "week", days: 1830 },
 };
 
-export async function getBars(symbol: string, timeframe: Timeframe): Promise<BarPoint[]> {
-  const key = `b:${symbol}:${timeframe}`;
-  const hit = cached<BarPoint[]>(key, 30 * 60_000);
-  if (hit) return hit;
-  if (!hasLiveData) return demoBars(symbol, timeframe);
-  if (!tryTakeToken()) throw new Error("market-rate-limited");
-  const { mult, span, days } = TF[timeframe];
-  const to = new Date();
-  const from = new Date(to.getTime() - days * 86_400_000);
-  const d = (x: Date) => x.toISOString().slice(0, 10);
+/** How stale a series' tail may get before we refresh it. Intraday series
+    move all session; daily series only grow after the close. */
+const TAIL_TTL: Record<Timeframe, number> = {
+  "1D": 10 * 60_000,
+  "1W": 30 * 60_000,
+  "1M": 6 * 3600_000,
+  "3M": 6 * 3600_000,
+  "1Y": 12 * 3600_000,
+  "5Y": 24 * 3600_000,
+};
+
+const seriesId = (symbol: string, tf: Timeframe) => `${symbol}:${tf}`;
+
+export type SeriesMeta = typeof schema.syncState.$inferSelect;
+
+export async function getSeriesMeta(symbol: string, tf: Timeframe): Promise<SeriesMeta | null> {
+  const [row] = await db.select().from(schema.syncState)
+    .where(eq(schema.syncState.id, seriesId(symbol, tf)));
+  return row ?? null;
+}
+
+async function readStored(symbol: string, tf: Timeframe): Promise<BarPoint[]> {
+  const rows = await db.select().from(schema.bars)
+    .where(and(eq(schema.bars.symbol, symbol), eq(schema.bars.timeframe, tf)))
+    .orderBy(asc(schema.bars.t));
+  return rows.map((r) => ({ time: r.t, open: r.o, high: r.h, low: r.l, close: r.c, volume: r.v }));
+}
+
+/** Idempotent write: the most recent bar keeps changing until its period
+    closes, so conflicts update from EXCLUDED instead of being ignored. */
+async function upsertBars(symbol: string, tf: Timeframe, bars: BarPoint[]) {
+  if (!bars.length) return;
+  const rows = bars.map((b) => ({
+    symbol, timeframe: tf, t: b.time, o: b.open, h: b.high, l: b.low, c: b.close, v: b.volume,
+  }));
+  for (let i = 0; i < rows.length; i += 500) {
+    await db.insert(schema.bars).values(rows.slice(i, i + 500))
+      .onConflictDoUpdate({
+        target: [schema.bars.symbol, schema.bars.timeframe, schema.bars.t],
+        set: {
+          o: dsql`excluded.o`, h: dsql`excluded.h`, l: dsql`excluded.l`,
+          c: dsql`excluded.c`, v: dsql`excluded.v`,
+        },
+      });
+  }
+}
+
+async function writeSyncState(symbol: string, tf: Timeframe,
+  patch: Partial<Omit<SeriesMeta, "id" | "symbol" | "timeframe">>) {
+  await db.insert(schema.syncState)
+    .values({ id: seriesId(symbol, tf), symbol, timeframe: tf, barCount: 0, status: "pending", ...patch })
+    .onConflictDoUpdate({ target: schema.syncState.id, set: patch });
+}
+
+async function fetchRange(symbol: string, tf: Timeframe, fromMs: number, toMs: number): Promise<BarPoint[]> {
+  const { mult, span } = TF[tf];
+  const d = (x: number) => new Date(x).toISOString().slice(0, 10);
   const reply = await massive<AggsReply>(
-    `/v2/aggs/ticker/${massiveTicker(symbol)}/range/${mult}/${span}/${d(from)}/${d(to)}`,
+    `/v2/aggs/ticker/${massiveTicker(symbol)}/range/${mult}/${span}/${d(fromMs)}/${d(toMs)}`,
     { adjusted: "true", sort: "asc", limit: "5000" });
-  const bars = (reply.results ?? []).map((r) => ({
+  return (reply.results ?? []).map((r) => ({
     time: Math.floor(r.t / 1000),
     open: r.o, high: r.h, low: r.l, close: r.c, volume: r.v,
   }));
-  store(key, bars);
-  return bars;
+}
+
+export type SyncResult = "synced" | "fresh" | "no-token" | "error";
+
+/**
+ * Bring one series up to date, spending at most one upstream call.
+ * - empty store → fetch the timeframe's whole window
+ * - stale tail  → fetch only from the last stored bar (with 1-bar overlap)
+ * - fresh       → no call at all
+ */
+export async function syncSeries(symbol: string, tf: Timeframe): Promise<SyncResult> {
+  if (!hasLiveData) return "fresh";
+  const meta = await getSeriesMeta(symbol, tf);
+  const now = Date.now();
+  if (meta?.lastSyncAt && now - meta.lastSyncAt < TAIL_TTL[tf] && (meta.barCount ?? 0) > 0) {
+    return "fresh";
+  }
+  if (!tryTakeToken()) return "no-token";
+
+  const windowStart = now - TF[tf].days * 86_400_000;
+  // Overlap one bar so the still-forming last bar gets corrected.
+  const from = meta?.latest ? Math.max(windowStart, meta.latest * 1000 - 86_400_000) : windowStart;
+  try {
+    const fetched = await fetchRange(symbol, tf, from, now);
+    await upsertBars(symbol, tf, fetched);
+    const earliest = Math.min(meta?.earliest ?? Infinity, fetched[0]?.time ?? Infinity);
+    const latest = Math.max(meta?.latest ?? 0, fetched[fetched.length - 1]?.time ?? 0);
+    const [cnt] = await db.select({ n: dsql<number>`count(*)::int` }).from(schema.bars)
+      .where(and(eq(schema.bars.symbol, symbol), eq(schema.bars.timeframe, tf)));
+    await writeSyncState(symbol, tf, {
+      earliest: Number.isFinite(earliest) ? earliest : null,
+      latest: latest || null,
+      barCount: cnt?.n ?? 0,
+      lastSyncAt: now, status: "ok", lastError: null,
+    });
+    return "synced";
+  } catch (e) {
+    await writeSyncState(symbol, tf, {
+      lastSyncAt: now, status: "error",
+      lastError: e instanceof Error ? e.message : "unknown",
+    }).catch(() => {});
+    return "error";
+  }
+}
+
+/**
+ * Read-through history. Postgres first; upstream only for the missing tail.
+ * Never blocks a request on the token bucket: if the store has bars but the
+ * tail is stale and no token is free, serve what we have and heal in the
+ * background. Throws only when there is NOTHING to show.
+ */
+export async function getBars(symbol: string, timeframe: Timeframe): Promise<BarPoint[]> {
+  if (!hasLiveData) return demoBars(symbol, timeframe);
+
+  const l1key = `b:${symbol}:${timeframe}`;
+  const l1 = cached<BarPoint[]>(l1key, 60_000);
+  if (l1) return l1;
+
+  const result = await syncSeries(symbol, timeframe);
+  const stored = await readStored(symbol, timeframe);
+
+  if (!stored.length) {
+    if (result === "no-token") {
+      warm(l1key, async () => { await takeToken(); await syncSeries(symbol, timeframe); });
+      throw new Error("market-rate-limited");
+    }
+    if (result === "error") throw new Error("market-fetch-failed");
+    return stored; // genuinely no data (unknown symbol)
+  }
+  if (result === "no-token") {
+    warm(l1key, async () => { await takeToken(); await syncSeries(symbol, timeframe); });
+  }
+  // Serve only the timeframe's window (the store may hold more history).
+  const cutoff = Math.floor((Date.now() - TF[timeframe].days * 86_400_000) / 1000);
+  const windowed = stored.filter((b) => b.time >= cutoff);
+  const out = windowed.length ? windowed : stored;
+  store(l1key, out);
+  return out;
 }
 
 // ---------- US market clock (approximate, ET regular session) ----------

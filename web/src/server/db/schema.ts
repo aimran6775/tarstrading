@@ -1,4 +1,4 @@
-import { pgTable, text, integer, bigint, doublePrecision, index } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, bigint, doublePrecision, index, primaryKey } from "drizzle-orm/pg-core";
 
 /*
   Tars Trading data model — Postgres (Supabase).
@@ -20,6 +20,8 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
+  /** "user" | "admin" — admins are bootstrapped from ADMIN_EMAILS at login. */
+  role: text("role").$type<"user" | "admin">().notNull().default("user"),
   createdAt: epochMs("created_at").notNull(),
 });
 
@@ -150,6 +152,82 @@ export const tarsMemory = pgTable("tars_memory", {
   messageCount: integer("message_count").notNull().default(0),
   updatedAt: epochMs("updated_at").notNull(),
 });
+
+/*
+  ---------- The data vault ----------
+  Historical bars are STORED, not cached: once a (symbol, timeframe, t) bar is
+  written it is never fetched again — chart reads hit Postgres and only the
+  missing tail goes upstream. sync_state tracks per-series coverage so gap
+  detection is a row read, not a table scan.
+*/
+
+export const bars = pgTable("bars", {
+  symbol: text("symbol").notNull(),
+  timeframe: text("timeframe").notNull(),
+  /** Bar open time, epoch SECONDS (lightweight-charts convention). */
+  t: bigint("t", { mode: "number" }).notNull(),
+  o: doublePrecision("o").notNull(),
+  h: doublePrecision("h").notNull(),
+  l: doublePrecision("l").notNull(),
+  c: doublePrecision("c").notNull(),
+  v: doublePrecision("v").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.symbol, t.timeframe, t.t] }),
+  index("bars_series").on(t.symbol, t.timeframe, t.t),
+]);
+
+/** Coverage bookkeeping for each stored series. */
+export const syncState = pgTable("sync_state", {
+  /** `${symbol}:${timeframe}` */
+  id: text("id").primaryKey(),
+  symbol: text("symbol").notNull(),
+  timeframe: text("timeframe").notNull(),
+  /** Coverage window, epoch seconds. */
+  earliest: bigint("earliest", { mode: "number" }),
+  latest: bigint("latest", { mode: "number" }),
+  barCount: integer("bar_count").notNull().default(0),
+  lastSyncAt: epochMs("last_sync_at"),
+  status: text("status").$type<"ok" | "pending" | "error">().notNull().default("pending"),
+  lastError: text("last_error"),
+});
+
+/** Intraday quote ticks — 1D charts get denser over time even on EOD data. */
+export const quoteHistory = pgTable("quote_history", {
+  symbol: text("symbol").notNull(),
+  t: epochMs("t").notNull(),
+  price: doublePrecision("price").notNull(),
+}, (t) => [primaryKey({ columns: [t.symbol, t.t] })]);
+
+/** Every upstream API request — the admin dashboard's raw feed. */
+export const apiCalls = pgTable("api_calls", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull(),
+  endpoint: text("endpoint").notNull(),
+  status: integer("status").notNull(),
+  ms: integer("ms").notNull(),
+  createdAt: epochMs("created_at").notNull(),
+}, (t) => [index("api_calls_time").on(t.createdAt)]);
+
+/** Every privileged action taken in /admin — who, what, when. */
+export const adminAudit = pgTable("admin_audit", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  action: text("action").notNull(),
+  detail: text("detail"),
+  createdAt: epochMs("created_at").notNull(),
+}, (t) => [index("audit_time").on(t.createdAt)]);
+
+/** Cron run history — the heartbeat's own logbook. */
+export const cronRuns = pgTable("cron_runs", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(),
+  users: integer("users").notNull().default(0),
+  actions: integer("actions").notNull().default(0),
+  ms: integer("ms").notNull(),
+  ok: integer("ok").notNull().default(1),
+  detail: text("detail"),
+  createdAt: epochMs("created_at").notNull(),
+}, (t) => [index("cron_time").on(t.createdAt)]);
 
 /** Shared L2 quote cache — one row per symbol, read by every instance so
     upstream (Massive) is hit at most once per symbol per TTL, fleet-wide. */
