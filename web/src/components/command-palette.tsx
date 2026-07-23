@@ -16,6 +16,7 @@ const SECTIONS: [string, string][] = [
   ["Markets — browse", "/app"],
   ["Academy", "/app/academy"],
   ["Placement test — skip what you know", "/app/academy/placement"],
+  ["Missions — prove it with a real trade", "/app/academy/missions"],
   ["Practice — flashcards & drills", "/app/academy/practice"],
   ["Assistant — your desk", "/app/assistant"],
   ["Standings — badges & leaderboard", "/app/standings"],

@@ -184,6 +184,16 @@ export const cardReviews = pgTable("card_reviews", {
   index("card_reviews_due").on(t.userId, t.dueAt),
 ]);
 
+/** A graded sim mission a learner has completed — process demonstrated with a
+    real (simulated) trade, not just a quiz passed. One row per mission, once. */
+export const missionProgress = pgTable("mission_progress", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  missionId: text("mission_id").notNull(),
+  completedAt: epochMs("completed_at").notNull(),
+  xp: integer("xp").notNull(),
+}, (t) => [index("mission_progress_user").on(t.userId)]);
+
 /** One row per drill played — the practice-side companion to quiz_attempts.
     Tells us which drills learners play and where they miss. */
 export const gameAttempts = pgTable("game_attempts", {

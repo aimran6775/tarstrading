@@ -161,6 +161,19 @@ export default async function AcademyHome() {
           })}
         </div>
 
+        {/* Missions — prove the lessons with real trades on the desk */}
+        <Link href="/app/academy/missions"
+          className="pressable mt-6 flex items-center justify-between gap-4 rounded-2xl border border-hairline bg-bg1 p-5 transition-colors hover:border-gain/40 hover:bg-bg2/60">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">Prove it on the desk</p>
+            <h2 className="mt-1 font-display text-xl font-bold text-ink-1">Missions 🎯</h2>
+            <p className="mt-0.5 text-sm text-ink-3">
+              Graded challenges you complete with a real trade — sized, stopped, heat under control. Judged on process, never profit.
+            </p>
+          </div>
+          <span className="shrink-0 text-2xl text-ink-4">→</span>
+        </Link>
+
         {/* Practice hub — the endless review loop after (and during) the stages */}
         <Link href="/app/academy/practice"
           className="pressable mt-6 flex items-center justify-between gap-4 rounded-2xl border border-hairline bg-bg1 p-5 transition-colors hover:border-gold/40 hover:bg-bg2/60">
