@@ -126,6 +126,7 @@ export const marketsTrack: Track = {
         { kind: "game", variant: "size-it", title: "Size it yourself" },
         { kind: "keyIdea", title: "Survival first, profit second",
           text: "A trader who never risks more than 1% can be wrong ten times in a row and still have ~90% of their account. A trader who bets big is one bad streak from zero. Boring math is how you stay in the game long enough to get good." },
+        { kind: "widget", variant: "first-trade" },
         { kind: "desk", instruction: "On the desk, the ticket shows a buying-power meter for exactly this reason. Try sizing a small position and watch it — feel the difference between a 2% position and a 40% one.", symbol: "NVDA" },
         { kind: "flashcards", title: "The survival kit",
           cards: [

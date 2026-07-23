@@ -26,6 +26,21 @@ export default async function LessonPage(props: { params: Promise<{ lessonId: st
   const done = new Set(rows.map((r) => r.lessonId));
   if (!isLessonUnlocked(lessonId, done)) redirect("/app/academy");
 
+  // If this lesson has the guided-trade widget, fetch the learner's real
+  // account server-side so the widget renders their numbers with no client
+  // fetch and nothing to hydrate.
+  const hasGuidedTrade = found.lesson.sections.some((s) => s.kind === "widget" && s.variant === "first-trade");
+  let accountEquity: number | null = null;
+  let positionCount = 0;
+  if (hasGuidedTrade) {
+    const [acct] = await db.select({ equity: schema.accounts.equity })
+      .from(schema.accounts).where(eq(schema.accounts.userId, user.id));
+    accountEquity = acct?.equity ?? null;
+    const pos = await db.select({ id: schema.positions.id })
+      .from(schema.positions).where(eq(schema.positions.userId, user.id));
+    positionCount = pos.length;
+  }
+
   const next = nextLessonInfo(lessonId);
 
   return (
@@ -38,6 +53,8 @@ export default async function LessonPage(props: { params: Promise<{ lessonId: st
         trackSize={found.track.lessons.length}
         nextLessonId={next?.lesson.id ?? null}
         nextTrackTitle={next?.newTrack ?? null}
+        accountEquity={accountEquity}
+        positionCount={positionCount}
       />
     </div>
   );

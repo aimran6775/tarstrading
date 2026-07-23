@@ -14,6 +14,7 @@ import PayoffDiagram from "@/components/academy/payoff";
 import { TiltSimulator, PreTradeChecklist } from "@/components/academy/psychology";
 import { RSIMeter, ForwardCurve, GreeksExplorer } from "@/components/academy/indicators";
 import { PortfolioHeat, CorrelationViz } from "@/components/academy/portfolio";
+import { GuidedTrade } from "@/components/academy/guided-trade";
 
 /*
   The lesson reader. Reading measure capped at 68ch, quizzes are interactive
@@ -43,13 +44,16 @@ function recordReview(front: string, got: boolean) {
   }).catch(() => { /* schedule is best-effort; a lost recall is harmless */ });
 }
 
-export default function LessonReader({ track, lesson, lessonNumber, trackSize, nextLessonId, nextTrackTitle }: {
+export default function LessonReader({ track, lesson, lessonNumber, trackSize, nextLessonId, nextTrackTitle, accountEquity = null, positionCount = 0 }: {
   track: { id: string; title: string; accent: string };
   lesson: Lesson;
   lessonNumber: number;
   trackSize: number;
   nextLessonId: string | null;
   nextTrackTitle?: string | null;
+  /** The learner's real paper-account numbers, for the guided-trade widget. */
+  accountEquity?: number | null;
+  positionCount?: number;
 }) {
   // Map each section to its quiz ordinal (null when it isn't a quiz) so the
   // reader and the server agree on answer order.
@@ -121,6 +125,8 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
             <SectionView section={section}
               quizIndex={quizIndexOf[i]}
               quizResult={quizIndexOf[i] != null ? results[quizIndexOf[i]!] : undefined}
+              accountEquity={accountEquity}
+              positionCount={positionCount}
               onQuizResult={(qi, r) => setResults((prev) => ({ ...prev, [qi]: r }))}
               onRate={recordReview} />
           </motion.div>
@@ -165,10 +171,12 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
   );
 }
 
-function SectionView({ section, quizIndex, quizResult, onQuizResult, onRate }: {
+function SectionView({ section, quizIndex, quizResult, accountEquity, positionCount, onQuizResult, onRate }: {
   section: Section;
   quizIndex: number | null;
   quizResult?: QuizResult;
+  accountEquity: number | null;
+  positionCount: number;
   onQuizResult: (quizIndex: number, result: QuizResult) => void;
   onRate: (front: string, got: boolean) => void;
 }) {
@@ -217,6 +225,7 @@ function SectionView({ section, quizIndex, quizResult, onQuizResult, onRate }: {
         case "greeks": return <GreeksExplorer />;
         case "heat": return <PortfolioHeat />;
         case "correlation": return <CorrelationViz />;
+        case "first-trade": return <GuidedTrade equity={accountEquity} positionCount={positionCount} />;
         default: return <PayoffDiagram />;
       }
 

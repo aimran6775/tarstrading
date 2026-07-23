@@ -64,10 +64,17 @@ export default async function AcademyHome() {
         </div>
 
         {next && (
-          <Link href={`/app/academy/${next.id}`}
-            className="pressable cta-gold mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold">
-            {done.size > 0 ? "Continue" : "Start learning"}: {next.title}
-          </Link>
+          <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2">
+            <Link href={`/app/academy/${next.id}`}
+              className="pressable cta-gold inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold">
+              {done.size > 0 ? "Continue" : "Start learning"}: {next.title}
+            </Link>
+            {doneCount === 0 && (
+              <Link href="/app/academy/placement" className="text-sm text-ink-3 hover:text-gold">
+                Already know some of this? Take the placement →
+              </Link>
+            )}
+          </div>
         )}
 
         {graduated && (
