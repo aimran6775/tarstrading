@@ -44,6 +44,12 @@ type Game = {
   title?: string;
 };
 
+/** A one-off teaching widget keyed by name (Trading-with-AI stage, etc.). */
+type Widget = {
+  kind: "widget";
+  variant: "rule-builder" | "overfit";
+};
+
 type Quiz = { kind: "quiz"; question: string; choices: string[]; answer: number; explain: string };
 
 /** Sends the learner into the real terminal to do the thing for real. */
@@ -51,7 +57,7 @@ type Desk = { kind: "desk"; instruction: string; symbol?: string };
 
 export type Block =
   | Prose | KeyIdea | Analogy | Formula
-  | ChartBlock | CalcBlock | Flashcards | Game | Quiz | Desk;
+  | ChartBlock | CalcBlock | Flashcards | Game | Widget | Quiz | Desk;
 
 // Back-compat alias — earlier content authored against `Section`.
 export type Section = Block;

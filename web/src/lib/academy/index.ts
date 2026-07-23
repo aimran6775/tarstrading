@@ -4,29 +4,32 @@ import { readingTrack } from "./stage2";
 import { ordersTrack } from "./stage3";
 import { riskStage } from "./stage4";
 import { edgeStage } from "./stage5";
+import { aiStage } from "./stage9";
 import { stocksTrack } from "./content1";
 import { optionsTrack, futuresTrack, fundTrack } from "./content2";
 
 /*
-  The stages of the academy, in order. Stages 1-3 are the rebuilt, fully-
-  interactive template (charts you drive, calculators you drag, drills you
-  play); the remaining stages carry the v1 content and are being upgraded to
-  the same standard, stage by stage. INTERACTIVE_THROUGH marks how far the
-  rebuild has reached so the home can badge them.
+  The ten stages of the academy, in order. The rebuilt, fully-interactive
+  stages (charts you drive, calculators you drag, drills you play) are marked
+  in INTERACTIVE_IDS so the home can badge them; the rest carry v1 content and
+  are being upgraded to the same standard, stage by stage.
 */
-export const INTERACTIVE_THROUGH = 5;
-
 export const tracks: Track[] = [
-  marketsTrack,   // Stage 1 — interactive
-  readingTrack,   // Stage 2 — interactive
-  ordersTrack,    // Stage 3 — interactive
-  riskStage,      // Stage 4 — interactive
-  edgeStage,      // Stage 5 — interactive
+  marketsTrack,   // Stage 1  — interactive
+  readingTrack,   // Stage 2  — interactive
+  ordersTrack,    // Stage 3  — interactive
+  riskStage,      // Stage 4  — interactive
+  edgeStage,      // Stage 5  — interactive
   stocksTrack,    // Stage 6
   optionsTrack,   // Stage 7
   futuresTrack,   // Stage 8
-  fundTrack,      // Stage 9
+  aiStage,        // Stage 9  — interactive
+  fundTrack,      // Stage 10
 ];
+
+export const INTERACTIVE_IDS = new Set([
+  "s1-markets", "s2-reading", "s3-orders", "s4-risk", "s5-edge", "s9-ai",
+]);
 
 export const allLessons: Lesson[] = tracks.flatMap((t) => t.lessons);
 

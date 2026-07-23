@@ -2,7 +2,7 @@ import { currentUser } from "@/server/auth";
 import { redirect } from "next/navigation";
 import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
-import { tracks, totalXP, INTERACTIVE_THROUGH } from "@/lib/academy";
+import { tracks, totalXP, INTERACTIVE_IDS } from "@/lib/academy";
 import Link from "next/link";
 import AppNav from "@/components/app-nav";
 
@@ -68,7 +68,7 @@ export default async function AcademyHome() {
           {tracks.map((track, ti) => {
             const completed = track.lessons.filter((l) => done.has(l.id)).length;
             const fraction = completed / track.lessons.length;
-            const interactive = ti < INTERACTIVE_THROUGH; // rebuilt stages
+            const interactive = INTERACTIVE_IDS.has(track.id); // rebuilt stages
             return (
               <section key={track.id} className="card overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-5 py-4">
