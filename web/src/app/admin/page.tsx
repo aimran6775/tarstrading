@@ -1,5 +1,7 @@
 import { db } from "@/server/db";
 import { sql as dsql } from "drizzle-orm";
+import { brainStatus } from "@/server/llm";
+import { liveFeedStatus } from "@/server/live-feed";
 
 /*
   Overview — every number that answers "is the platform healthy?" on one
@@ -19,6 +21,8 @@ type Snapshot = {
 export default async function AdminOverview() {
   const dayAgo = Date.now() - 86_400_000;
   const hourAgo = Date.now() - 3_600_000;
+  const brain = brainStatus();
+  const feed = liveFeedStatus();
 
   const [snap] = await db.execute<Snapshot>(dsql`
     select
@@ -34,7 +38,7 @@ export default async function AdminOverview() {
         and status >= 400)                                                                 as errors1h,
       (select count(*)::int from quote_cache)                                              as quote_rows,
       (select count(*)::int from sessions where expires_at >= ${Date.now()})               as sessions,
-      (select count(*)::int from chat_messages where created_at >= ${dayAgo})              as chats24
+      (select count(*)::int from agent_chats where created_at >= ${dayAgo})                as chats24
   `);
   const { users, orders24, fills24, agents_running: agentsRunning, bars_rows: barsRows,
     series_rows: seriesRows, calls1h, errors1h, quote_rows: quoteRows, sessions, chats24 } = snap;
@@ -47,7 +51,9 @@ export default async function AdminOverview() {
     ["Upstream · 1h", calls1h, `${errors1h} errors`],
     ["Quotes cached", quoteRows, "symbols warm"],
     ["Sessions", sessions, "currently valid"],
-    ["Tars chats · 24h", chats24, "messages"],
+    ["Assistant · 24h", chats24, "messages"],
+    ["AI brain", brain.provider, brain.provider === "ollama" ? `local · ${brain.model}` : brain.provider === "hf" ? "hosted fallback" : "no model"],
+    ["Live feed", feed.enabled ? (feed.stocks.authed || feed.crypto.authed ? "on" : "connecting") : "off", `${feed.symbolsTicking} symbols ticking`],
   ];
 
   return (

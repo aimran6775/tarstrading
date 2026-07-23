@@ -82,8 +82,9 @@ export default function Landing() {
             className="mt-6 max-w-xl text-lg leading-relaxed text-ink-2"
           >
             Tars hands you <span className="tnum text-ink-1">$100,000</span>{" "}in simulated
-            capital, real market data, an academy that starts at zero, and trading
-            agents you program yourself. Every fill is practice. That&apos;s the point.
+            capital, real market data, an academy that starts at zero, and an
+            assistant that hires analysts to trade your ideas. Every fill is
+            practice. That&apos;s the point.
           </motion.p>
           <motion.div
             initial={reduced ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -195,16 +196,17 @@ export default function Landing() {
       <section className="border-t border-hairline">
         <div className="mx-auto w-full max-w-6xl px-5 py-28 md:px-10 md:py-40">
           <motion.div {...(reduced ? { initial: false } : revealMotion)}>
-            <p className="kicker mb-4">03 · The agent lab</p>
+            <p className="kicker mb-4">03 · The assistant</p>
             <h2 className="display max-w-3xl text-4xl text-ink-1 md:text-6xl">
-              Program a trader.
+              Just say it.
               <br />
-              <span className="text-agent">Then watch it work.</span>
+              <span className="text-agent">It hires the analyst.</span>
             </h2>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-2">
-              Deploy as many agents as you want. They run exactly the rules you
-              write — nothing hidden — backtest honestly on data they&apos;ve never
-              seen, narrate every decision, and die by your kill switch.
+              Describe a strategy in plain English. Your assistant compiles it
+              into transparent rules, backtests it honestly on data it&apos;s never
+              seen, deploys it on your word, and narrates every decision. The
+              kill switch is always yours.
             </p>
           </motion.div>
 

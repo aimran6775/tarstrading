@@ -14,8 +14,8 @@ type Steps = { hasTrade: boolean; hasLesson: boolean; hasChat: boolean; hasAgent
 const ITEMS: { key: keyof Steps; label: string; hint: string; href: string }[] = [
   { key: "hasLesson", label: "Learn one thing", hint: "Read a lesson in the Academy — start at zero.", href: "/app/academy" },
   { key: "hasTrade", label: "Make your first trade", hint: "Pick a symbol, size it small, hold the gold button.", href: "/app" },
-  { key: "hasChat", label: "Meet Tars", hint: "Ask your mentor to critique your book.", href: "/app/tars" },
-  { key: "hasAgent", label: "Deploy an agent", hint: "Program a rule, backtest it honestly, set it loose.", href: "/app/agents" },
+  { key: "hasChat", label: "Meet your assistant", hint: "Tell it what to build — it hires an analyst to run it.", href: "/app/assistant" },
+  { key: "hasAgent", label: "Hire an analyst", hint: "Describe a strategy in plain English; deploy it on your word.", href: "/app/assistant" },
 ];
 
 export default function GettingStarted() {

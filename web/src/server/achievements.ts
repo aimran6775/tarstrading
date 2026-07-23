@@ -41,7 +41,7 @@ export async function computeAchievements(userId: string): Promise<{ badges: Bad
     db.select().from(schema.journalEntries).where(eq(schema.journalEntries.userId, userId)),
     db.select().from(schema.lessonProgress).where(eq(schema.lessonProgress.userId, userId)),
     db.select().from(schema.agents).where(eq(schema.agents.userId, userId)),
-    db.select().from(schema.chatMessages).where(eq(schema.chatMessages.userId, userId)),
+    db.select().from(schema.agentChats).where(eq(schema.agentChats.userId, userId)),
     db.select().from(schema.priceAlerts).where(eq(schema.priceAlerts.userId, userId)),
     db.select().from(schema.accounts).where(eq(schema.accounts.userId, userId)),
   ]);
@@ -74,9 +74,9 @@ export async function computeAchievements(userId: string): Promise<{ badges: Bad
     ["first-class", "First Class", "Complete your first lesson.", "bronze", lessonCount, 1, "lesson"],
     ["scholar", "Scholar", "Complete 10 lessons.", "silver", lessonCount, 10, "lessons"],
     ["dean", "Dean's List", "Earn 1,000 XP.", "gold", xp, 1000, "xp"],
-    ["quant", "Quant", "Build your first agent.", "bronze", agentCount, 1, "agent"],
-    ["automated", "Automated", "Put an agent on the desk.", "silver", liveAgent ? 1 : 0, 1, "agent"],
-    ["met-tars", "Met Tars", "Ask Tars a question.", "bronze", chatCount, 1, "chat"],
+    ["quant", "Quant", "Hire your first analyst.", "bronze", agentCount, 1, "analyst"],
+    ["automated", "Automated", "Put an analyst on the floor.", "silver", liveAgent ? 1 : 0, 1, "analyst"],
+    ["met-assistant", "Briefed In", "Talk to your assistant.", "bronze", chatCount, 1, "chat"],
     ["on-watch", "On Watch", "Set a price alert.", "bronze", alerts.length, 1, "alert"],
   ];
 

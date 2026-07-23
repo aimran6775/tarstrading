@@ -16,8 +16,8 @@ export async function GET() {
       .where(and(eq(schema.orders.userId, user.id), eq(schema.orders.status, "filled"))).limit(1),
     db.select({ id: schema.lessonProgress.id }).from(schema.lessonProgress)
       .where(eq(schema.lessonProgress.userId, user.id)).limit(1),
-    db.select({ id: schema.chatMessages.id }).from(schema.chatMessages)
-      .where(and(eq(schema.chatMessages.userId, user.id), eq(schema.chatMessages.role, "user"))).limit(1),
+    db.select({ id: schema.agentChats.id }).from(schema.agentChats)
+      .where(and(eq(schema.agentChats.userId, user.id), eq(schema.agentChats.role, "user"))).limit(1),
     db.select({ id: schema.agents.id }).from(schema.agents)
       .where(eq(schema.agents.userId, user.id)).limit(1),
   ]);

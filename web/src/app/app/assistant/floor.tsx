@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import HoldButton from "@/components/hold-button";
-import AnalystChat from "@/components/analyst-chat";
+import AssistantChat from "@/components/assistant-chat";
 
 /*
   The Agent Lab: your analyst floor, run by conversation. You TALK to your
@@ -37,7 +37,7 @@ type Activity = { id: string; agentName: string; text: string; createdAt: number
 const usd = (v: number) => v.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const pctf = (v: number) => `${(v * 100).toFixed(1)}%`;
 
-export default function AgentLab() {
+export default function AnalystFloor() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -78,13 +78,13 @@ export default function AgentLab() {
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-24 pt-10 md:pb-10 md:px-8">
-      <p className="kicker mb-3">The agent lab</p>
-      <h1 className="display text-4xl text-ink-1 md:text-5xl">Talk to your analyst.</h1>
+      <p className="kicker mb-3">The assistant</p>
+      <h1 className="display text-4xl text-ink-1 md:text-5xl">Talk to your assistant.</h1>
       <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-2">
-        Describe the strategy in plain English — your analyst compiles it into
-        transparent rules, backtests it honestly, and deploys it on your word.
-        It remembers everything. Agents still halt at their drawdown limit,
-        and the kill switch is always yours.
+        Tell it what you want and it hires an analyst to run it — plain English
+        in, transparent rules out. It backtests honestly and deploys on your
+        word, and it remembers everything. Analysts halt at their drawdown
+        limit, and the kill switch is always yours.
       </p>
 
       {error && (
@@ -95,22 +95,22 @@ export default function AgentLab() {
 
       <div className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         {/* The conversation IS the builder. */}
-        <AnalystChat onDeskChanged={load} />
+        <AssistantChat onDeskChanged={load} />
 
         {/* The roster — audit view + hard controls. */}
         <div className="flex min-w-0 flex-col gap-4 lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto">
           {agents.length === 0 && (
             <section className="panel flex flex-col items-center gap-3 px-6 py-14 text-center">
-              <p className="text-sm text-ink-2">The desk is empty.</p>
+              <p className="text-sm text-ink-2">The floor is empty.</p>
               <p className="max-w-sm text-xs text-ink-4">
-                Tell your analyst what to build — one symbol, a simple
+                Ask your assistant to hire one — a single symbol, a simple
                 moving-average cross, smallest allocation. Watch it work for a
                 week before giving it a raise.
               </p>
             </section>
           )}
           {agents.map((agent) => (
-            <AgentCard key={agent.id} agent={agent} busy={busy === agent.id}
+            <AnalystCard key={agent.id} agent={agent} busy={busy === agent.id}
               onAction={(a) => act(agent.id, a)} onDelete={() => remove(agent.id)} />
           ))}
         </div>
@@ -122,7 +122,7 @@ export default function AgentLab() {
         </div>
         {activity.length === 0 ? (
           <p className="px-5 py-8 text-center text-xs text-ink-4">
-            Nothing logged yet. Run an agent and this becomes the most honest trading diary you own.
+            Nothing logged yet. Put an analyst to work and this becomes the most honest trading diary you own.
           </p>
         ) : (
           <ul className="max-h-[420px] overflow-y-auto">
@@ -142,7 +142,7 @@ export default function AgentLab() {
       </section>
 
       <p className="mt-8 text-center text-xs text-ink-4">
-        Agents trade simulated capital only, while your desk is open. Every order is tagged and auditable.
+        Your analysts trade simulated capital only, while your desk is open. Every order is tagged and auditable.
       </p>
     </main>
   );
@@ -158,7 +158,7 @@ const STATUS_STYLE: Record<Agent["status"], string> = {
   killed: "text-loss",
 };
 
-function AgentCard({ agent, busy, onAction, onDelete }: {
+function AnalystCard({ agent, busy, onAction, onDelete }: {
   agent: Agent; busy: boolean;
   onAction: (a: string) => void; onDelete: () => void;
 }) {

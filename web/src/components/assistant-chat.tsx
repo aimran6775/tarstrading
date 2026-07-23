@@ -12,12 +12,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Msg = { id: string; role: "user" | "analyst"; text: string; createdAt: number };
 
 const OPENERS = [
-  "Hire an agent that buys NVDA when the 10-day SMA crosses above the 30-day, sells when RSI(14) goes over 70. Give it $10k.",
-  "Backtest my newest agent.",
-  "How's the desk doing?",
+  "Hire an analyst that buys NVDA when the 10-day SMA crosses above the 30-day, sells when RSI(14) goes over 70. Give it $10k.",
+  "Backtest my newest analyst.",
+  "How is the floor doing?",
 ];
 
-export default function AnalystChat({ onDeskChanged }: { onDeskChanged: () => void }) {
+export default function AssistantChat({ onDeskChanged }: { onDeskChanged: () => void }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [phase, setPhase] = useState<"loading" | "idle" | "thinking" | "error">("loading");
@@ -33,7 +33,7 @@ export default function AnalystChat({ onDeskChanged }: { onDeskChanged: () => vo
     let alive = true;
     (async () => {
       try {
-        const res = await fetch("/api/agents/analyst");
+        const res = await fetch("/api/assistant");
         const data = await res.json();
         if (alive && data.ok) { setMessages(data.messages); setPhase("idle"); scrollDown(); }
         else if (alive) setPhase("error");
@@ -51,7 +51,7 @@ export default function AnalystChat({ onDeskChanged }: { onDeskChanged: () => vo
     setMessages((m) => [...m, { id: `u-${now}`, role: "user", text, createdAt: now }]);
     scrollDown();
     try {
-      const res = await fetch("/api/agents/analyst", {
+      const res = await fetch("/api/assistant", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
@@ -74,9 +74,9 @@ export default function AnalystChat({ onDeskChanged }: { onDeskChanged: () => vo
   return (
     <section className="panel flex min-h-[420px] flex-col overflow-hidden lg:h-[calc(100vh-220px)] lg:min-h-[520px]">
       <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Your analyst</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Your assistant</h2>
         <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-agent">
-          <span className="h-1.5 w-1.5 rounded-full bg-agent" /> On desk
+          <span className="h-1.5 w-1.5 rounded-full bg-agent" /> On the floor
         </span>
       </div>
 
@@ -88,7 +88,7 @@ export default function AnalystChat({ onDeskChanged }: { onDeskChanged: () => vo
         {phase !== "loading" && messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
             <p className="text-sm text-ink-2">
-              Tell me what to build — plain English, your rules. I compile, backtest, and deploy on your word.
+              Tell me what you want and I'll hire an analyst to run it — plain English, your rules. I compile, backtest, and deploy on your word.
             </p>
             <div className="flex flex-col gap-2">
               {OPENERS.map((o) => (

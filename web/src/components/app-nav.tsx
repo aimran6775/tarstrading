@@ -13,21 +13,20 @@ import TarsWordmark from "./tars-wordmark";
   bar on mobile so the four sections are always reachable on a phone.
 */
 
-export type Section = "terminal" | "academy" | "agents" | "tars" | "standings";
+export type Section = "terminal" | "academy" | "assistant" | "standings";
 
 const NAV: [Section, string, string][] = [
   ["terminal", "Markets", "/app"],
   ["academy", "Academy", "/app/academy"],
-  ["agents", "Agents", "/app/agents"],
-  ["tars", "Tars", "/app/tars"],
+  ["assistant", "Assistant", "/app/assistant"],
   ["standings", "Standings", "/app/standings"],
 ];
 
 const ICON: Record<Section, string> = {
   terminal: "M3 17l5-6 4 3 6-8", // sparkline
   academy: "M12 4L2 9l10 5 8-4v6M6 12v4c0 1 3 2 6 2s6-1 6-2v-4",
-  agents: "M12 3a4 4 0 014 4v1a3 3 0 013 3v3a5 5 0 01-5 5H8a5 5 0 01-5-5v-3a3 3 0 013-3V7a4 4 0 014-4z M9 13h.01M15 13h.01",
-  tars: "M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z",
+  // chat bubble — the assistant you talk to
+  assistant: "M4 5h16v11H9l-4 4v-4H4z M8 10h.01M12 10h.01M16 10h.01",
   standings: "M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM7 6H4v1a3 3 0 003 3M17 6h3v1a3 3 0 01-3 3", // trophy
 };
 
@@ -39,8 +38,8 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
       if (d?.ok) setXp(d.xp);
     }).catch(() => {});
   }, []);
-  // The desk tick runs wherever you are in the app, not just on the Agents
-  // page — your analysts work while you read a lesson or chat with Tars.
+  // The desk tick runs wherever you are in the app, not just on the Assistant
+  // page — your analysts work while you read a lesson or browse markets.
   useEffect(() => {
     const tick = () => fetch("/api/agents/tick", { method: "POST" }).catch(() => {});
     tick();

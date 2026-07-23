@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/server/auth";
-import { analystHistory, analystTurn } from "@/server/analyst";
+import { assistantHistory, assistantTurn } from "@/server/assistant";
 
 /*
-  The analyst desk conversation. GET → the whole thread (full memory);
-  POST { text } → one turn: the analyst thinks, may execute a desk action
-  (create/backtest/deploy/pause/kill/status), and replies with real numbers.
+  The assistant conversation. GET → the whole thread (full memory);
+  POST { text } → one turn: the assistant thinks, may act on the floor
+  (hire / backtest / deploy / pause / retire / status), and replies.
 */
 
 export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
-  return NextResponse.json({ ok: true, messages: await analystHistory(user.id) });
+  return NextResponse.json({ ok: true, messages: await assistantHistory(user.id) });
 }
 
 export async function POST(request: Request) {
@@ -25,6 +25,6 @@ export async function POST(request: Request) {
   const text = String(body.text ?? "").trim().slice(0, 2000);
   if (!text) return NextResponse.json({ ok: false, error: "Say something." }, { status: 400 });
 
-  const { reply, acted } = await analystTurn(user.id, text);
+  const { reply, acted } = await assistantTurn(user.id, text);
   return NextResponse.json({ ok: true, reply, acted });
 }
