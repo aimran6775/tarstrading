@@ -4,6 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import type { Lesson, Section } from "@/lib/academy/types";
+import LessonChart from "@/components/academy/charts";
+import LessonCalc from "@/components/academy/calculators";
+import Flashcards from "@/components/academy/flashcards";
+import LessonGame from "@/components/academy/games";
 
 /*
   The lesson reader. Reading measure capped at 68ch, quizzes are interactive
@@ -123,6 +127,27 @@ function SectionView({ section, onAnswered, onCorrect, onReset }: {
         </div>
       );
 
+    case "analogy":
+      return (
+        <div className="rounded-2xl border border-hairline bg-bg2/60 p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-ink-4">In plain terms</p>
+          <p className="mt-2 text-base font-semibold text-ink-1">{section.title}</p>
+          <p className="mt-1.5 text-[15px] leading-relaxed text-ink-2">{section.text}</p>
+        </div>
+      );
+
+    case "chart":
+      return <LessonChart variant={section.variant} caption={section.caption} />;
+
+    case "calc":
+      return <LessonCalc tool={section.tool} title={section.title} />;
+
+    case "flashcards":
+      return <Flashcards title={section.title} cards={section.cards} />;
+
+    case "game":
+      return <LessonGame variant={section.variant} title={section.title} />;
+
     case "formula":
       return (
         <div className="card p-5">
@@ -140,7 +165,7 @@ function SectionView({ section, onAnswered, onCorrect, onReset }: {
         <div className="card border-l-2 border-l-gain p-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-gain">To the desk</p>
           <p className="mt-2 text-sm leading-relaxed text-ink-2">{section.instruction}</p>
-          <Link href={section.symbol ? `/app?symbol=${encodeURIComponent(section.symbol)}` : "/app"}
+          <Link href={section.symbol ? `/app/m/${encodeURIComponent(section.symbol)}` : "/app"}
             className="pressable mt-3 inline-block rounded-full border border-hairline px-4 py-2 text-xs text-ink-1 hover:border-ink-4">
             Open the terminal{section.symbol ? ` · ${section.symbol}` : ""}
           </Link>

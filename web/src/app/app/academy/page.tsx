@@ -7,10 +7,13 @@ import Link from "next/link";
 import AppNav from "@/components/app-nav";
 
 /*
-  Academy home: seven tracks from "what is a market" to "run it like a fund."
-  Server-rendered — progress comes with the page, no loading spinners.
+  Academy home: the staged journey from "what is a market" to "run it like a
+  fund." Stage 1 is the rebuilt interactive template; the rest upgrade behind
+  it. Server-rendered — progress comes with the page, no loading spinners.
 */
 export const metadata = { title: "Academy" };
+
+const HOURS = 10;
 
 export default async function AcademyHome() {
   const user = await currentUser();
@@ -20,7 +23,10 @@ export default async function AcademyHome() {
     .where(eq(schema.lessonProgress.userId, user.id));
   const done = new Set(rows.map((r) => r.lessonId));
   const xp = rows.reduce((s, r) => s + r.xp, 0);
-  const next = tracks.flatMap((t) => t.lessons).find((l) => !done.has(l.id));
+  const allLessons = tracks.flatMap((t) => t.lessons);
+  const next = allLessons.find((l) => !done.has(l.id));
+  const doneCount = allLessons.filter((l) => done.has(l.id)).length;
+  const overall = Math.round((doneCount / allLessons.length) * 100);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -36,17 +42,25 @@ export default async function AcademyHome() {
           </p>
         </div>
         <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-2">
-          Seven tracks. Everything a professional desk expects you to know —
-          markets, price, risk, margin, options, futures, and the process that
-          binds them — taught in plain language, practiced with your simulated
-          $100,000. No credential at the end; something better: a book you run
-          like you mean it.
+          Ten stages, about {HOURS} hours, from &ldquo;what is a market&rdquo; to running
+          a book like a pro. Plain language, an analogy for every idea, and
+          something to <em>do</em> on every screen — charts you drive,
+          calculators you drag, drills you play. Practiced with your simulated
+          $100,000.
         </p>
+
+        {/* overall progress bar */}
+        <div className="mt-6 flex items-center gap-3">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg3">
+            <div className="h-full rounded-full bg-gold transition-all" style={{ width: `${overall}%` }} />
+          </div>
+          <span className="tnum shrink-0 text-xs text-ink-3">{overall}%</span>
+        </div>
 
         {next && (
           <Link href={`/app/academy/${next.id}`}
             className="pressable cta-gold mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold">
-            {done.size > 0 ? "Continue" : "Start"}: {next.title}
+            {done.size > 0 ? "Continue" : "Start learning"}: {next.title}
           </Link>
         )}
 
@@ -54,12 +68,14 @@ export default async function AcademyHome() {
           {tracks.map((track, ti) => {
             const completed = track.lessons.filter((l) => done.has(l.id)).length;
             const fraction = completed / track.lessons.length;
+            const interactive = ti === 0; // Stage 1 is the rebuilt template
             return (
               <section key={track.id} className="card overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-5 py-4">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">
-                      Track {String(ti + 1).padStart(2, "0")} · {track.covers}
+                      Stage {ti + 1} · {track.covers}
+                      {interactive && <span className="ml-2 rounded-full bg-gain/15 px-2 py-0.5 text-[9px] font-semibold tracking-[0.15em] text-gain">INTERACTIVE</span>}
                     </p>
                     <h2 className="mt-1 font-display text-xl font-bold text-ink-1">{track.title}</h2>
                     <p className="text-sm text-ink-3">{track.tagline}</p>

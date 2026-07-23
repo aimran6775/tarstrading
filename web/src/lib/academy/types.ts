@@ -1,16 +1,60 @@
 /*
-  Academy content model. Lessons are data, the reader renders them.
-  Sections are deliberately few in kind — prose does the teaching, keyIdea
-  crystallizes, formula shows the one equation that matters, quiz checks,
-  and desk sends the learner to the terminal to DO it.
+  Academy content model, v2. Lessons are DATA; the reader renders them.
+  Blocks come in two families:
+
+  - Reading blocks (prose, keyIdea, analogy, formula) carry the idea.
+  - Interactive blocks (chart, calc, flashcards, game, desk, quiz) make the
+    learner DO something — the point of Academy v2. Never a wall of paragraphs.
 */
 
-export type Section =
-  | { kind: "prose"; text: string }
-  | { kind: "keyIdea"; title: string; text: string }
-  | { kind: "formula"; label: string; expression: string; legend: string }
-  | { kind: "quiz"; question: string; choices: string[]; answer: number; explain: string }
-  | { kind: "desk"; instruction: string; symbol?: string };
+// --- reading blocks ---
+type Prose = { kind: "prose"; text: string };
+type KeyIdea = { kind: "keyIdea"; title: string; text: string };
+/** Plain-language "explain-it-to-anyone" analogy — the beginner's on-ramp. */
+type Analogy = { kind: "analogy"; title: string; text: string };
+type Formula = { kind: "formula"; label: string; expression: string; legend: string };
+
+// --- interactive blocks ---
+
+/** An animated, annotated chart that teaches one idea. */
+type ChartBlock = {
+  kind: "chart";
+  variant: "candle-anatomy" | "sma-cross" | "support-resistance" | "trend" | "spread";
+  caption?: string;
+};
+
+/** A live calculator: sliders/inputs in, the number out, color-coded. */
+type CalcBlock = {
+  kind: "calc";
+  tool: "position-size" | "risk-reward" | "expectancy" | "compounding";
+  title?: string;
+};
+
+/** A flip-card deck for the terms this lesson introduced. */
+type Flashcards = {
+  kind: "flashcards";
+  title?: string;
+  cards: { front: string; back: string }[];
+};
+
+/** A quick interactive drill — learn by deciding, not reading. */
+type Game = {
+  kind: "game";
+  variant: "size-it" | "bull-or-bear" | "spot-the-level" | "order-match";
+  title?: string;
+};
+
+type Quiz = { kind: "quiz"; question: string; choices: string[]; answer: number; explain: string };
+
+/** Sends the learner into the real terminal to do the thing for real. */
+type Desk = { kind: "desk"; instruction: string; symbol?: string };
+
+export type Block =
+  | Prose | KeyIdea | Analogy | Formula
+  | ChartBlock | CalcBlock | Flashcards | Game | Quiz | Desk;
+
+// Back-compat alias — earlier content authored against `Section`.
+export type Section = Block;
 
 export type Lesson = {
   id: string;
@@ -18,14 +62,14 @@ export type Lesson = {
   hook: string;         // one sentence that earns the next ten minutes
   minutes: number;
   xp: number;
-  sections: Section[];
+  sections: Block[];
 };
 
 export type Track = {
   id: string;
   title: string;
   tagline: string;
-  /** Which instruments this unlocks understanding of. */
+  /** Which instruments/skills this unlocks. */
   covers: string;
   accent: "gold" | "gain" | "agent" | "loss";
   lessons: Lesson[];

@@ -1,15 +1,21 @@
 import type { Lesson, Track } from "./types";
-import { foundationsTrack, priceTrack, riskTrack, stocksTrack } from "./content1";
+import { marketsTrack } from "./stage1";
+import { priceTrack, riskTrack, stocksTrack } from "./content1";
 import { optionsTrack, futuresTrack, fundTrack } from "./content2";
 
+/*
+  The stages of the academy, in order. Stage 1 (Markets 101) is the rebuilt,
+  fully-interactive template; the remaining stages carry the v1 content and are
+  being upgraded to the same interactive standard stage by stage.
+*/
 export const tracks: Track[] = [
-  foundationsTrack,
-  priceTrack,
-  riskTrack,
-  stocksTrack,
-  optionsTrack,
-  futuresTrack,
-  fundTrack,
+  marketsTrack,   // Stage 1 — interactive
+  priceTrack,     // Stage 2
+  riskTrack,      // Stage 3
+  stocksTrack,    // Stage 4
+  optionsTrack,   // Stage 5
+  futuresTrack,   // Stage 6
+  fundTrack,      // Stage 7
 ];
 
 export const allLessons: Lesson[] = tracks.flatMap((t) => t.lessons);
