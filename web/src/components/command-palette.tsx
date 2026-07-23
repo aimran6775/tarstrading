@@ -15,6 +15,7 @@ type Item = { id: string; label: string; sub: string; run: () => void };
 const SECTIONS: [string, string][] = [
   ["Markets — browse", "/app"],
   ["Academy", "/app/academy"],
+  ["Practice — flashcards & drills", "/app/academy/practice"],
   ["Assistant — your desk", "/app/assistant"],
   ["Standings — badges & leaderboard", "/app/standings"],
   ["Performance", "/app/m/SPY?tray=perf"],

@@ -127,6 +127,19 @@ export default async function AcademyHome() {
           })}
         </div>
 
+        {/* Practice hub — the endless review loop after (and during) the stages */}
+        <Link href="/app/academy/practice"
+          className="pressable mt-6 flex items-center justify-between gap-4 rounded-2xl border border-hairline bg-bg1 p-5 transition-colors hover:border-gold/40 hover:bg-bg2/60">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">Beyond the stages</p>
+            <h2 className="mt-1 font-display text-xl font-bold text-ink-1">Practice 🔥</h2>
+            <p className="mt-0.5 text-sm text-ink-3">
+              Every term and drill on repeat — flashcards, the arcade, and a daily streak. A few minutes keeps it sharp.
+            </p>
+          </div>
+          <span className="shrink-0 text-2xl text-ink-4">→</span>
+        </Link>
+
         <p className="mt-10 text-center text-xs text-ink-4">
           Education, not investment advice. The desk is where lessons become skill.
         </p>

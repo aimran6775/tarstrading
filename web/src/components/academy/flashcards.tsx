@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 /*
@@ -12,13 +12,17 @@ import { motion, AnimatePresence } from "framer-motion";
 
 type Card = { front: string; back: string };
 
-export default function Flashcards({ title, cards }: { title?: string; cards: Card[] }) {
+export default function Flashcards({ title, cards, onDone }: { title?: string; cards: Card[]; onDone?: () => void }) {
   const [queue, setQueue] = useState<number[]>(() => cards.map((_, i) => i));
   const [pos, setPos] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [got, setGot] = useState<Set<number>>(new Set());
 
   const done = pos >= queue.length;
+  const firedDone = useRef(false);
+  useEffect(() => {
+    if (done && !firedDone.current) { firedDone.current = true; onDone?.(); }
+  }, [done, onDone]);
   const current = queue[pos];
   const total = cards.length;
   const learned = got.size;
