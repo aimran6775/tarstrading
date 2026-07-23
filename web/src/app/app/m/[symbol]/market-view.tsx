@@ -10,6 +10,7 @@ import { useToast } from "@/components/toast";
 import { SYMBOLS } from "@/lib/symbols";
 import { usd, pct, categoryOf, type Quote, type Account, type Position, type Order, type Timeframe }
   from "@/components/trading/shared";
+import LearnLink from "@/components/academy/learn-link";
 import type { ChartBar } from "@/components/price-chart";
 
 const PriceChart = dynamic(() => import("@/components/price-chart"), {
@@ -270,10 +271,13 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
               <div className="skeleton m-4 h-[300px] md:h-[420px]" />
             )}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline px-4 py-2">
-              <span className="tnum text-[11px] text-ink-4">
-                {bars.length ? `${bars.length} bars` : "—"}
-                {syncedAt ? ` · synced ${new Date(syncedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}` : ""}
-                {marketOpen === false && !symbol.includes("/") ? " · market closed" : ""}
+              <span className="flex items-center gap-2">
+                <span className="tnum text-[11px] text-ink-4">
+                  {bars.length ? `${bars.length} bars` : "—"}
+                  {syncedAt ? ` · synced ${new Date(syncedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}` : ""}
+                  {marketOpen === false && !symbol.includes("/") ? " · market closed" : ""}
+                </span>
+                <LearnLink concept="chart" className="hidden sm:inline-flex" />
               </span>
               <div className="flex gap-1">
                 {(["1D", "1W", "1M", "3M", "1Y", "5Y"] as Timeframe[]).map((tf) => (
@@ -301,7 +305,10 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
             />
 
             <section className="panel p-4">
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Context</h2>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Context</h2>
+                <LearnLink concept="sizing" />
+              </div>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
                 <dt className="text-ink-4">Prev close</dt>
                 <dd className="tnum text-right text-ink-1">{quote ? usd(quote.previousClose) : "—"}</dd>

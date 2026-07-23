@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import HoldButton from "@/components/hold-button";
 import AssistantChat from "@/components/assistant-chat";
+import LearnLink from "@/components/academy/learn-link";
 
 /*
   The Agent Lab: your analyst floor, run by conversation. You TALK to your
@@ -78,7 +79,10 @@ export default function AnalystFloor() {
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-24 pt-10 md:pb-10 md:px-8">
-      <p className="kicker mb-3">The assistant</p>
+      <div className="mb-3 flex items-center gap-3">
+        <p className="kicker">The assistant</p>
+        <LearnLink concept="ai" />
+      </div>
       <h1 className="display text-4xl text-ink-1 md:text-5xl">Talk to your assistant.</h1>
       <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-2">
         Tell it what you want and it hires an analyst to run it — plain English

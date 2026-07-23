@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import HoldButton from "@/components/hold-button";
 import { useToast } from "@/components/toast";
+import LearnLink from "@/components/academy/learn-link";
 import { usd, type Quote, type Order } from "./shared";
 
 /*
@@ -82,7 +83,10 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
   return (
     <section className="panel p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Trade</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Trade</h2>
+          <LearnLink concept="orders" />
+        </div>
         <span className="sim-mark">SIMULATED</span>
       </div>
 

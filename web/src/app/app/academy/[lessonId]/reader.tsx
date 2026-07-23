@@ -9,6 +9,7 @@ import LessonCalc from "@/components/academy/calculators";
 import Flashcards from "@/components/academy/flashcards";
 import LessonGame from "@/components/academy/games";
 import { RuleBuilder, OverfitDemo } from "@/components/academy/backtest";
+import PayoffDiagram from "@/components/academy/payoff";
 
 /*
   The lesson reader. Reading measure capped at 68ch, quizzes are interactive
@@ -150,7 +151,9 @@ function SectionView({ section, onAnswered, onCorrect, onReset }: {
       return <LessonGame variant={section.variant} title={section.title} />;
 
     case "widget":
-      return section.variant === "rule-builder" ? <RuleBuilder /> : <OverfitDemo />;
+      return section.variant === "rule-builder" ? <RuleBuilder />
+        : section.variant === "overfit" ? <OverfitDemo />
+        : <PayoffDiagram />;
 
     case "formula":
       return (

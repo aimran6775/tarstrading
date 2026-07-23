@@ -4,9 +4,10 @@ import { readingTrack } from "./stage2";
 import { ordersTrack } from "./stage3";
 import { riskStage } from "./stage4";
 import { edgeStage } from "./stage5";
+import { optionsStage } from "./stage7";
 import { aiStage } from "./stage9";
 import { stocksTrack } from "./content1";
-import { optionsTrack, futuresTrack, fundTrack } from "./content2";
+import { futuresTrack, fundTrack } from "./content2";
 
 /*
   The ten stages of the academy, in order. The rebuilt, fully-interactive
@@ -21,15 +22,29 @@ export const tracks: Track[] = [
   riskStage,      // Stage 4  — interactive
   edgeStage,      // Stage 5  — interactive
   stocksTrack,    // Stage 6
-  optionsTrack,   // Stage 7
+  optionsStage,   // Stage 7  — interactive
   futuresTrack,   // Stage 8
   aiStage,        // Stage 9  — interactive
   fundTrack,      // Stage 10
 ];
 
 export const INTERACTIVE_IDS = new Set([
-  "s1-markets", "s2-reading", "s3-orders", "s4-risk", "s5-edge", "s9-ai",
+  "s1-markets", "s2-reading", "s3-orders", "s4-risk", "s5-edge", "s7-options", "s9-ai",
 ]);
+
+/** Map a concept → the lesson that teaches it, for contextual "Learn" links
+    scattered through the app (terminal, ticket, assistant). */
+export const CONCEPT_LESSON: Record<string, { id: string; label: string }> = {
+  chart: { id: "p1-timeframes", label: "Reading charts" },
+  candles: { id: "m3-reading-a-chart", label: "Reading a candle" },
+  orders: { id: "o1-three-orders", label: "Order types" },
+  sizing: { id: "r1-risk-per-trade", label: "Position sizing" },
+  stop: { id: "o3-stops", label: "Using a stop" },
+  spread: { id: "o2-slippage", label: "Spread & slippage" },
+  ai: { id: "ai1-what-ai-can-do", label: "Trading with AI" },
+  backtest: { id: "ai3-honest-backtest", label: "Honest backtesting" },
+  options: { id: "op1-calls-puts", label: "How options work" },
+};
 
 export const allLessons: Lesson[] = tracks.flatMap((t) => t.lessons);
 
