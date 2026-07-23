@@ -10,19 +10,29 @@ import { motion, useReducedMotion } from "framer-motion";
   order to its job.
 */
 
+/** Fire-and-forget: log a drill attempt for the admin's drill analytics. */
+function logGame(variant: string, correct: boolean) {
+  fetch("/api/academy/game", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ variant, correct }),
+  }).catch(() => { /* analytics are best-effort */ });
+}
+
 export default function LessonGame({ variant, title }: {
   variant: "size-it" | "bull-or-bear" | "spot-the-level" | "order-match";
   title?: string;
 }) {
+  const report = (correct: boolean) => logGame(variant, correct);
   return (
     <div className="card p-5">
       <p className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-agent">
         <span>▲</span> {title ?? "Your turn"}
       </p>
-      {variant === "size-it" && <SizeIt />}
-      {variant === "bull-or-bear" && <ReadStructure />}
-      {variant === "spot-the-level" && <SpotLevel />}
-      {variant === "order-match" && <OrderMatch />}
+      {variant === "size-it" && <SizeIt onResult={report} />}
+      {variant === "bull-or-bear" && <ReadStructure onResult={report} />}
+      {variant === "spot-the-level" && <SpotLevel onResult={report} />}
+      {variant === "order-match" && <OrderMatch onResult={report} />}
     </div>
   );
 }
@@ -44,7 +54,7 @@ function Verdict({ right, text, onNext }: { right: boolean; text: string; onNext
 }
 
 /* ---------- Size it ---------- */
-function SizeIt() {
+function SizeIt({ onResult }: { onResult: (correct: boolean) => void }) {
   const rounds = useMemo(() => [
     { account: 100_000, risk: 1, entry: 50, stop: 48, answer: 500 },
     { account: 50_000, risk: 2, entry: 200, stop: 195, answer: 200 },
@@ -71,7 +81,7 @@ function SizeIt() {
         {options.map((o) => {
           const isAns = o === correct, isPicked = o === picked;
           return (
-            <button key={o} disabled={picked !== null} onClick={() => setPicked(o)}
+            <button key={o} disabled={picked !== null} onClick={() => { setPicked(o); onResult(o === correct); }}
               className={`pressable tnum rounded-lg border px-4 py-3 text-sm font-semibold ${
                 picked === null ? "border-hairline text-ink-1 hover:border-ink-4"
                 : isAns ? "border-gain/60 bg-gain/10 text-gain"
@@ -92,7 +102,7 @@ function SizeIt() {
 }
 
 /* ---------- Read the structure ---------- */
-function ReadStructure() {
+function ReadStructure({ onResult }: { onResult: (correct: boolean) => void }) {
   const rm = useReducedMotion();
   const rounds = useMemo(() => [
     { data: [30, 40, 35, 50, 44, 60, 54, 72], answer: "up" },
@@ -117,7 +127,7 @@ function ReadStructure() {
         {(["up", "down", "range"] as const).map((k) => {
           const isAns = k === round.answer, isPicked = k === picked;
           return (
-            <button key={k} disabled={picked !== null} onClick={() => setPicked(k)}
+            <button key={k} disabled={picked !== null} onClick={() => { setPicked(k); onResult(k === round.answer); }}
               className={`pressable rounded-lg border px-3 py-2 text-xs font-semibold capitalize ${
                 picked === null ? "border-hairline text-ink-1 hover:border-ink-4"
                 : isAns ? "border-gain/60 bg-gain/10 text-gain"
@@ -138,7 +148,7 @@ function ReadStructure() {
 }
 
 /* ---------- Spot the level ---------- */
-function SpotLevel() {
+function SpotLevel({ onResult }: { onResult: (correct: boolean) => void }) {
   // Tap (or arrow-key) where support sits (~value 45). Reveal after committing.
   const data = [50, 44, 62, 45, 64, 44, 60, 46, 63];
   const W = 260, H = 120, min = 40, max = 70;
@@ -163,13 +173,15 @@ function SpotLevel() {
         aria-valuemin={0} aria-valuemax={H} aria-valuenow={Math.round(cursorY)}
         onClick={(e) => {
           const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-          setCursorY(((e.clientY - r.top) / r.height) * H);
+          const y = ((e.clientY - r.top) / r.height) * H;
+          setCursorY(y);
           setCommitted(true);
+          onResult(Math.abs(y - supportY) < 20);
         }}
         onKeyDown={(e) => {
           if (e.key === "ArrowUp") { e.preventDefault(); setCommitted(false); setCursorY((v) => Math.max(6, v - 4)); }
           else if (e.key === "ArrowDown") { e.preventDefault(); setCommitted(false); setCursorY((v) => Math.min(H - 6, v + 4)); }
-          else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCommitted(true); }
+          else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCommitted(true); onResult(close); }
         }}>
         <polyline points={path} fill="none" stroke="var(--ink-2)" strokeWidth="1.8" />
         {!committed && (
@@ -193,7 +205,7 @@ function SpotLevel() {
 }
 
 /* ---------- Order match ---------- */
-function OrderMatch() {
+function OrderMatch({ onResult }: { onResult: (correct: boolean) => void }) {
   const jobs = useMemo(() => [
     { q: "Buy right now, whatever the price.", answer: "Market", why: "A market order fills immediately at the best available price — speed over price." },
     { q: "Only buy if it dips to $95.", answer: "Limit", why: "A limit order sets your price and waits — price over speed. It may never fill." },
@@ -209,7 +221,7 @@ function OrderMatch() {
         {["Market", "Limit", "Stop"].map((o) => {
           const isAns = o === job.answer, isPicked = o === picked;
           return (
-            <button key={o} disabled={picked !== null} onClick={() => setPicked(o)}
+            <button key={o} disabled={picked !== null} onClick={() => { setPicked(o); onResult(o === job.answer); }}
               className={`pressable rounded-lg border px-3 py-2 text-xs font-semibold ${
                 picked === null ? "border-hairline text-ink-1 hover:border-ink-4"
                 : isAns ? "border-gain/60 bg-gain/10 text-gain"

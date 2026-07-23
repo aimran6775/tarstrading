@@ -184,6 +184,16 @@ export const cardReviews = pgTable("card_reviews", {
   index("card_reviews_due").on(t.userId, t.dueAt),
 ]);
 
+/** One row per drill played — the practice-side companion to quiz_attempts.
+    Tells us which drills learners play and where they miss. */
+export const gameAttempts = pgTable("game_attempts", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  variant: text("variant").notNull(),
+  correct: integer("correct").notNull(),
+  createdAt: epochMs("created_at").notNull(),
+}, (t) => [index("game_attempts_variant").on(t.variant), index("game_attempts_user").on(t.userId)]);
+
 export const chatMessages = pgTable("chat_messages", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),

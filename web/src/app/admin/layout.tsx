@@ -11,6 +11,7 @@ export const metadata = { title: { default: "Admin", template: "%s · Tars Admin
 
 const NAV: [string, string][] = [
   ["Overview", "/admin"],
+  ["Academy", "/admin/academy"],
   ["Data ops", "/admin/data"],
   ["Users", "/admin/users"],
   ["System", "/admin/system"],
