@@ -2,7 +2,9 @@ import type { Lesson, Track } from "./types";
 import { marketsTrack } from "./stage1";
 import { readingTrack } from "./stage2";
 import { ordersTrack } from "./stage3";
-import { riskTrack, stocksTrack } from "./content1";
+import { riskStage } from "./stage4";
+import { edgeStage } from "./stage5";
+import { stocksTrack } from "./content1";
 import { optionsTrack, futuresTrack, fundTrack } from "./content2";
 
 /*
@@ -12,17 +14,18 @@ import { optionsTrack, futuresTrack, fundTrack } from "./content2";
   the same standard, stage by stage. INTERACTIVE_THROUGH marks how far the
   rebuild has reached so the home can badge them.
 */
-export const INTERACTIVE_THROUGH = 3;
+export const INTERACTIVE_THROUGH = 5;
 
 export const tracks: Track[] = [
   marketsTrack,   // Stage 1 — interactive
   readingTrack,   // Stage 2 — interactive
   ordersTrack,    // Stage 3 — interactive
-  riskTrack,      // Stage 4
-  stocksTrack,    // Stage 5
-  optionsTrack,   // Stage 6
-  futuresTrack,   // Stage 7
-  fundTrack,      // Stage 8
+  riskStage,      // Stage 4 — interactive
+  edgeStage,      // Stage 5 — interactive
+  stocksTrack,    // Stage 6
+  optionsTrack,   // Stage 7
+  futuresTrack,   // Stage 8
+  fundTrack,      // Stage 9
 ];
 
 export const allLessons: Lesson[] = tracks.flatMap((t) => t.lessons);
