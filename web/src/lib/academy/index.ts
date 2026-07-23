@@ -4,6 +4,7 @@ import { readingTrack } from "./stage2";
 import { ordersTrack } from "./stage3";
 import { riskStage } from "./stage4";
 import { edgeStage } from "./stage5";
+import { psychologyStage } from "./stage_mind";
 import { stocksStage } from "./stage6";
 import { optionsStage } from "./stage7";
 import { futuresStage } from "./stage8";
@@ -11,22 +12,23 @@ import { aiStage } from "./stage9";
 import { fundStage } from "./stage10";
 
 /*
-  The ten stages of the academy, in order. The rebuilt, fully-interactive
+  The stages of the academy, in order. The rebuilt, fully-interactive
   stages (charts you drive, calculators you drag, drills you play) are marked
   in INTERACTIVE_IDS so the home can badge them; the rest carry v1 content and
   are being upgraded to the same standard, stage by stage.
 */
 export const tracks: Track[] = [
-  marketsTrack,   // Stage 1
-  readingTrack,   // Stage 2
-  ordersTrack,    // Stage 3
-  riskStage,      // Stage 4
-  edgeStage,      // Stage 5
-  stocksStage,    // Stage 6
-  optionsStage,   // Stage 7
-  futuresStage,   // Stage 8
-  aiStage,        // Stage 9
-  fundStage,      // Stage 10
+  marketsTrack,     // Stage 1
+  readingTrack,     // Stage 2
+  ordersTrack,      // Stage 3
+  riskStage,        // Stage 4
+  edgeStage,        // Stage 5
+  psychologyStage,  // Stage 6 — the inner game
+  stocksStage,      // Stage 7
+  optionsStage,     // Stage 8
+  futuresStage,     // Stage 9
+  aiStage,          // Stage 10
+  fundStage,        // Stage 11
 ];
 
 // Every stage is now the rebuilt, fully-interactive template.
@@ -44,6 +46,8 @@ export const CONCEPT_LESSON: Record<string, { id: string; label: string }> = {
   ai: { id: "ai1-what-ai-can-do", label: "Trading with AI" },
   backtest: { id: "ai3-honest-backtest", label: "Honest backtesting" },
   options: { id: "op1-calls-puts", label: "How options work" },
+  psychology: { id: "mind1-the-enemy-is-you", label: "The inner game" },
+  tilt: { id: "mind2-tilt", label: "Tilt & revenge trading" },
 };
 
 export const allLessons: Lesson[] = tracks.flatMap((t) => t.lessons);
@@ -73,5 +77,9 @@ export function nextLessonInfo(id: string): { lesson: Lesson; newTrack: string |
 }
 
 export const totalXP = allLessons.reduce((sum, l) => sum + l.xp, 0);
+
+/** Sum of every lesson's own time estimate — the honest basis for any
+    "about N hours" claim, so the number moves with the content. */
+export const totalMinutes = allLessons.reduce((sum, l) => sum + l.minutes, 0);
 
 export type { Lesson, Track, Section } from "./types";

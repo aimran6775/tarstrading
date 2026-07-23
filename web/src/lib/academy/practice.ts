@@ -1,7 +1,7 @@
 import { tracks } from "./index";
 
 /*
-  The practice layer — everything the ten stages taught, recycled into an
+  The practice layer — everything the stages taught, recycled into an
   endless review loop. We harvest every flashcard the lessons defined (single
   source of truth: write a card once in a lesson, it shows up here too) and
   expose the game roster. No new content to maintain — it all derives from the

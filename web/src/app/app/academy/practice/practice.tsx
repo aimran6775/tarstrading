@@ -8,7 +8,7 @@ import { allTerms, GAMES, type Term } from "@/lib/academy/practice";
 import { cardKey } from "@/lib/academy/srs";
 
 /*
-  The Practice hub — everything the ten stages taught, recycled forever.
+  The Practice hub — everything the stages taught, recycled forever.
   Flashcards are scheduled by spaced repetition (due cards surface first), an
   arcade replays the same drills the lessons use, and a server-side daily
   streak rewards coming back. No new content: it all derives from the stages.
@@ -123,7 +123,7 @@ export default function Practice() {
         </div>
       </div>
       <p className="mt-3 text-sm leading-relaxed text-ink-3">
-        Every term and drill from the ten stages, on repeat. A few minutes a day is how it sticks.
+        Every term and drill from all {stages.length} stages, on repeat. A few minutes a day is how it sticks.
         {dueCount != null && dueCount > 0 && (
           <> <span className="text-gold">{dueCount} card{dueCount === 1 ? "" : "s"} due</span> today.</>
         )}

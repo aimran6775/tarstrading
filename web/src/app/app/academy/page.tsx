@@ -2,7 +2,7 @@ import { currentUser } from "@/server/auth";
 import { redirect } from "next/navigation";
 import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
-import { tracks, totalXP, INTERACTIVE_IDS } from "@/lib/academy";
+import { tracks, totalXP, totalMinutes, INTERACTIVE_IDS } from "@/lib/academy";
 import Link from "next/link";
 import AppNav from "@/components/app-nav";
 
@@ -13,7 +13,10 @@ import AppNav from "@/components/app-nav";
 */
 export const metadata = { title: "Academy" };
 
-const HOURS = 10;
+// Derived from the lessons themselves so the pitch can never overstate the
+// content: stage count and hours move automatically as the curriculum grows.
+const STAGES = tracks.length;
+const HOURS = Math.round(totalMinutes / 60);
 
 export default async function AcademyHome() {
   const user = await currentUser();
@@ -42,8 +45,9 @@ export default async function AcademyHome() {
           </p>
         </div>
         <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-2">
-          Ten stages, about {HOURS} hours, from &ldquo;what is a market&rdquo; to running
-          a book like a pro. Plain language, an analogy for every idea, and
+          {STAGES} stages, about {HOURS} hours, from &ldquo;what is a market&rdquo; to running
+          a book like a pro — including the inner game, where most traders
+          actually lose. Plain language, an analogy for every idea, and
           something to <em>do</em> on every screen — charts you drive,
           calculators you drag, drills you play. Practiced with your simulated
           $100,000.

@@ -86,6 +86,7 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
         <div className="flex items-center gap-2">
           <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Trade</h2>
           <LearnLink concept="orders" />
+          <LearnLink concept="tilt" />
         </div>
         <span className="sim-mark">SIMULATED</span>
       </div>
