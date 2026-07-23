@@ -90,7 +90,7 @@ export async function endSession() {
   jar.delete(SESSION_COOKIE);
 }
 
-export type SessionUser = { id: string; email: string; name: string };
+export type SessionUser = { id: string; email: string; name: string; role: "user" | "admin" };
 
 export async function currentUser(): Promise<SessionUser | null> {
   const jar = await cookies();
@@ -98,12 +98,33 @@ export async function currentUser(): Promise<SessionUser | null> {
   if (!token) return null;
   const [row] = await db.select({
     id: schema.users.id, email: schema.users.email, name: schema.users.name,
+    role: schema.users.role,
   })
     .from(schema.sessions)
     .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
     .where(and(eq(schema.sessions.id, token), gt(schema.sessions.expiresAt, Date.now())))
     .limit(1);
   return row ?? null;
+}
+
+// ---- admin ----
+// Admins are bootstrapped from ADMIN_EMAILS (comma-separated, case-insensitive):
+// on every login, a matching account is promoted. No self-serve path to admin.
+function adminEmails(): Set<string> {
+  return new Set((process.env.ADMIN_EMAILS ?? "")
+    .split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
+}
+
+export async function currentAdmin(): Promise<SessionUser | null> {
+  const user = await currentUser();
+  if (!user) return null;
+  if (user.role === "admin") return user;
+  // Bootstrap: whitelisted email that hasn't been promoted yet.
+  if (adminEmails().has(user.email.toLowerCase())) {
+    await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, user.id));
+    return { ...user, role: "admin" };
+  }
+  return null;
 }
 
 export async function requireUser(): Promise<SessionUser> {

@@ -34,6 +34,10 @@ function createDb() {
     prepare: false,
     max: 10,
     idle_timeout: 20,
+    // Recycle sockets before the pooler can silently drop them — a query on a
+    // half-dead connection hangs forever, which reads as a stuck page.
+    max_lifetime: 10 * 60,
+    connect_timeout: 10,
     ssl: "require",
   });
   return drizzle(sql, { schema });
