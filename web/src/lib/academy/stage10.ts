@@ -74,6 +74,39 @@ export const fundStage: Track = {
 
     // ---------------------------------------------------------------
     {
+      id: "h4-scorecard",
+      title: "Reading your scorecard: risk-adjusted returns",
+      hook: "A 40% return means nothing until you know how much risk you took to get it.",
+      minutes: 13,
+      xp: 100,
+      sections: [
+        { kind: "prose", text: "Amateurs brag about returns. Professionals ask a harder question: how much risk did you take to earn them? Two traders both made 30% this year — but one rode a stomach-churning rollercoaster and the other barely felt a bump. The second is the far better trader, and there are numbers that prove it. Learning to read them is how you judge a strategy honestly, including your own." },
+        { kind: "keyIdea", title: "Volatility: how bumpy the ride was",
+          text: "Volatility (standard deviation of returns) measures how much your results swing around their average. High volatility means big ups and downs — more stress, and a bigger risk that a bad stretch forces you out at the worst time. Two strategies with the same average return but different volatility are not equally good: the smoother one is easier to hold, and holding is where returns actually come from." },
+        { kind: "formula", label: "Sharpe ratio", expression: "Sharpe = (return − risk-free rate) ÷ volatility",
+          legend: "Return earned per unit of risk taken. Higher is better. Above ~1 is solid, above ~2 is excellent. It's the single best one-number answer to 'was this skill or was this just leverage?'" },
+        { kind: "prose", text: "The Sharpe ratio divides your excess return by your volatility — reward per unit of risk. It's the great equalizer: it strips away leverage and luck and asks whether you were actually compensated for the risk you took. A 15% return with a Sharpe of 2 beats a 40% return with a Sharpe of 0.5, because the second one only got there by betting big — and betting big eventually meets the drawdown that ends it." },
+        { kind: "keyIdea", title: "Maximum drawdown: the number that decides if you survive",
+          text: "Max drawdown is the deepest peak-to-trough fall your account suffered. It matters more than any return figure, because it's the number that makes people quit — nobody rationally sticks with a strategy through a 60% drawdown, even if it recovers. When you judge a track record, look at the worst drop first. If you couldn't stomach it live, the returns above it are fiction." },
+        { kind: "desk", instruction: "Open Performance on the desk. Your equity curve and its drawdown are your real scorecard — read the depth of the dips, not just the height of the peaks. That's the number a professional looks at first.", symbol: "SPY" },
+        { kind: "quiz",
+          question: "Strategy A returned 40% (Sharpe 0.5). Strategy B returned 18% (Sharpe 1.8). Which is the better strategy?",
+          choices: ["A — it made more money", "B — it earned far more return per unit of risk", "They're equal", "Impossible to compare"],
+          answer: 1,
+          explain: "B. A's big return came from taking big risk (low Sharpe) — the kind that eventually meets a drawdown that ends the game. B earned more per unit of risk, which is the return you can actually compound and survive. Risk-adjusted beats raw every time." },
+        { kind: "flashcards", title: "The scorecard",
+          cards: [
+            { front: "Volatility", back: "Standard deviation of returns — how much your results swing. Lower is easier to hold." },
+            { front: "Sharpe ratio", back: "Excess return ÷ volatility — reward per unit of risk. Above ~1 is solid." },
+            { front: "Maximum drawdown", back: "The deepest peak-to-trough fall — the number that decides whether you quit." },
+            { front: "Risk-adjusted return", back: "Return measured against the risk taken to earn it — the honest scoreboard." },
+            { front: "Beta", back: "How much a position moves with the market — 1 tracks it, 0 ignores it." },
+          ] },
+      ],
+    },
+
+    // ---------------------------------------------------------------
+    {
       id: "h3-process",
       title: "The process: your operating system",
       hook: "Everything you've learned only works if it becomes a routine you actually follow.",
