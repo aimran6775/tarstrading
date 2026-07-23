@@ -13,12 +13,12 @@ import { searchSymbols, SYMBOLS as SYMBOL_DICT } from "@/lib/symbols";
 type Item = { id: string; label: string; sub: string; run: () => void };
 
 const SECTIONS: [string, string][] = [
-  ["Terminal", "/app"],
+  ["Markets — browse", "/app"],
   ["Academy", "/app/academy"],
   ["Agent Lab", "/app/agents"],
   ["Tars — the mentor", "/app/tars"],
   ["Standings — badges & leaderboard", "/app/standings"],
-  ["Performance", "/app?perf=1"],
+  ["Performance", "/app/m/SPY?tray=perf"],
 ];
 
 // Popular defaults shown before the user types anything.
@@ -59,14 +59,14 @@ export default function CommandPalette() {
     const matches = q ? searchSymbols(q, 6) : DEFAULT_SYMBOLS.map((s) => ({ symbol: s, name: "" }));
     const symMatches = matches.map((m) => ({
       id: `sym:${m.symbol}`, label: m.symbol,
-      sub: m.name || "Open chart", run: go(`/app?symbol=${encodeURIComponent(m.symbol)}`),
+      sub: m.name || "Open market", run: go(`/app/m/${encodeURIComponent(m.symbol)}`),
     }));
 
     // Free-form ticker: whatever the user typed, if it looks like a symbol and
     // isn't already in the dictionary matches, routed straight to its chart.
     const known = new Set([...SYMBOL_DICT.map((e) => e.symbol), ...matches.map((m) => m.symbol)]);
     const freeform: Item[] = q && /^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/.test(q) && !known.has(q)
-      ? [{ id: `free:${q}`, label: q, sub: "Open chart", run: go(`/app?symbol=${encodeURIComponent(q)}`) }]
+      ? [{ id: `free:${q}`, label: q, sub: "Open market", run: go(`/app/m/${encodeURIComponent(q)}`) }]
       : [];
 
     return [...freeform, ...symMatches, ...sections];

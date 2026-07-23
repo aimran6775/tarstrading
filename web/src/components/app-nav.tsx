@@ -16,7 +16,7 @@ import TarsWordmark from "./tars-wordmark";
 export type Section = "terminal" | "academy" | "agents" | "tars" | "standings";
 
 const NAV: [Section, string, string][] = [
-  ["terminal", "Terminal", "/app"],
+  ["terminal", "Markets", "/app"],
   ["academy", "Academy", "/app/academy"],
   ["agents", "Agents", "/app/agents"],
   ["tars", "Tars", "/app/tars"],

@@ -1,0 +1,328 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import HoldButton from "@/components/hold-button";
+import { usd, type Quote, type Position, type Order } from "./shared";
+
+/*
+  The portfolio tray — the persistent bottom band of every market page.
+  Positions, Orders, Alerts, and Performance as flat, dense panels (no outer
+  card chrome; the tray provides the frame).
+*/
+
+export function Positions({ positions, quotes, onSelect, onClosed }: {
+  positions: Position[];
+  quotes: Map<string, Quote>;
+  onSelect: (s: string) => void;
+  onClosed: () => void;
+}) {
+  const [closing, setClosing] = useState<string | null>(null);
+
+  async function close(p: Position) {
+    setClosing(p.id);
+    try {
+      await fetch("/api/orders", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: p.symbol, side: "sell", type: "market", qty: p.qty }),
+      });
+    } finally {
+      setClosing(null);
+      onClosed();
+    }
+  }
+
+  if (!positions.length) {
+    return (
+      <p className="px-6 py-10 text-center text-xs text-ink-4">
+        No positions yet. Pick a market, size it modestly, and hold the gold button.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="divide-y divide-[var(--hairline)]">
+      {positions.map((p) => {
+        const q = quotes.get(p.symbol);
+        const value = (q?.price ?? p.avgEntryPrice) * p.qty;
+        const pnl = q ? (q.price - p.avgEntryPrice) * p.qty : 0;
+        return (
+          <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3 md:px-5">
+            <button onClick={() => onSelect(p.symbol)} className="pressable min-w-[110px] text-left">
+              <p className="text-sm font-semibold text-ink-1">{p.symbol}</p>
+              <p className="tnum text-[11px] text-ink-3">{p.qty} @ {usd(p.avgEntryPrice)}</p>
+            </button>
+            <div className="min-w-[110px] text-right md:text-left">
+              <p className="tnum text-sm text-ink-1">{usd(value)}</p>
+              <p className={`tnum text-[11px] ${pnl > 0 ? "text-gain" : pnl < 0 ? "text-loss" : "text-ink-3"}`}>
+                {pnl >= 0 ? "+" : ""}{usd(pnl)}
+              </p>
+            </div>
+            <div className="ml-auto w-full sm:w-56">
+              <HoldButton
+                label={closing === p.id ? "Closing…" : "Close position"}
+                holdLabel="Keep holding to close…"
+                tone="loss"
+                disabled={closing === p.id}
+                onCommit={() => close(p)}
+              />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: () => void }) {
+  async function cancel(id: string) {
+    try { await fetch(`/api/orders/${id}`, { method: "DELETE" }); }
+    finally { onCanceled(); }
+  }
+
+  if (!orders.length) {
+    return (
+      <p className="px-6 py-10 text-center text-xs text-ink-4">
+        No orders yet. Everything you place — filled, resting, or rejected — shows up here.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="max-h-[380px] divide-y divide-[var(--hairline)] overflow-y-auto">
+      {orders.slice(0, 60).map((o) => (
+        <li key={o.id} className="flex items-center justify-between px-4 py-2.5 md:px-5">
+          <div>
+            <p className="text-sm text-ink-1">
+              <span className={o.side === "buy" ? "text-gain" : "text-loss"}>{o.side}</span>{" "}
+              <span className="tnum">{o.qty}</span> {o.symbol}
+            </p>
+            <p className="tnum text-[11px] text-ink-4">
+              {o.type}{o.limitPrice ? ` @ ${usd(o.limitPrice)}` : ""}{o.stopPrice ? ` stop ${usd(o.stopPrice)}` : ""}
+              {" · "}{new Date(o.createdAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+            </p>
+            {o.rejectReason && <p className="text-[11px] text-loss">{o.rejectReason}</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`tnum text-[10px] uppercase tracking-[0.15em] ${
+              o.status === "filled" ? "text-gain"
+              : o.status === "accepted" ? "text-gold"
+              : o.status === "rejected" ? "text-loss" : "text-ink-4"
+            }`}>
+              {o.status === "accepted" ? "resting" : o.status}
+            </span>
+            {o.status === "accepted" && (
+              <button onClick={() => cancel(o.id)}
+                className="pressable rounded-full border border-hairline px-2.5 py-1 text-[11px] text-ink-3 hover:text-loss"
+                aria-label={`Cancel ${o.side} order for ${o.symbol}`}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+type Alert = {
+  id: string; symbol: string; price: number; direction: "above" | "below";
+  triggeredAt: number | null; createdAt: number;
+};
+
+/** Price alerts — set a level on the current symbol; the quote poll fires it
+    and toasts app-wide. */
+export function Alerts({ symbol, quote }: { symbol: string; quote: Quote | undefined }) {
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [price, setPrice] = useState("");
+  const [direction, setDirection] = useState<"above" | "below">("above");
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/alerts");
+      const data = await res.json();
+      if (data.ok) setAlerts(data.alerts);
+    } catch { /* transient */ }
+  }, []);
+  useEffect(() => { load(); const id = setInterval(load, 20_000); return () => clearInterval(id); }, [load]);
+
+  useEffect(() => {
+    if (quote) {
+      setPrice(quote.price.toFixed(2));
+      setDirection("above");
+    }
+  }, [symbol, quote?.price]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function add() {
+    const p = Number(price);
+    if (!(p > 0)) return;
+    try {
+      const res = await fetch("/api/alerts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol, price: p, direction }),
+      });
+      if ((await res.json()).ok) load();
+    } catch { /* transient */ }
+  }
+  async function remove(id: string) {
+    try { await fetch(`/api/alerts/${id}`, { method: "DELETE" }); } finally { load(); }
+  }
+
+  const active = alerts.filter((a) => a.triggeredAt == null);
+  const fired = alerts.filter((a) => a.triggeredAt != null);
+
+  return (
+    <div className="grid gap-0 md:grid-cols-[280px_1fr]">
+      {/* Quick-set for the current symbol */}
+      <div className="flex flex-col gap-2 border-b border-hairline p-4 md:border-b-0 md:border-r">
+        <p className="text-[11px] uppercase tracking-[0.2em] text-ink-4">New alert · {symbol}</p>
+        <div className="flex rounded-full border border-hairline bg-bg2 p-0.5">
+          {(["above", "below"] as const).map((d) => (
+            <button key={d} onClick={() => setDirection(d)}
+              className={`flex-1 rounded-full py-1.5 text-xs font-medium capitalize ${
+                direction === d ? "bg-bg3 text-ink-1" : "text-ink-3"
+              }`}>
+              {d}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))}
+            inputMode="decimal" placeholder="Price"
+            className="tnum w-full rounded-full border border-hairline bg-bg2 px-4 py-2 text-xs text-ink-1 outline-none focus:border-gold"
+            aria-label="Alert price" />
+          <button onClick={add}
+            className="pressable rounded-full border border-hairline px-4 text-xs text-ink-2 hover:text-ink-1">
+            Set
+          </button>
+        </div>
+      </div>
+
+      {active.length === 0 && fired.length === 0 ? (
+        <p className="px-6 py-10 text-center text-xs text-ink-4">
+          No alerts yet. Set a level and we&apos;ll ping you when price crosses it.
+        </p>
+      ) : (
+        <ul className="max-h-[300px] divide-y divide-[var(--hairline)] overflow-y-auto">
+          {active.map((a) => (
+            <li key={a.id} className="flex items-center justify-between px-4 py-2.5 text-xs md:px-5">
+              <span className="text-ink-1">
+                {a.symbol} <span className="text-ink-4">{a.direction}</span>{" "}
+                <span className="tnum">{usd(a.price)}</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="tnum text-[10px] uppercase tracking-[0.15em] text-gold">armed</span>
+                <button onClick={() => remove(a.id)} className="pressable text-ink-4 hover:text-loss" aria-label="Remove alert">×</button>
+              </div>
+            </li>
+          ))}
+          {fired.map((a) => (
+            <li key={a.id} className="flex items-center justify-between px-4 py-2.5 text-xs opacity-60 md:px-5">
+              <span className="text-ink-2">
+                {a.symbol} crossed <span className="text-ink-3">{a.direction}</span>{" "}
+                <span className="tnum">{usd(a.price)}</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="tnum text-[10px] uppercase tracking-[0.15em] text-gain">fired</span>
+                <button onClick={() => remove(a.id)} className="pressable text-ink-4 hover:text-loss" aria-label="Remove alert">×</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+type JournalEntry = {
+  id: string; symbol: string; side: string; qty: number;
+  entryPrice: number; exitPrice: number | null; pnl: number | null; createdAt: number;
+};
+
+/** Your track record — equity curve + closed-trade journal. */
+export function Performance() {
+  const [history, setHistory] = useState<{ time: number; equity: number }[] | null>(null);
+  const [journal, setJournal] = useState<JournalEntry[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/portfolio");
+        const data = await res.json();
+        if (alive && data.ok) { setHistory(data.history); setJournal(data.journal); }
+        else if (alive) setHistory([]);
+      } catch { if (alive) setHistory([]); }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const realized = journal.reduce((s, j) => s + (j.pnl ?? 0), 0);
+  const wins = journal.filter((j) => (j.pnl ?? 0) > 0).length;
+  const closed = journal.filter((j) => j.pnl != null).length;
+
+  return (
+    <div className="grid gap-0 md:grid-cols-[1fr_1fr]">
+      <div className="border-b border-hairline p-4 md:border-b-0 md:border-r md:p-5">
+        {history == null ? (
+          <div className="skeleton h-16 w-full" />
+        ) : history.length >= 2 ? (
+          <EquitySpark points={history} />
+        ) : (
+          <p className="py-6 text-center text-xs text-ink-4">
+            Your equity curve draws itself as you trade. Make a move on the desk.
+          </p>
+        )}
+        <div className="mt-4 grid grid-cols-2 gap-3 text-center">
+          <div className="rounded-lg bg-bg2 py-2.5">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-ink-4">Realized</p>
+            <p className={`tnum text-sm font-semibold ${realized > 0 ? "text-gain" : realized < 0 ? "text-loss" : "text-ink-2"}`}>
+              {realized >= 0 ? "+" : ""}{usd(realized)}
+            </p>
+          </div>
+          <div className="rounded-lg bg-bg2 py-2.5">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-ink-4">Win rate</p>
+            <p className="tnum text-sm font-semibold text-ink-1">
+              {closed ? `${Math.round((wins / closed) * 100)}%` : "—"}
+              <span className="text-[10px] font-normal text-ink-4"> · {closed} closed</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {journal.length > 0 ? (
+        <ul className="max-h-[300px] divide-y divide-[var(--hairline)] overflow-y-auto">
+          {journal.map((j) => (
+            <li key={j.id} className="flex items-center justify-between px-4 py-2.5 text-xs md:px-5">
+              <span className="text-ink-1">
+                {j.symbol} <span className="tnum text-ink-4">{j.qty} @ {usd(j.entryPrice)}
+                {j.exitPrice != null ? ` → ${usd(j.exitPrice)}` : ""}</span>
+              </span>
+              {j.pnl != null && (
+                <span className={`tnum font-medium ${j.pnl > 0 ? "text-gain" : j.pnl < 0 ? "text-loss" : "text-ink-3"}`}>
+                  {j.pnl >= 0 ? "+" : ""}{usd(j.pnl)}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="px-6 py-10 text-center text-xs text-ink-4">Closed trades will journal themselves here.</p>
+      )}
+    </div>
+  );
+}
+
+function EquitySpark({ points }: { points: { time: number; equity: number }[] }) {
+  const vals = points.map((p) => p.equity);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const W = 300, H = 64;
+  const up = vals[vals.length - 1] >= vals[0];
+  const path = points.map((p, i) =>
+    `${((i / (points.length - 1)) * W).toFixed(1)},${(H - ((p.equity - min) / range) * H).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-16 w-full" preserveAspectRatio="none" aria-label="Equity curve">
+      <polyline points={path} fill="none" stroke={up ? "var(--gain)" : "var(--loss)"} strokeWidth="1.5" />
+    </svg>
+  );
+}
