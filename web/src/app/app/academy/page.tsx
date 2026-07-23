@@ -2,7 +2,7 @@ import { currentUser } from "@/server/auth";
 import { redirect } from "next/navigation";
 import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
-import { tracks, totalXP, totalMinutes } from "@/lib/academy";
+import { tracks, totalXP, totalMinutes, unlockedTrackIds } from "@/lib/academy";
 import Link from "next/link";
 import AppNav from "@/components/app-nav";
 
@@ -30,6 +30,8 @@ export default async function AcademyHome() {
   const next = allLessons.find((l) => !done.has(l.id));
   const doneCount = allLessons.filter((l) => done.has(l.id)).length;
   const overall = Math.round((doneCount / allLessons.length) * 100);
+  const unlocked = unlockedTrackIds(done);
+  const graduated = doneCount === allLessons.length;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -68,16 +70,33 @@ export default async function AcademyHome() {
           </Link>
         )}
 
+        {graduated && (
+          <div className="mt-6 flex items-center gap-4 rounded-2xl border border-gold/40 bg-gold/8 p-5">
+            <span className="text-3xl" aria-hidden>🎓</span>
+            <div>
+              <p className="font-display text-lg font-bold text-gold">Academy complete — every stage cleared.</p>
+              <p className="mt-0.5 text-sm text-ink-2">
+                You&apos;ve been from &ldquo;what is a market&rdquo; to running a book. Now the real teacher is the desk —
+                and <Link href="/app/academy/practice" className="text-gold hover:underline">Practice</Link> keeps it sharp.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="mt-10 flex flex-col gap-5">
           {tracks.map((track, ti) => {
             const completed = track.lessons.filter((l) => done.has(l.id)).length;
             const fraction = completed / track.lessons.length;
+            const locked = !unlocked.has(track.id);
+            const cleared = completed === track.lessons.length;
             return (
-              <section key={track.id} className="card overflow-hidden">
+              <section key={track.id} className={`card overflow-hidden ${locked ? "opacity-60" : ""}`}>
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-5 py-4">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">
                       Stage {ti + 1} · {track.covers}
+                      {cleared && <span className="ml-2 rounded-full bg-gold/15 px-2 py-0.5 text-[9px] font-semibold tracking-[0.15em] text-gold">CLEARED</span>}
+                      {locked && <span className="ml-2 rounded-full border border-hairline px-2 py-0.5 text-[9px] font-semibold tracking-[0.15em] text-ink-4">LOCKED</span>}
                     </p>
                     <h2 className="mt-1 font-display text-xl font-bold text-ink-1">{track.title}</h2>
                     <p className="text-sm text-ink-3">{track.tagline}</p>
@@ -94,36 +113,42 @@ export default async function AcademyHome() {
                     </span>
                   </div>
                 </div>
-                <ul>
-                  {track.lessons.map((lesson) => (
-                    <li key={lesson.id}>
-                      <Link
-                        href={`/app/academy/${lesson.id}`}
-                        className="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-bg3/40"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span
-                            aria-hidden
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${
-                              done.has(lesson.id)
-                                ? "border-transparent bg-gold text-ongold"
-                                : "border-hairline text-transparent"
-                            }`}
-                          >
-                            ✓
-                          </span>
-                          <div>
-                            <p className="text-sm font-medium text-ink-1">{lesson.title}</p>
-                            <p className="text-xs text-ink-4">{lesson.hook}</p>
+                {locked ? (
+                  <p className="px-5 py-4 text-xs text-ink-4">
+                    Clear <span className="text-ink-2">Stage {ti}</span> to unlock this stage — the ideas here build on it.
+                  </p>
+                ) : (
+                  <ul>
+                    {track.lessons.map((lesson) => (
+                      <li key={lesson.id}>
+                        <Link
+                          href={`/app/academy/${lesson.id}`}
+                          className="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-bg3/40"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span
+                              aria-hidden
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${
+                                done.has(lesson.id)
+                                  ? "border-transparent bg-gold text-ongold"
+                                  : "border-hairline text-transparent"
+                              }`}
+                            >
+                              ✓
+                            </span>
+                            <div>
+                              <p className="text-sm font-medium text-ink-1">{lesson.title}</p>
+                              <p className="text-xs text-ink-4">{lesson.hook}</p>
+                            </div>
                           </div>
-                        </div>
-                        <span className="tnum shrink-0 text-[11px] text-ink-4">
-                          {lesson.minutes}m · {lesson.xp}xp
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                          <span className="tnum shrink-0 text-[11px] text-ink-4">
+                            {lesson.minutes}m · {lesson.xp}xp
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
             );
           })}

@@ -73,6 +73,27 @@ export function nextLessonInfo(id: string): { lesson: Lesson; newTrack: string |
   return { lesson: next, newTrack };
 }
 
+/** Which stages are open, given what's complete. Stage 1 is always open; each
+    later stage unlocks only when every lesson in the one before it is done — a
+    real progression, not a cosmetic order. Placement (elsewhere) can grant an
+    earlier jump. */
+export function unlockedTrackIds(done: Set<string>): Set<string> {
+  const ids = new Set<string>();
+  for (let i = 0; i < tracks.length; i++) {
+    if (i === 0) { ids.add(tracks[i].id); continue; }
+    const prevComplete = tracks[i - 1].lessons.every((l) => done.has(l.id));
+    if (prevComplete) ids.add(tracks[i].id);
+    else break; // once a stage is locked, everything after it is too
+  }
+  return ids;
+}
+
+/** Is this specific lesson reachable yet? */
+export function isLessonUnlocked(lessonId: string, done: Set<string>): boolean {
+  const found = findLesson(lessonId);
+  return found ? unlockedTrackIds(done).has(found.track.id) : false;
+}
+
 export const totalXP = allLessons.reduce((sum, l) => sum + l.xp, 0);
 
 /** Sum of every lesson's own time estimate — the honest basis for any

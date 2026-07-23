@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import type { Lesson, Section } from "@/lib/academy/types";
@@ -64,6 +64,21 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
   const passedCount = Object.values(results).filter((r) => r.correct).length;
   const allPassed = passedCount >= quizCount;
 
+  // Resume mid-lesson: quiz answers persist locally, so a reload (or coming
+  // back tomorrow) restores your progress instead of restarting the checks.
+  const STORAGE_KEY = `tars-lesson-${lesson.id}`;
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) { const r = JSON.parse(raw); if (r && typeof r === "object") setResults(r); }
+    } catch { /* first visit / storage blocked */ }
+  }, [STORAGE_KEY]);
+  useEffect(() => {
+    try {
+      if (Object.keys(results).length) localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+    } catch { /* storage blocked — no resume, no harm */ }
+  }, [results, STORAGE_KEY]);
+
   const [completed, setCompleted] = useState(false);
   const [xpTotal, setXpTotal] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -82,8 +97,10 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
         body: JSON.stringify({ lessonId: lesson.id, answers }),
       });
       const data = await res.json();
-      if (data.ok && data.passed) { setCompleted(true); setXpTotal(data.xp); }
-      else setSaveError(true);
+      if (data.ok && data.passed) {
+        setCompleted(true); setXpTotal(data.xp);
+        try { localStorage.removeItem(STORAGE_KEY); } catch { /* fine */ }
+      } else setSaveError(true);
     } catch { setSaveError(true); }
     finally { setSaving(false); }
   }
@@ -103,6 +120,7 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
           <motion.div key={i} {...(rm ? still : reveal)}>
             <SectionView section={section}
               quizIndex={quizIndexOf[i]}
+              quizResult={quizIndexOf[i] != null ? results[quizIndexOf[i]!] : undefined}
               onQuizResult={(qi, r) => setResults((prev) => ({ ...prev, [qi]: r }))}
               onRate={recordReview} />
           </motion.div>
@@ -147,9 +165,10 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
   );
 }
 
-function SectionView({ section, quizIndex, onQuizResult, onRate }: {
+function SectionView({ section, quizIndex, quizResult, onQuizResult, onRate }: {
   section: Section;
   quizIndex: number | null;
+  quizResult?: QuizResult;
   onQuizResult: (quizIndex: number, result: QuizResult) => void;
   onRate: (front: string, got: boolean) => void;
 }) {
@@ -211,7 +230,7 @@ function SectionView({ section, quizIndex, onQuizResult, onRate }: {
       );
 
     case "quiz":
-      return <Quiz section={section} quizIndex={quizIndex ?? 0} onResult={onQuizResult} />;
+      return <Quiz section={section} quizIndex={quizIndex ?? 0} result={quizResult} onResult={onQuizResult} />;
 
     case "desk":
       return (
@@ -227,23 +246,22 @@ function SectionView({ section, quizIndex, onQuizResult, onRate }: {
   }
 }
 
-function Quiz({ section, quizIndex, onResult }: {
+function Quiz({ section, quizIndex, result, onResult }: {
   section: Extract<Section, { kind: "quiz" }>;
   quizIndex: number;
+  result?: QuizResult;
   onResult: (quizIndex: number, result: QuizResult) => void;
 }) {
-  const [picked, setPicked] = useState<number | null>(null);
-  const [tries, setTries] = useState(0);
+  // Fully controlled by the reader's `results` so a restored answer shows on
+  // reload. A choice of -1 means "retrying" — picked clears, tries preserved.
+  const picked = result && result.choice >= 0 ? result.choice : null;
   const answered = picked !== null;
 
   function pick(i: number) {
-    const attempt = tries + 1;
-    setTries(attempt);
-    setPicked(i);
-    onResult(quizIndex, { choice: i, correct: i === section.answer, tries: attempt });
+    onResult(quizIndex, { choice: i, correct: i === section.answer, tries: (result?.tries ?? 0) + 1 });
   }
   function retry() {
-    setPicked(null); // keep `tries` — the struggle is the signal
+    onResult(quizIndex, { choice: -1, correct: false, tries: result?.tries ?? 0 }); // keep tries — struggle is the signal
   }
 
   return (

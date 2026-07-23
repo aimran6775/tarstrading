@@ -1,6 +1,8 @@
 import { currentUser } from "@/server/auth";
 import { redirect, notFound } from "next/navigation";
-import { findLesson, nextLessonInfo } from "@/lib/academy";
+import { db, schema } from "@/server/db";
+import { eq } from "drizzle-orm";
+import { findLesson, nextLessonInfo, isLessonUnlocked } from "@/lib/academy";
 import AppNav from "@/components/app-nav";
 import LessonReader from "./reader";
 
@@ -17,6 +19,12 @@ export default async function LessonPage(props: { params: Promise<{ lessonId: st
   const { lessonId } = await props.params;
   const found = findLesson(lessonId);
   if (!found) notFound();
+
+  // Gate: you can't skip ahead. Finish the prior stage first.
+  const rows = await db.select({ lessonId: schema.lessonProgress.lessonId })
+    .from(schema.lessonProgress).where(eq(schema.lessonProgress.userId, user.id));
+  const done = new Set(rows.map((r) => r.lessonId));
+  if (!isLessonUnlocked(lessonId, done)) redirect("/app/academy");
 
   const next = nextLessonInfo(lessonId);
 
