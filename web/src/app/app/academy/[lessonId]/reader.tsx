@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { Lesson, Section } from "@/lib/academy/types";
 import { cardKey } from "@/lib/academy/srs";
 import LessonChart from "@/components/academy/charts";
@@ -29,6 +29,8 @@ const reveal = {
   viewport: { once: true, margin: "-40px" },
   transition: { duration: 0.5, ease: [0.32, 0.72, 0, 1] as const },
 };
+// When the viewer prefers reduced motion, render in place — no slide, no fade.
+const still = { initial: false as const };
 
 type QuizResult = { choice: number; correct: boolean; tries: number };
 
@@ -51,6 +53,7 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
 }) {
   // Map each section to its quiz ordinal (null when it isn't a quiz) so the
   // reader and the server agree on answer order.
+  const rm = useReducedMotion();
   const quizIndexOf = useMemo(() => {
     let n = 0;
     return lesson.sections.map((s) => (s.kind === "quiz" ? n++ : null));
@@ -97,7 +100,7 @@ export default function LessonReader({ track, lesson, lessonNumber, trackSize, n
 
       <div className="mt-10 flex flex-col gap-8">
         {lesson.sections.map((section, i) => (
-          <motion.div key={i} {...reveal}>
+          <motion.div key={i} {...(rm ? still : reveal)}>
             <SectionView section={section}
               quizIndex={quizIndexOf[i]}
               onQuizResult={(qi, r) => setResults((prev) => ({ ...prev, [qi]: r }))}

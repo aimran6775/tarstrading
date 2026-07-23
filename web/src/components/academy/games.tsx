@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 /*
   Micro-games — a lesson lands harder when you had to DECIDE. Each is one
@@ -28,8 +28,9 @@ export default function LessonGame({ variant, title }: {
 }
 
 function Verdict({ right, text, onNext }: { right: boolean; text: string; onNext?: () => void }) {
+  const rm = useReducedMotion();
   return (
-    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+    <motion.div initial={rm ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} aria-live="polite"
       className={`mt-3 rounded-lg border px-4 py-3 text-sm leading-relaxed ${
         right ? "border-gain/40 bg-gain/10 text-ink-1" : "border-loss/40 bg-loss/10 text-ink-1"
       }`}>
@@ -92,6 +93,7 @@ function SizeIt() {
 
 /* ---------- Read the structure ---------- */
 function ReadStructure() {
+  const rm = useReducedMotion();
   const rounds = useMemo(() => [
     { data: [30, 40, 35, 50, 44, 60, 54, 72], answer: "up" },
     { data: [72, 58, 64, 46, 52, 34, 40, 24], answer: "down" },
@@ -109,7 +111,7 @@ function ReadStructure() {
       <p className="mb-2 text-sm text-ink-2">Reading the past — what structure is this?</p>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-24 w-full rounded-lg bg-bg2">
         <motion.polyline key={r} points={path} fill="none" stroke="var(--ink-2)" strokeWidth="2"
-          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7 }} />
+          initial={rm ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: rm ? 0 : 0.7 }} />
       </svg>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {(["up", "down", "range"] as const).map((k) => {
@@ -137,36 +139,54 @@ function ReadStructure() {
 
 /* ---------- Spot the level ---------- */
 function SpotLevel() {
-  // Tap near the support line (~y for value 44). We reveal after a tap.
+  // Tap (or arrow-key) where support sits (~value 45). Reveal after committing.
   const data = [50, 44, 62, 45, 64, 44, 60, 46, 63];
   const W = 260, H = 120, min = 40, max = 70;
   const x = (i: number) => 10 + (i / (data.length - 1)) * (W - 20);
   const y = (v: number) => H - 12 - ((v - min) / (max - min)) * (H - 24);
   const supportY = y(45);
-  const [tapY, setTapY] = useState<number | null>(null);
+  const rm = useReducedMotion();
+  const [cursorY, setCursorY] = useState(H / 2);
+  const [committed, setCommitted] = useState(false);
   const path = data.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  const close = tapY != null && Math.abs(tapY - supportY) < 14;
+  const close = Math.abs(cursorY - supportY) < 20; // forgiving on touch
+
   return (
     <div>
-      <p className="mb-2 text-sm text-ink-2">Tap where <span className="text-gain">support</span> is — the floor price keeps bouncing off.</p>
+      <p className="mb-2 text-sm text-ink-2">
+        Point at where <span className="text-gain">support</span> is — the floor price keeps bouncing off.
+        Tap the chart, or focus it and use <span className="text-ink-1">↑ ↓</span> then <span className="text-ink-1">Enter</span>.
+      </p>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-40 w-full rounded-lg bg-bg2 cursor-crosshair"
+        role="slider" tabIndex={0}
+        aria-label="Guess the support price level: use up and down arrows, then Enter to commit"
+        aria-valuemin={0} aria-valuemax={H} aria-valuenow={Math.round(cursorY)}
         onClick={(e) => {
           const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-          setTapY(((e.clientY - r.top) / r.height) * H);
+          setCursorY(((e.clientY - r.top) / r.height) * H);
+          setCommitted(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowUp") { e.preventDefault(); setCommitted(false); setCursorY((v) => Math.max(6, v - 4)); }
+          else if (e.key === "ArrowDown") { e.preventDefault(); setCommitted(false); setCursorY((v) => Math.min(H - 6, v + 4)); }
+          else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCommitted(true); }
         }}>
         <polyline points={path} fill="none" stroke="var(--ink-2)" strokeWidth="1.8" />
-        {tapY != null && (
+        {!committed && (
+          <line x1="10" x2={W - 10} y1={cursorY} y2={cursorY} stroke="var(--ink-4)" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.7" />
+        )}
+        {committed && (
           <>
-            <line x1="10" x2={W - 10} y1={tapY} y2={tapY} stroke={close ? "var(--gain)" : "var(--loss)"} strokeWidth="1.5" strokeDasharray="4 3" />
+            <line x1="10" x2={W - 10} y1={cursorY} y2={cursorY} stroke={close ? "var(--gain)" : "var(--loss)"} strokeWidth="1.5" strokeDasharray="4 3" />
             <motion.line x1="10" x2={W - 10} y1={supportY} y2={supportY} stroke="var(--gain)" strokeWidth="1.5"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} />
+              initial={rm ? false : { opacity: 0 }} animate={{ opacity: 1 }} />
           </>
         )}
       </svg>
-      {tapY != null && (
+      {committed && (
         <Verdict right={close}
           text={close ? "That's the level — price tested it three times and held each time. Buyers defend it." : "Look for the price where the line bottomed out again and again — that repeated floor is support (the solid green line)."}
-          onNext={() => setTapY(null)} />
+          onNext={() => { setCommitted(false); setCursorY(H / 2); }} />
       )}
     </div>
   );

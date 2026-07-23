@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 /*
   A flip-card deck for the terms a lesson introduced. Tap to flip, rate
@@ -21,6 +21,7 @@ export default function Flashcards({ title, cards, onDone, onRate }: {
   const [pos, setPos] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [got, setGot] = useState<Set<number>>(new Set());
+  const rm = useReducedMotion();
 
   const done = pos >= queue.length;
   const firedDone = useRef(false);
@@ -63,8 +64,8 @@ export default function Flashcards({ title, cards, onDone, onRate }: {
             className="pressable relative block h-40 w-full [perspective:1200px]" aria-label="Flip card">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={`${current}-${flipped}`}
-                initial={{ rotateY: -90, opacity: 0 }} animate={{ rotateY: 0, opacity: 1 }} exit={{ rotateY: 90, opacity: 0 }}
-                transition={{ duration: 0.22 }}
+                initial={rm ? false : { rotateY: -90, opacity: 0 }} animate={{ rotateY: 0, opacity: 1 }} exit={rm ? undefined : { rotateY: 90, opacity: 0 }}
+                transition={{ duration: rm ? 0 : 0.22 }}
                 className={`absolute inset-0 flex items-center justify-center rounded-xl border p-6 text-center ${
                   flipped ? "border-gold/40 bg-gold/8" : "border-hairline bg-bg2"
                 }`}>

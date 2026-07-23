@@ -12,10 +12,8 @@ import { aiStage } from "./stage9";
 import { fundStage } from "./stage10";
 
 /*
-  The stages of the academy, in order. The rebuilt, fully-interactive
-  stages (charts you drive, calculators you drag, drills you play) are marked
-  in INTERACTIVE_IDS so the home can badge them; the rest carry v1 content and
-  are being upgraded to the same standard, stage by stage.
+  The stages of the academy, in order — every one fully interactive: charts you
+  drive, calculators you drag, drills you play, a quiz you must pass to advance.
 */
 export const tracks: Track[] = [
   marketsTrack,     // Stage 1
@@ -30,9 +28,6 @@ export const tracks: Track[] = [
   aiStage,          // Stage 10
   fundStage,        // Stage 11
 ];
-
-// Every stage is now the rebuilt, fully-interactive template.
-export const INTERACTIVE_IDS = new Set(tracks.map((t) => t.id));
 
 /** Map a concept → the lesson that teaches it, for contextual "Learn" links
     scattered through the app (terminal, ticket, assistant). */

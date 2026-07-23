@@ -2,7 +2,7 @@ import { currentUser } from "@/server/auth";
 import { redirect } from "next/navigation";
 import { db, schema } from "@/server/db";
 import { eq } from "drizzle-orm";
-import { tracks, totalXP, totalMinutes, INTERACTIVE_IDS } from "@/lib/academy";
+import { tracks, totalXP, totalMinutes } from "@/lib/academy";
 import Link from "next/link";
 import AppNav from "@/components/app-nav";
 
@@ -72,14 +72,12 @@ export default async function AcademyHome() {
           {tracks.map((track, ti) => {
             const completed = track.lessons.filter((l) => done.has(l.id)).length;
             const fraction = completed / track.lessons.length;
-            const interactive = INTERACTIVE_IDS.has(track.id); // rebuilt stages
             return (
               <section key={track.id} className="card overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-5 py-4">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">
                       Stage {ti + 1} · {track.covers}
-                      {interactive && <span className="ml-2 rounded-full bg-gain/15 px-2 py-0.5 text-[9px] font-semibold tracking-[0.15em] text-gain">INTERACTIVE</span>}
                     </p>
                     <h2 className="mt-1 font-display text-xl font-bold text-ink-1">{track.title}</h2>
                     <p className="text-sm text-ink-3">{track.tagline}</p>
