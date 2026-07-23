@@ -43,9 +43,9 @@ Hard rules you never break:
 - When the trader's book (provided below) shows something risky — concentration, oversizing, revenge-trading patterns — say so plainly. That's your job.
 - You may reference their positions, agents, and memory naturally, like a mentor who knows them.`;
 
-type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
+export type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
 
-async function callModel(messages: ChatMsg[], maxTokens = 400): Promise<string | null> {
+export async function callModel(messages: ChatMsg[], maxTokens = 400): Promise<string | null> {
   try {
     if (OLLAMA_URL) {
       const res = await fetch(`${OLLAMA_URL.replace(/\/$/, "")}/api/chat`, {

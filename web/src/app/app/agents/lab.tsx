@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import HoldButton from "@/components/hold-button";
+import AnalystChat from "@/components/analyst-chat";
 
 /*
-  The Agent Lab: your analyst floor. Hire (build), test honestly (70/30
-  backtest), allocate (run), supervise (activity feed), and fire without
-  sentiment (hold-to-kill). Every order an agent places is tagged — a fund
-  where you can't audit your analysts is a casino with extra steps.
+  The Agent Lab: your analyst floor, run by conversation. You TALK to your
+  analyst — plain English in, transparent rules out: it hires (compiles your
+  strategy), tests honestly (70/30 backtest), deploys, pauses, and kills on
+  your word, and remembers the whole conversation. The roster alongside is
+  the audit view: live status, P&L, and a kill switch that never needs the
+  model's permission.
 */
 
 type IndicatorRef =
@@ -37,7 +40,6 @@ const pctf = (v: number) => `${(v * 100).toFixed(1)}%`;
 export default function AgentLab() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
-  const [building, setBuilding] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,18 +79,12 @@ export default function AgentLab() {
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-24 pt-10 md:pb-10 md:px-8">
       <p className="kicker mb-3">The agent lab</p>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="display text-4xl text-ink-1 md:text-5xl">Your analyst floor.</h1>
-        <button onClick={() => setBuilding((b) => !b)}
-          className="pressable cta-gold rounded-full px-6 py-3 text-sm font-semibold">
-          {building ? "Close builder" : "Hire an agent"}
-        </button>
-      </div>
+      <h1 className="display text-4xl text-ink-1 md:text-5xl">Talk to your analyst.</h1>
       <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-2">
-        Agents run exactly the rules you write — nothing hidden. They must pass
-        an honest backtest before they touch allocation, they narrate every
-        decision, and they halt themselves at their drawdown limit. The kill
-        switch is yours.
+        Describe the strategy in plain English — your analyst compiles it into
+        transparent rules, backtests it honestly, and deploys it on your word.
+        It remembers everything. Agents still halt at their drawdown limit,
+        and the kill switch is always yours.
       </p>
 
       {error && (
@@ -97,23 +93,27 @@ export default function AgentLab() {
         </p>
       )}
 
-      {building && <Builder onDone={() => { setBuilding(false); load(); }} />}
+      <div className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+        {/* The conversation IS the builder. */}
+        <AnalystChat onDeskChanged={load} />
 
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
-        {agents.length === 0 && !building && (
-          <section className="panel col-span-full flex flex-col items-center gap-3 px-6 py-14 text-center">
-            <p className="text-sm text-ink-2">No agents yet.</p>
-            <p className="max-w-sm text-xs text-ink-4">
-              Hire your first: a simple moving-average cross on one symbol,
-              smallest allocation, drawdown limit set. Watch it work for a week
-              before giving it a raise.
-            </p>
-          </section>
-        )}
-        {agents.map((agent) => (
-          <AgentCard key={agent.id} agent={agent} busy={busy === agent.id}
-            onAction={(a) => act(agent.id, a)} onDelete={() => remove(agent.id)} />
-        ))}
+        {/* The roster — audit view + hard controls. */}
+        <div className="flex min-w-0 flex-col gap-4 lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto">
+          {agents.length === 0 && (
+            <section className="panel flex flex-col items-center gap-3 px-6 py-14 text-center">
+              <p className="text-sm text-ink-2">The desk is empty.</p>
+              <p className="max-w-sm text-xs text-ink-4">
+                Tell your analyst what to build — one symbol, a simple
+                moving-average cross, smallest allocation. Watch it work for a
+                week before giving it a raise.
+              </p>
+            </section>
+          )}
+          {agents.map((agent) => (
+            <AgentCard key={agent.id} agent={agent} busy={busy === agent.id}
+              onAction={(a) => act(agent.id, a)} onDelete={() => remove(agent.id)} />
+          ))}
+        </div>
       </div>
 
       <section className="panel mt-8 overflow-hidden">
@@ -322,147 +322,3 @@ const defaultExit: RuleDraft = {
   comparator: "crossesBelow",
   rhs: { kind: "sma", period: "50", value: "" },
 };
-
-function toRef(d: RefDraft): IndicatorRef {
-  if (d.kind === "price") return { kind: "price" };
-  if (d.kind === "constant") return { kind: "constant", value: Number(d.value) || 0 };
-  return { kind: d.kind as "sma" | "ema" | "rsi", period: Math.max(2, Math.min(200, Number(d.period) || 20)) };
-}
-
-function Builder({ onDone }: { onDone: () => void }) {
-  const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState("🤖");
-  const [universe, setUniverse] = useState("AAPL");
-  const [allocation, setAllocation] = useState(5000);
-  const [maxDD, setMaxDD] = useState(20);
-  const [cash, setCash] = useState<number | null>(null);
-  useEffect(() => {
-    fetch("/api/account").then((r) => r.ok ? r.json() : null).then((d) => {
-      if (d?.ok) setCash(d.account?.cash ?? null);
-    }).catch(() => {});
-  }, []);
-  const overCash = cash != null && allocation > cash;
-  const [entry, setEntry] = useState<RuleDraft[]>([defaultEntry]);
-  const [exit, setExit] = useState<RuleDraft[]>([defaultExit]);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function hire() {
-    setBusy(true); setError(null);
-    const strategy = {
-      universe: universe.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
-      entry: entry.map((r) => ({ lhs: toRef(r.lhs), comparator: r.comparator, rhs: toRef(r.rhs) })),
-      exit: exit.map((r) => ({ lhs: toRef(r.lhs), comparator: r.comparator, rhs: toRef(r.rhs) })),
-    };
-    const res = await fetch("/api/agents", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, emoji, strategy, allocation, maxDrawdown: maxDD / 100 }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (data.ok) onDone();
-    else setError(data.error ?? "Couldn't create the agent.");
-  }
-
-  return (
-    <section className="card mt-8 p-5 md:p-6">
-      <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">New hire</h2>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-[64px_1fr_1fr]">
-        <input value={emoji} onChange={(e) => setEmoji(e.target.value)} aria-label="Emoji"
-          className="rounded-lg border border-hairline bg-bg1 px-3 py-2.5 text-center text-lg outline-none focus:border-gold" />
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name — e.g. Golden Cross"
-          className="rounded-lg border border-hairline bg-bg1 px-3.5 py-2.5 text-sm text-ink-1 outline-none focus:border-gold" />
-        <input value={universe} onChange={(e) => setUniverse(e.target.value)} placeholder="Universe — AAPL, BTC/USD"
-          className="rounded-lg border border-hairline bg-bg1 px-3.5 py-2.5 text-sm text-ink-1 outline-none focus:border-gold" />
-      </div>
-
-      <RuleEditor title="Entry — ALL must be true" rules={entry} setRules={setEntry} />
-      <RuleEditor title="Exit — ANY fires the sell" rules={exit} setRules={setExit} />
-
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5">
-          <span className="tnum text-xs text-ink-3">Allocation: {usd(allocation)}</span>
-          <input type="range" min={500} max={50000} step={500} value={allocation}
-            onChange={(e) => setAllocation(Number(e.target.value))} className="accent-[var(--gold)]" />
-          <span className="text-[11px] text-ink-4">Simulated capital only. It spends this, not your rent.</span>
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="tnum text-xs text-ink-3">Halt at drawdown: −{maxDD}%</span>
-          <input type="range" min={5} max={50} step={5} value={maxDD}
-            onChange={(e) => setMaxDD(Number(e.target.value))} className="accent-[var(--loss)]" />
-          <span className="text-[11px] text-ink-4">Even your best analyst doesn&apos;t lose unsupervised.</span>
-        </label>
-      </div>
-
-      {overCash && (
-        <p className="mt-4 text-sm text-warning">
-          Allocation exceeds your {usd(cash!)} of simulated cash. Lower it, or fund the desk with a few winning trades first.
-        </p>
-      )}
-      {error && <p role="alert" className="mt-4 text-sm text-loss">{error}</p>}
-
-      <button disabled={busy || overCash} onClick={hire}
-        className="pressable cta-gold mt-5 rounded-full px-8 py-3 text-sm font-semibold disabled:opacity-50">
-        {busy ? "Hiring…" : "Hire agent (starts as draft)"}
-      </button>
-    </section>
-  );
-}
-
-function RuleEditor({ title, rules, setRules }: {
-  title: string; rules: RuleDraft[]; setRules: (r: RuleDraft[]) => void;
-}) {
-  function update(i: number, patch: Partial<RuleDraft>) {
-    setRules(rules.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  }
-  return (
-    <div className="mt-5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-4">{title}</p>
-      {rules.map((rule, i) => (
-        <div key={i} className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="tnum text-[11px] text-ink-4">IF</span>
-          <RefEditor value={rule.lhs} onChange={(lhs) => update(i, { lhs })} allowConstant={false} />
-          <select value={rule.comparator} onChange={(e) => update(i, { comparator: e.target.value })}
-            className="rounded-lg border border-hairline bg-bg1 px-2.5 py-2 text-xs text-ink-1 outline-none focus:border-gold">
-            {COMPARATORS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-          <RefEditor value={rule.rhs} onChange={(rhs) => update(i, { rhs })} allowConstant />
-          {rules.length > 1 && (
-            <button onClick={() => setRules(rules.filter((_, j) => j !== i))}
-              className="pressable px-2 text-xs text-ink-4 hover:text-loss" aria-label="Remove rule">×</button>
-          )}
-        </div>
-      ))}
-      {rules.length < 3 && (
-        <button onClick={() => setRules([...rules, structuredClone(rules[0])])}
-          className="pressable mt-2 text-xs text-gold hover:underline">+ rule</button>
-      )}
-    </div>
-  );
-}
-
-function RefEditor({ value, onChange, allowConstant }: {
-  value: RefDraft; onChange: (v: RefDraft) => void; allowConstant: boolean;
-}) {
-  const needsPeriod = ["sma", "ema", "rsi"].includes(value.kind);
-  return (
-    <span className="flex items-center gap-1.5">
-      <select value={value.kind} onChange={(e) => onChange({ ...value, kind: e.target.value })}
-        className="rounded-lg border border-hairline bg-bg1 px-2.5 py-2 text-xs text-ink-1 outline-none focus:border-gold">
-        {INDICATORS.filter((i) => allowConstant || i.value !== "constant")
-          .map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
-      </select>
-      {needsPeriod && (
-        <input value={value.period} onChange={(e) => onChange({ ...value, period: e.target.value.replace(/\D/g, "") })}
-          className="tnum w-14 rounded-lg border border-hairline bg-bg1 px-2 py-2 text-center text-xs text-ink-1 outline-none focus:border-gold"
-          aria-label="Period" />
-      )}
-      {value.kind === "constant" && (
-        <input value={value.value} onChange={(e) => onChange({ ...value, value: e.target.value.replace(/[^\d.]/g, "") })}
-          className="tnum w-16 rounded-lg border border-hairline bg-bg1 px-2 py-2 text-center text-xs text-ink-1 outline-none focus:border-gold"
-          aria-label="Value" />
-      )}
-    </span>
-  );
-}

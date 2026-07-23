@@ -145,6 +145,16 @@ export const chatMessages = pgTable("chat_messages", {
   createdAt: epochMs("created_at").notNull(),
 }, (t) => [index("chat_user_time").on(t.userId, t.createdAt)]);
 
+/** The analyst desk conversation — one thread per user, full memory. The
+    analyst parses plain-English strategies and executes desk commands. */
+export const agentChats = pgTable("agent_chats", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  role: text("role").$type<"user" | "analyst">().notNull(),
+  text: text("text").notNull(),
+  createdAt: epochMs("created_at").notNull(),
+}, (t) => [index("agent_chats_user_time").on(t.userId, t.createdAt)]);
+
 /** Tars's long-term memory of each trader: a distilled, evolving summary. */
 export const tarsMemory = pgTable("tars_memory", {
   userId: text("user_id").primaryKey().references(() => users.id),

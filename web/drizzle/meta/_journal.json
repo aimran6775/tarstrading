@@ -15,6 +15,13 @@
       "when": 1784765339949,
       "tag": "0001_data-vault",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784771917837,
+      "tag": "0002_analyst-chat",
+      "breakpoints": true
     }
   ]
 }

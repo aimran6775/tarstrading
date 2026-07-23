@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { currentUser } from "@/server/auth";
 import { db, schema } from "@/server/db";
 import { desc, eq } from "drizzle-orm";
-import { recentActivity, describeStrategy, agentPnL, type Strategy } from "@/server/agents";
+import { recentActivity, describeStrategy, agentPnL, sanitizeStrategy, type Strategy } from "@/server/agents";
 
 export async function GET() {
   const user = await currentUser();
@@ -21,38 +21,6 @@ export async function GET() {
       ? await agentPnL(user.id, a.id) : 0,
   })));
   return NextResponse.json({ ok: true, agents: enriched, activity: await recentActivity(user.id) });
-}
-
-const VALID_KINDS = new Set(["price", "sma", "ema", "rsi", "constant"]);
-const VALID_COMPARATORS = new Set(["crossesAbove", "crossesBelow", "greaterThan", "lessThan"]);
-
-function sanitizeStrategy(raw: unknown): Strategy | null {
-  const s = raw as Strategy;
-  if (!s || !Array.isArray(s.universe) || !Array.isArray(s.entry) || !Array.isArray(s.exit)) return null;
-  const universe = s.universe.map((x) => String(x).toUpperCase().trim())
-    .filter((x) => /^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/.test(x)).slice(0, 6);
-  if (!universe.length) return null;
-  const cleanRules = (rules: unknown[]): Strategy["entry"] | null => {
-    const out = [];
-    for (const r of rules.slice(0, 4)) {
-      const rule = r as Strategy["entry"][number];
-      if (!rule?.lhs || !rule?.rhs || !VALID_KINDS.has(rule.lhs.kind) || !VALID_KINDS.has(rule.rhs.kind)) return null;
-      if (!VALID_COMPARATORS.has(rule.comparator)) return null;
-      // Periods must be sane integers; constants must be finite numbers.
-      for (const ref of [rule.lhs, rule.rhs] as Array<{ kind: string; period?: number; value?: number }>) {
-        if (["sma", "ema", "rsi"].includes(ref.kind)) {
-          if (!Number.isInteger(ref.period) || ref.period! < 2 || ref.period! > 200) return null;
-        }
-        if (ref.kind === "constant" && !Number.isFinite(ref.value)) return null;
-      }
-      out.push(rule);
-    }
-    return out;
-  };
-  const entry = cleanRules(s.entry);
-  const exit = cleanRules(s.exit);
-  if (!entry?.length || !exit?.length) return null;
-  return { universe, entry, exit };
 }
 
 export async function POST(request: Request) {
