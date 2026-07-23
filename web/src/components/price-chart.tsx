@@ -72,13 +72,37 @@ export default function PriceChart({ bars, height = 420 }: { bars: ChartBar[]; h
         horzLines: { color: hairline },
       },
       rightPriceScale: { borderVisible: false },
-      timeScale: { borderVisible: false, timeVisible: true },
+      // NOTE: fixLeftEdge/fixRightEdge are applied AFTER data lands (below) —
+      // setting them on an empty series leaves the pane permanently blank.
+      timeScale: {
+        borderVisible: false,
+        timeVisible: true,
+        lockVisibleTimeRangeOnResize: true,
+      },
       crosshair: {
         vertLine: { color: ink3, width: 1, style: 2, labelBackgroundColor: cssVar("--bg3") },
         horzLine: { color: ink3, width: 1, style: 2, labelBackgroundColor: cssVar("--bg3") },
       },
-      handleScroll: { mouseWheel: false },
+      // Full pro interaction: wheel + pinch zoom, drag/two-finger pan,
+      // axis-drag scaling, double-click on an axis to reset that axis.
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: true,
+        axisDoubleClickReset: true,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: false, // vertical swipe keeps scrolling the page on mobile
+      },
+      kineticScroll: { mouse: false, touch: true },
     });
+
+    // Double-click anywhere on the chart = fit everything back into view.
+    const onDblClick = () => chart.timeScale().fitContent();
+    el.addEventListener("dblclick", onDblClick);
 
     const candles = chart.addSeries(CandlestickSeries, {
       upColor: gain, downColor: loss,
@@ -96,12 +120,26 @@ export default function PriceChart({ bars, height = 420 }: { bars: ChartBar[]; h
     candleRef.current = candles;
     volumeRef.current = volume;
 
+    // Track width — and self-heal: a chart born in a hidden/zero-width tab
+    // (background tab, collapsed pane) renders blank until it first gains
+    // real width, at which point we must refit or it stays empty forever.
+    let hadWidth = el.clientWidth > 0;
     const resize = new ResizeObserver(() => {
-      chart.applyOptions({ width: el.clientWidth });
+      const w = el.clientWidth;
+      chart.applyOptions({ width: w });
+      if (!hadWidth && w > 0) {
+        hadWidth = true;
+        chart.timeScale().fitContent();
+      }
     });
     resize.observe(el);
 
-    return () => { resize.disconnect(); chart.remove(); chartRef.current = null; };
+    return () => {
+      el.removeEventListener("dblclick", onDblClick);
+      resize.disconnect();
+      chart.remove();
+      chartRef.current = null;
+    };
   }, [height, themeTick]);
 
   useEffect(() => {
@@ -114,6 +152,11 @@ export default function PriceChart({ bars, height = 420 }: { bars: ChartBar[]; h
     volumeRef.current.setData(
       bars.map((b) => ({ time: b.time as UTCTimestamp, value: b.volume })));
     chartRef.current?.timeScale().fitContent();
+    // With real data on the scale it's now safe to pin the edges, so zoom
+    // and pan stay inside the series instead of drifting into blank space.
+    if (bars.length) {
+      chartRef.current?.applyOptions({ timeScale: { fixLeftEdge: true, fixRightEdge: true } });
+    }
   }, [bars, themeTick]);
 
   return <div ref={holder} className="w-full" style={{ height }} />;

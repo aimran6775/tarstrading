@@ -8,8 +8,11 @@ export default defineConfig({
     // Ignore macOS AppleDouble sidecars that exFAT drives create next to files.
     exclude: ["**/node_modules/**", "**/dist/**", "**/._*"],
     setupFiles: ["./test/setup.ts"],
-    testTimeout: 30_000,
-    hookTimeout: 30_000,
+    // These are integration tests against the real Supabase over the network;
+    // the free-tier pooler's latency swings from ~70ms to ~500ms+ per query,
+    // and the lock tests serialize many queries. Generous on purpose.
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
     // DB integration tests share one Supabase database — don't run files in
     // parallel processes that could stomp each other's rows.
     fileParallelism: false,
