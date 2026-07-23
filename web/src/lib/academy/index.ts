@@ -48,6 +48,8 @@ export const CONCEPT_LESSON: Record<string, { id: string; label: string }> = {
   options: { id: "op1-calls-puts", label: "How options work" },
   psychology: { id: "mind1-the-enemy-is-you", label: "The inner game" },
   tilt: { id: "mind2-tilt", label: "Tilt & revenge trading" },
+  indicators: { id: "p5-momentum", label: "Indicators & RSI" },
+  heat: { id: "r4-portfolio-heat", label: "Portfolio heat" },
 };
 
 export const allLessons: Lesson[] = tracks.flatMap((t) => t.lessons);

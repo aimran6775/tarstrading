@@ -83,7 +83,8 @@ export const optionsStage: Track = {
       minutes: 14,
       xp: 95,
       sections: [
-        { kind: "prose", text: "The Greeks sound intimidating but each just answers one plain question about how your option's price will move. You don't need the calculus — you need the intuition." },
+        { kind: "prose", text: "The Greeks sound intimidating but each just answers one plain question about how your option's price will move. You don't need the calculus — you need the intuition. Drive the explorer below first: move the stock and the clock, and watch which risks wake up. Then the definitions underneath will click." },
+        { kind: "widget", variant: "greeks" },
         { kind: "keyIdea", title: "Delta — how much does it move with the stock?",
           text: "Delta is how many dollars the option gains for each $1 the stock rises. A delta of 0.5 means the option moves 50 cents per dollar. It's also a rough probability the option finishes in-the-money. Deep in-the-money options have delta near 1 — they track the stock almost dollar-for-dollar." },
         { kind: "keyIdea", title: "Gamma — how fast does delta itself change?",

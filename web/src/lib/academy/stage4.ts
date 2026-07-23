@@ -104,5 +104,37 @@ export const riskStage: Track = {
           ] },
       ],
     },
+
+    // ---------------------------------------------------------------
+    {
+      id: "r4-portfolio-heat",
+      title: "Portfolio heat: your real risk",
+      hook: "You sized each trade at 1%. You have eight of them. So what are you really risking?",
+      minutes: 13,
+      xp: 95,
+      sections: [
+        { kind: "prose", text: "Everything so far has been about one trade: risk 1%, set a stop, size it right. But you rarely hold just one position. The question that actually blows up accounts isn't 'how big is this trade?' — it's 'how much am I risking across everything at once?' The sum of all your open risk has a name on professional desks: heat." },
+        { kind: "keyIdea", title: "Add up every stop, not just this one",
+          text: "If you hold six positions each risking 1%, your portfolio heat is 6% — the amount you'd lose if every stop hit on the same bad day. And bad days are exactly when everything moves together. Sizing one trade perfectly means nothing if you're stacked into ten of them." },
+        { kind: "widget", variant: "heat" },
+        { kind: "prose", text: "A common professional guardrail is to cap total heat around 6% — pick your own number, but pick one, and honor it. When you're at the cap, a new idea doesn't get added; it has to compete. Either it replaces a weaker position or you size everything down to make room. That constraint is a feature: it forces you to hold only your best ideas." },
+        { kind: "keyIdea", title: "Managing a position after entry",
+          text: "Risk isn't fixed once you're in. As a trade works, moving your stop up to breakeven turns a live risk into a free roll — you can no longer lose on it, so its heat drops to zero. Scaling out (selling part into strength) banks profit and cuts exposure. Good position management is a slow, deliberate reduction of risk as uncertainty resolves." },
+        { kind: "quiz",
+          question: "You hold five positions, each risking 1.5% of the account. What's your portfolio heat?",
+          choices: ["1.5%", "5%", "7.5%", "It depends on which wins"],
+          answer: 2,
+          explain: "5 × 1.5% = 7.5%. That's what you lose if every stop triggers together — and correlated positions tend to. Above a ~6% cap, one rough day does real damage. The fix is fewer positions or smaller size." },
+        { kind: "desk", instruction: "On the desk, open two or three positions and add up what you'd lose if each hit its stop. That total — your heat — is the number that actually matters. Try moving a winner's stop to breakeven and watch its risk vanish.", symbol: "NVDA" },
+        { kind: "flashcards", title: "Portfolio risk",
+          cards: [
+            { front: "Portfolio heat", back: "Total open risk — the sum of every position's risk if all stops hit at once." },
+            { front: "Heat cap", back: "A pre-set ceiling on total open risk (e.g. ~6%) that forces you to hold only your best ideas." },
+            { front: "Stop to breakeven", back: "Moving a winner's stop to your entry — the trade can no longer lose; its heat drops to zero." },
+            { front: "Scaling out", back: "Selling part of a position into strength to bank profit and cut exposure." },
+            { front: "Correlation risk", back: "Positions that move together aren't diversified — in a shock they act as one big bet." },
+          ] },
+      ],
+    },
   ],
 };

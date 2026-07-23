@@ -47,7 +47,8 @@ type Game = {
 /** A one-off teaching widget keyed by name (Trading-with-AI, Options, etc.). */
 type Widget = {
   kind: "widget";
-  variant: "rule-builder" | "overfit" | "payoff" | "tilt" | "checklist";
+  variant: "rule-builder" | "overfit" | "payoff" | "tilt" | "checklist"
+    | "rsi" | "curve" | "greeks" | "heat" | "correlation";
 };
 
 type Quiz = { kind: "quiz"; question: string; choices: string[]; answer: number; explain: string };

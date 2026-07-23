@@ -28,6 +28,8 @@ export const aiStage: Track = {
         { kind: "prose", text: "The honest promise of AI in trading is not prediction — it's discipline and scale. Where humans get emotional, tired, and inconsistent, a well-built system does exactly what it was told, every time, on every symbol, 24/7. That consistency is a real edge. But the moment someone sells you an AI that 'predicts the market' or 'guarantees returns,' close the tab. Markets are partly random; certainty is the tell of a scam." },
         { kind: "keyIdea", title: "AI amplifies your process — good or bad",
           text: "Automation makes a good process better and a bad process ruinous, faster. If you don't understand risk, sizing, and expectancy (the last five stages), an AI just helps you lose money more efficiently. The human sets the strategy and the risk limits; the machine executes." },
+        { kind: "game", variant: "bull-or-bear", title: "Predict the next candle — go on, try" },
+        { kind: "prose", text: "How did that go? If you felt yourself guessing, good — that's the honest experience of forecasting price, and no AI escapes it. What a machine adds isn't a better crystal ball; it's the discipline to size every one of those uncertain bets correctly and never let emotion change the plan. Prediction is the fantasy; consistent execution under uncertainty is the edge." },
         { kind: "quiz",
           question: "Which is a realistic thing to expect from a trading AI?",
           choices: ["It predicts tomorrow's price", "It follows your rules consistently, without emotion, across many symbols", "It guarantees a profit", "It replaces the need to understand risk"],

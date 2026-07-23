@@ -12,6 +12,8 @@ import LessonGame from "@/components/academy/games";
 import { RuleBuilder, OverfitDemo } from "@/components/academy/backtest";
 import PayoffDiagram from "@/components/academy/payoff";
 import { TiltSimulator, PreTradeChecklist } from "@/components/academy/psychology";
+import { RSIMeter, ForwardCurve, GreeksExplorer } from "@/components/academy/indicators";
+import { PortfolioHeat, CorrelationViz } from "@/components/academy/portfolio";
 
 /*
   The lesson reader. Reading measure capped at 68ch, quizzes are interactive
@@ -183,11 +185,18 @@ function SectionView({ section, quizIndex, onQuizResult, onRate }: {
       return <LessonGame variant={section.variant} title={section.title} />;
 
     case "widget":
-      return section.variant === "rule-builder" ? <RuleBuilder />
-        : section.variant === "overfit" ? <OverfitDemo />
-        : section.variant === "tilt" ? <TiltSimulator />
-        : section.variant === "checklist" ? <PreTradeChecklist />
-        : <PayoffDiagram />;
+      switch (section.variant) {
+        case "rule-builder": return <RuleBuilder />;
+        case "overfit": return <OverfitDemo />;
+        case "tilt": return <TiltSimulator />;
+        case "checklist": return <PreTradeChecklist />;
+        case "rsi": return <RSIMeter />;
+        case "curve": return <ForwardCurve />;
+        case "greeks": return <GreeksExplorer />;
+        case "heat": return <PortfolioHeat />;
+        case "correlation": return <CorrelationViz />;
+        default: return <PayoffDiagram />;
+      }
 
     case "formula":
       return (

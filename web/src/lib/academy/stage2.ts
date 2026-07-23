@@ -134,5 +134,35 @@ export const readingTrack: Track = {
           ] },
       ],
     },
+
+    // ---------------------------------------------------------------
+    {
+      id: "p5-momentum",
+      title: "Momentum indicators & RSI",
+      hook: "An indicator can't see the future. It can only measure the recent past — and that's still useful.",
+      minutes: 13,
+      xp: 90,
+      sections: [
+        { kind: "prose", text: "You'll hear traders throw around indicator names — RSI, MACD, stochastics. They sound like crystal balls. They aren't. An indicator is just arithmetic on recent prices, repackaged into an easier-to-read number. It describes what already happened. The moment you treat it as a prediction, it starts costing you money. Learn what each one measures, and you'll never be fooled by someone who claims it 'called the top.'" },
+        { kind: "prose", text: "The most common momentum indicator is RSI — the Relative Strength Index. It boils recent gains and losses down to a single value between 0 and 100. High means price has been rising hard lately; low means it's been falling hard. Traders label above 70 'overbought' and below 30 'oversold.' Slide the reading below and watch — but read the fine print." },
+        { kind: "widget", variant: "rsi" },
+        { kind: "keyIdea", title: "Overbought is not a sell signal",
+          text: "The single most expensive misreading in trading: seeing RSI at 75 and shorting because it's 'overbought.' Strong trends stay overbought for weeks while they keep climbing. RSI tells you momentum is strong — that's often a reason the trend continues, not that it's about to reverse. Indicators describe; they do not command." },
+        { kind: "prose", text: "This matters double when you build automated strategies later. It's trivial to write 'buy when RSI drops below 30.' It's also a great way to catch a falling knife — buying things that are cheap for a reason and keep getting cheaper. Every indicator is a lagging summary of the past dressed up as a signal. Respect what it actually is, and it becomes a useful piece of context among many." },
+        { kind: "quiz",
+          question: "RSI hits 80 during a powerful uptrend. What does that actually tell you?",
+          choices: ["Sell immediately — it's overbought", "Momentum has been strongly up recently; the trend may well continue", "The price will reverse within a day", "The stock is now worth more than the company"],
+          answer: 1,
+          explain: "RSI is a summary of recent momentum, not a reversal alarm. A high reading in a strong trend often means the trend is healthy. 'Overbought' is a label, not an instruction — trends can stay overbought far longer than a short seller can stay solvent." },
+        { kind: "flashcards", title: "Indicators",
+          cards: [
+            { front: "Indicator", back: "Arithmetic on recent prices, repackaged as an easier-to-read number. Describes the past." },
+            { front: "RSI", back: "Relative Strength Index — recent gains vs losses on a 0–100 scale." },
+            { front: "Overbought / oversold", back: "RSI above 70 / below 30. Labels for strong recent momentum — NOT buy/sell commands." },
+            { front: "MACD", back: "Two moving averages' distance — another way to read momentum shifts." },
+            { front: "The indicator trap", back: "Treating a lagging summary of the past as a prediction of the future." },
+          ] },
+      ],
+    },
   ],
 };
