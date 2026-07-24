@@ -1,10 +1,13 @@
 import { ToastProvider, AgentActivityToasts } from "@/components/toast";
+import { MarketFooter } from "@/components/market-footer";
+import { Icon } from "@/components/icons";
 import { getPlatformConfig } from "@/server/platform";
 
 /*
   The authenticated shell layout: provides global toasts to every /app surface,
-  mounts the background agent-activity watcher, and shows the admin broadcast
-  banner (when one is set) above everything.
+  mounts the background agent-activity watcher, shows the admin broadcast
+  banner (when one is set) above everything, and pins the market ticker
+  footer — tape, world clock, SIMULATED mark — to the bottom of every screen.
 */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { announcement } = await getPlatformConfig();
@@ -14,10 +17,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <AgentActivityToasts />
       {announcement && (
         <div role="status" className="flex items-center justify-center gap-2 border-b border-agent/30 bg-agent/12 px-4 py-2 text-center text-xs font-medium text-agent">
-          <span aria-hidden>📣</span> {announcement}
+          <Icon.Spark className="h-3.5 w-3.5 shrink-0" /> {announcement}
         </div>
       )}
-      {children}
+      {/* Clearance: ticker (2.25rem) everywhere; + mobile tab bar (3.5rem) below sm */}
+      <div className="pb-[calc(5.75rem+env(safe-area-inset-bottom))] sm:pb-9">{children}</div>
+      <MarketFooter />
     </ToastProvider>
   );
 }

@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { tracks, totalXP, totalMinutes, unlockedTrackIds } from "@/lib/academy";
 import Link from "next/link";
 import AppNav from "@/components/app-nav";
+import { Icon } from "@/components/icons";
 
 /*
   Academy home: the staged journey from "what is a market" to "run it like a
@@ -42,8 +43,10 @@ export default async function AcademyHome() {
           <h1 className="display text-4xl text-ink-1 md:text-5xl">
             Zero to fund manager.
           </h1>
-          <p className="tnum text-sm text-ink-3">
-            <span className="text-gold">{xp}</span> / {totalXP} XP
+          <p className="tnum flex items-center gap-1.5 text-sm text-ink-3">
+            <Icon.GoldBlock className="h-3.5 w-3.5" />
+            <span><span className="text-gold">{xp}</span> / {totalXP}</span>
+            <span className="sr-only">gold blocks</span>
           </p>
         </div>
         <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-2">
@@ -79,7 +82,7 @@ export default async function AcademyHome() {
 
         {graduated && (
           <div className="mt-6 flex items-center gap-4 rounded-2xl border border-gold/40 bg-gold/8 p-5">
-            <span className="text-3xl" aria-hidden>🎓</span>
+            <Icon.Academy className="h-8 w-8 shrink-0 text-gold" />
             <div>
               <p className="font-display text-lg font-bold text-gold">Academy complete — every stage cleared.</p>
               <p className="mt-0.5 text-sm text-ink-2">
@@ -135,21 +138,26 @@ export default async function AcademyHome() {
                           <div className="flex items-center gap-3">
                             <span
                               aria-hidden
-                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
                                 done.has(lesson.id)
                                   ? "border-transparent bg-gold text-ongold"
                                   : "border-hairline text-transparent"
                               }`}
                             >
-                              ✓
+                              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor"
+                                strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M5 12.5 L10 17.5 L19 7" />
+                              </svg>
                             </span>
                             <div>
                               <p className="text-sm font-medium text-ink-1">{lesson.title}</p>
                               <p className="text-xs text-ink-4">{lesson.hook}</p>
                             </div>
                           </div>
-                          <span className="tnum shrink-0 text-[11px] text-ink-4">
-                            {lesson.minutes}m · {lesson.xp}xp
+                          <span className="tnum flex shrink-0 items-center gap-1 text-[11px] text-ink-4">
+                            {lesson.minutes}m · {lesson.xp}
+                            <Icon.GoldBlock className="h-3 w-3" />
+                            <span className="sr-only">gold blocks</span>
                           </span>
                         </Link>
                       </li>
@@ -166,7 +174,7 @@ export default async function AcademyHome() {
           className="pressable mt-6 flex items-center justify-between gap-4 rounded-2xl border border-hairline bg-bg1 p-5 transition-colors hover:border-gain/40 hover:bg-bg2/60">
           <div>
             <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">Prove it on the desk</p>
-            <h2 className="mt-1 font-display text-xl font-bold text-ink-1">Missions 🎯</h2>
+            <h2 className="mt-1 flex items-center gap-2 font-display text-xl font-bold text-ink-1">Missions <Icon.Target className="h-5 w-5 text-gain" /></h2>
             <p className="mt-0.5 text-sm text-ink-3">
               Graded challenges you complete with a real trade — sized, stopped, heat under control. Judged on process, never profit.
             </p>
@@ -179,7 +187,7 @@ export default async function AcademyHome() {
           className="pressable mt-6 flex items-center justify-between gap-4 rounded-2xl border border-hairline bg-bg1 p-5 transition-colors hover:border-agent/40 hover:bg-bg2/60">
           <div>
             <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">Trade history blind</p>
-            <h2 className="mt-1 font-display text-xl font-bold text-ink-1">Replay ⏪</h2>
+            <h2 className="mt-1 flex items-center gap-2 font-display text-xl font-bold text-ink-1">Replay <Icon.Chart className="h-5 w-5 text-agent" /></h2>
             <p className="mt-0.5 text-sm text-ink-3">
               Step into the COVID crash, the 2022 bear, or the GameStop squeeze — one day at a time — and feel the decisions for real.
             </p>
@@ -192,7 +200,7 @@ export default async function AcademyHome() {
           className="pressable mt-6 flex items-center justify-between gap-4 rounded-2xl border border-hairline bg-bg1 p-5 transition-colors hover:border-gold/40 hover:bg-bg2/60">
           <div>
             <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">Beyond the stages</p>
-            <h2 className="mt-1 font-display text-xl font-bold text-ink-1">Practice 🔥</h2>
+            <h2 className="mt-1 flex items-center gap-2 font-display text-xl font-bold text-ink-1">Practice <Icon.Flame className="h-5 w-5 text-gold" /></h2>
             <p className="mt-0.5 text-sm text-ink-3">
               Every term and drill on repeat — flashcards, the arcade, and a daily streak. A few minutes keeps it sharp.
             </p>

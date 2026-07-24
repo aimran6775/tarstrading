@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { Icon } from "@/components/icons";
 
 /*
   The first-run tour — a five-card welcome the very first time someone lands on
@@ -11,29 +12,29 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 const KEY = "tars-tour-seen";
 
-const STEPS: { icon: string; title: string; body: string }[] = [
+const STEPS: { icon: React.ReactNode; title: string; body: string }[] = [
   {
-    icon: "👋",
+    icon: <Icon.Compass className="h-9 w-9 text-gold" />,
     title: "Welcome to your Trading Floor",
     body: "This is home base. Your equity, your book, your learning, and your analysts — all on one screen. It's the first thing you'll see every time you log in.",
   },
   {
-    icon: "💹",
+    icon: <Icon.Candles className="h-9 w-9 text-gold" />,
     title: "The desk",
     body: "Trade US stocks and crypto with $100,000 in simulated money. Real prices, real mechanics, zero real risk. Size every trade from a stop and you're already ahead of most.",
   },
   {
-    icon: "🎓",
+    icon: <Icon.Academy className="h-9 w-9 text-gold" />,
     title: "The academy",
     body: "Eleven interactive stages, from “what is a market” to running a book — with an AI tutor on every lesson, missions you prove with real trades, and famous crashes to replay.",
   },
   {
-    icon: "🤖",
+    icon: <Icon.Analyst className="h-9 w-9 text-agent" />,
     title: "Your assistant",
     body: "Describe a strategy in plain English and it hires an analyst to run it for you, around the clock. You stay in control — a kill switch is always one tap away.",
   },
   {
-    icon: "🚀",
+    icon: <Icon.Ascend className="h-9 w-9 text-gold" />,
     title: "You're set",
     body: "Everything here is simulated, so explore freely and make mistakes on purpose. That's how you learn to trade without it costing you.",
   },
@@ -74,7 +75,7 @@ export default function FloorTour({ hasAgents }: { hasAgents?: boolean }) {
           initial={rm ? false : { opacity: 0, y: 18, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: rm ? 0 : 0.3, ease: [0.32, 0.72, 0, 1] }}
           className="glass relative w-full max-w-md overflow-hidden rounded-3xl border border-hairline p-7 shadow-2xl">
-          <div className="text-4xl" aria-hidden>{step.icon}</div>
+          <div aria-hidden>{step.icon}</div>
           <h2 className="mt-4 font-display text-xl font-bold text-ink-1">{step.title}</h2>
           <p className="mt-2 text-sm leading-relaxed text-ink-2">{step.body}</p>
 

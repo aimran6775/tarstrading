@@ -6,7 +6,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import ThemeToggle from "./theme-toggle";
 import TarsWordmark from "./tars-wordmark";
 
-const OrbitalMarket = dynamic(() => import("./orbital-market"), {
+const VideoHero = dynamic(() => import("./video-hero"), {
   ssr: false,
   loading: () => (
     <div
@@ -52,11 +52,11 @@ export default function Landing() {
         </nav>
       </header>
 
-      {/* ---------- HERO: the market you can hold ---------- */}
+      {/* ---------- HERO: the real tape, in motion ---------- */}
       <section className="relative flex min-h-[100svh] flex-col justify-end overflow-hidden">
-        <OrbitalMarket />
+        <VideoHero dim={0.45} />
 
-        {/* Legibility scrim over the canvas floor */}
+        {/* Legibility scrim over the footage floor */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3"
           style={{ background: "linear-gradient(to top, var(--bg0) 12%, transparent)" }} />
 

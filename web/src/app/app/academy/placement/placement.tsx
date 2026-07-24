@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PLACEMENT_QUESTIONS } from "@/lib/academy/placement-quiz";
+import { Icon } from "@/components/icons";
 
 /*
   The placement test. Answer six questions; we place you at the first stage
@@ -43,7 +44,7 @@ export default function Placement() {
     return (
       <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-24 pt-10 md:pb-10 md:px-0">
         <div className="card border-l-2 border-l-gold p-6 text-center">
-          <p className="text-3xl" aria-hidden>🎯</p>
+          <Icon.Target className="mx-auto h-8 w-8 text-gold" />
           {result.startStage === 0 ? (
             <>
               <h1 className="display mt-2 text-2xl text-ink-1">Let&apos;s start at the beginning.</h1>
@@ -59,7 +60,7 @@ export default function Placement() {
               </h1>
               <p className="mt-2 text-sm leading-relaxed text-ink-2">
                 You tested out of <span className="text-gold">{result.startStage} stage{result.startStage === 1 ? "" : "s"}</span>
-                {" "}({result.skipped} lessons), unlocked and marked as complete — no XP, since you skipped the reading, but they&apos;re
+                {" "}({result.skipped} lessons), unlocked and marked as complete — no gold blocks, since you skipped the reading, but they&apos;re
                 yours to revisit any time. Jump in at <span className="text-ink-1">{result.startStageTitle}</span>.
               </p>
             </>

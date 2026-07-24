@@ -6,17 +6,18 @@ import { motion, useReducedMotion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { usd, pct } from "@/components/trading/shared";
 import { Spark } from "@/components/market-card";
+import { Icon } from "@/components/icons";
 import FloorTour from "./tour";
 
-// The three.js/WebGL hero is heavy — keep it out of the Floor's initial JS and
-// hydrate it after paint (the landing does the same).
-const OrbitalMarket = dynamic(() => import("@/components/orbital-market"), { ssr: false });
+// The hero backdrop is real market footage — one <video>, no WebGL. Hydrate
+// after paint to keep it out of the Floor's initial JS.
+const VideoHero = dynamic(() => import("@/components/video-hero"), { ssr: false });
 
 /*
-  The Trading Floor dashboard — home base, glanceable and alive. A 3D orbital
-  hero over a settling equity count-up, then everything that matters one card
-  away: your book, your learning, your edge (does the academy show up in your
-  trading?), your agents, the market's pulse.
+  The Trading Floor dashboard — home base, glanceable and alive. Real market
+  footage under a settling equity count-up, then everything that matters one
+  card away: your book, your learning, your edge (does the academy show up in
+  your trading?), your agents, the market's pulse.
 */
 
 type Data = {
@@ -104,8 +105,7 @@ export default function Floor({ data }: { data: Data }) {
       {/* ---- hero ---- */}
       <motion.section {...(rm ? {} : rise(0))}
         className="relative overflow-hidden rounded-3xl border border-hairline">
-        <div className="absolute inset-0 opacity-70"><OrbitalMarket /></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-bg0 via-bg0/60 to-bg0/20" aria-hidden />
+        <VideoHero dim={0.5} />
         <div className="relative flex flex-col gap-6 p-6 md:flex-row md:items-end md:justify-between md:p-8">
           <div>
             <p className="text-sm text-ink-3">{greeting}, {data.name.split(" ")[0]}.</p>
@@ -179,10 +179,10 @@ export default function Floor({ data }: { data: Data }) {
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
             <Chip>{a.stagesCleared}/{a.totalStages} stages</Chip>
-            <Chip>{a.xp} XP</Chip>
-            <Chip>🔥 {a.streak}d</Chip>
-            <Chip>🎯 {a.missions}/{a.totalMissions}</Chip>
-            <Chip>⏪ {a.replays}/{a.totalReplays}</Chip>
+            <Chip><Icon.GoldBlock className="h-3 w-3" /> {a.xp}</Chip>
+            <Chip><Icon.Flame className="h-3 w-3 text-gold" /> {a.streak}d</Chip>
+            <Chip><Icon.Target className="h-3 w-3 text-ink-3" /> {a.missions}/{a.totalMissions}</Chip>
+            <Chip><Icon.Journal className="h-3 w-3 text-ink-3" /> {a.replays}/{a.totalReplays}</Chip>
           </div>
           {a.nextId && (
             <Link href={`/app/academy/${a.nextId}`}

@@ -3,11 +3,12 @@ import TarsMark from "./tars-mark";
 /*
   The Tars lockup — the mark paired with the wordmark, spaced and sized as one
   unit so every surface reads the brand identically. Type scales off the mark
-  so the lockup stays balanced at any size. Pass `text="TARS TRADING"` for the
-  full form (footer, brand moments); `animate` boots the mark on mount.
+  so the lockup stays balanced at any size. The brand reads TARS TRADING in
+  full everywhere; pass `text="TARS"` only where space truly forbids it.
+  `animate` boots the mark on mount.
 */
 export default function TarsWordmark({
-  size = 28, text = "TARS", animate = false, className,
+  size = 28, text = "TARS TRADING", animate = false, className,
 }: { size?: number; text?: string; animate?: boolean; className?: string }) {
   return (
     <span className={`inline-flex items-center gap-2.5 ${className ?? ""}`.trim()}>

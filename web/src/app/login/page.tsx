@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import ThemeToggle from "@/components/theme-toggle";
-import TarsWordmark from "@/components/tars-wordmark";
+import AuthScene, { AuthField } from "@/components/auth-scene";
 
 export default function Login() {
   const router = useRouter();
@@ -32,49 +31,35 @@ export default function Login() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center px-6">
-      <div className="absolute right-4 top-4"><ThemeToggle /></div>
-      <div className="w-full max-w-md">
-        <Link href="/" className="pressable mb-6 flex justify-center"><TarsWordmark size={32} animate /></Link>
-        <h1 className="mb-8 text-center text-3xl font-bold tracking-tight text-ink-1">
-          Welcome back
-        </h1>
-        <form onSubmit={submit} className="card flex flex-col gap-4 p-6">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">Email</span>
-            <input
-              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email" required
-              className="rounded-lg border border-hairline bg-bg1 px-3.5 py-3 text-ink-1 outline-none transition focus:border-gold"
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">Password</span>
-            <input
-              type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password" required
-              className="rounded-lg border border-hairline bg-bg1 px-3.5 py-3 text-ink-1 outline-none transition focus:border-gold"
-            />
-          </label>
+    <AuthScene
+      micro="Authenticated access"
+      title="Welcome back"
+      subtitle="The desk is exactly as you left it."
+      sceneKicker="Tars Terminal"
+      sceneHeading={<>The desk<br />is live.</>}
+      sceneCopy="Your watchlists, positions, and analysts kept working the tape while you were gone. Sign back in and pick up the session."
+    >
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <AuthField label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" />
+        <AuthField label="Password" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
 
-          {error && (
-            <p role="alert" className="rounded-lg border border-loss/40 bg-loss/10 px-3 py-2 text-sm text-loss">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit" disabled={busy}
-            className="pressable cta-gold mt-2 rounded-full px-6 py-3.5 text-base font-semibold disabled:opacity-60"
-          >
-            {busy ? "Logging in…" : "Log in"}
-          </button>
-          <p className="text-center text-xs text-ink-3">
-            New here?{" "}
-            <Link href="/join" className="text-gold hover:underline">Start with $100,000</Link>
+        {error && (
+          <p role="alert" className="rounded-lg border border-loss/40 bg-loss/10 px-3 py-2 text-sm text-loss">
+            {error}
           </p>
-        </form>
-      </div>
-    </main>
+        )}
+
+        <button
+          type="submit" disabled={busy}
+          className="pressable cta-gold mt-2 rounded-full px-6 py-3.5 text-base font-semibold disabled:opacity-60"
+        >
+          {busy ? "Authenticating…" : "Enter the terminal"}
+        </button>
+        <p className="text-center text-xs text-ink-3">
+          New here?{" "}
+          <Link href="/join" className="text-gold hover:underline">Start with $100,000</Link>
+        </p>
+      </form>
+    </AuthScene>
   );
 }

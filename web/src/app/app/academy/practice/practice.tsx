@@ -6,6 +6,7 @@ import Flashcards from "@/components/academy/flashcards";
 import LessonGame from "@/components/academy/games";
 import { allTerms, GAMES, type Term } from "@/lib/academy/practice";
 import { cardKey } from "@/lib/academy/srs";
+import { Icon } from "@/components/icons";
 
 /*
   The Practice hub — everything the stages taught, recycled forever.
@@ -117,7 +118,7 @@ export default function Practice() {
           <h1 className="display text-3xl text-ink-1 md:text-4xl">Keep it sharp.</h1>
         </div>
         <div className="flex items-center gap-1.5 rounded-full border border-hairline bg-bg2 px-3 py-1.5">
-          <span className="text-base">🔥</span>
+          <Icon.Flame className="h-4 w-4 text-gold" />
           <span className="tnum text-sm font-semibold text-gold">{streak}</span>
           <span className="text-xs text-ink-4">day{streak === 1 ? "" : "s"}</span>
         </div>
@@ -176,7 +177,7 @@ export default function Practice() {
                 <button key={g.variant} onClick={() => { setPlayedGame(i); markPracticed(); }}
                   className="pressable flex flex-col gap-1.5 rounded-2xl border border-hairline bg-bg1 p-4 text-left transition-colors hover:border-agent/40 hover:bg-bg2/60">
                   <span className="flex items-center gap-2 text-sm font-semibold text-ink-1">
-                    <span className="text-agent">▲</span> {g.title}
+                    <Icon.Bolt className="h-4 w-4 text-agent" /> {g.title}
                   </span>
                   <span className="text-xs leading-relaxed text-ink-4">{g.blurb}</span>
                 </button>

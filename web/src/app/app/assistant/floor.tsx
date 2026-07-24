@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import HoldButton from "@/components/hold-button";
 import AssistantChat from "@/components/assistant-chat";
 import LearnLink from "@/components/academy/learn-link";
+import { Icon } from "@/components/icons";
 
 /*
   The Agent Lab: your analyst floor, run by conversation. You TALK to your
@@ -172,7 +173,9 @@ function AnalystCard({ agent, busy, onAction, onDelete }: {
     <section className={`card p-5 ${agent.status === "killed" ? "opacity-70" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="text-2xl">{agent.emoji}</span>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-agent/12" aria-hidden>
+            <Icon.Analyst className="h-4.5 w-4.5 text-agent" />
+          </span>
           <div>
             <p className="text-sm font-semibold text-ink-1">{agent.name}</p>
             <p className="tnum text-[11px] text-ink-4">

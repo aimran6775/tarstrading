@@ -6,11 +6,14 @@ import { useRouter } from "next/navigation";
 import ThemeToggle from "./theme-toggle";
 import CommandPalette from "./command-palette";
 import TarsWordmark from "./tars-wordmark";
+import { Icon } from "./icons";
 
 /*
-  The authenticated shell: a sticky top header (wordmark, simulated marker,
-  desktop nav, optional right slot, theme, logout) plus a fixed bottom tab
-  bar on mobile so the five sections are always reachable on a phone.
+  The authenticated shell header — a trading desk's masthead, not a SaaS bar.
+  Full TARS TRADING lockup, a market-open pulse, nav tabs with a gold active
+  underline, and the gold-block balance. The SIMULATED marker lives in the
+  persistent footer ticker (still unmistakable, off the masthead). A fixed
+  bottom tab bar keeps the five sections reachable on a phone.
 */
 
 export type Section = "floor" | "terminal" | "academy" | "assistant" | "standings";
@@ -32,13 +35,31 @@ const ICON: Record<Section, string> = {
   standings: "M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM7 6H4v1a3 3 0 003 3M17 6h3v1a3 3 0 01-3 3", // trophy
 };
 
+/** True during the US regular session (approximate, ET). Client-side mirror of
+    the server clock — for the header pulse only, never for order gating. */
+function usMarketOpen(): boolean {
+  const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const d = et.getDay();
+  if (d === 0 || d === 6) return false;
+  const m = et.getHours() * 60 + et.getMinutes();
+  return m >= 9 * 60 + 30 && m < 16 * 60;
+}
+
 export default function AppNav({ active, right }: { active: Section; right?: React.ReactNode }) {
   const router = useRouter();
   const [xp, setXp] = useState<number | null>(null);
+  const [open, setOpen] = useState<boolean | null>(null);
   useEffect(() => {
     fetch("/api/academy").then((r) => r.ok ? r.json() : null).then((d) => {
       if (d?.ok) setXp(d.xp);
     }).catch(() => {});
+  }, []);
+  // Market pulse — evaluated client-side each minute.
+  useEffect(() => {
+    const set = () => setOpen(usMarketOpen());
+    set();
+    const id = setInterval(set, 60_000);
+    return () => clearInterval(id);
   }, []);
   // The desk tick runs wherever you are in the app, not just on the Assistant
   // page — your analysts work while you read a lesson or browse markets.
@@ -56,41 +77,64 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
   return (
     <>
       <CommandPalette />
-      <header className="glass sticky top-0 z-50 flex items-center justify-between px-4 py-2.5 md:px-6">
-        <div className="flex items-center gap-3">
-          <Link href="/app/floor" className="pressable"><TarsWordmark size={22} /></Link>
-          <Link href="/disclosures" className="sim-mark" title="All capital on Tars is simulated — no real money.">
-            SIMULATED
-          </Link>
-          <nav className="ml-2 hidden gap-1 sm:flex">
-            {NAV.map(([key, label, href]) => (
-              <Link key={key} href={href}
-                className={`pressable rounded-full px-3.5 py-1.5 text-xs font-medium ${
-                  active === key ? "bg-bg3 text-ink-1" : "text-ink-3 hover:text-ink-1"
-                }`}>
-                {label}
-              </Link>
-            ))}
-          </nav>
+      <header className="glass sticky top-0 z-50">
+        <div className="flex items-center justify-between px-4 py-2.5 md:px-6">
+          <div className="flex min-w-0 items-center gap-4">
+            <Link href="/app/floor" className="pressable shrink-0">
+              <TarsWordmark size={22} text="TARS TRADING" />
+            </Link>
+
+            {/* Market pulse — a real desk always shows session state */}
+            {open != null && (
+              <span className="hidden items-center gap-1.5 border-l border-hairline pl-4 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-4 lg:flex"
+                title={open ? "US regular session is open" : "US regular session is closed — crypto trades 24/7"}>
+                <span className={`h-1.5 w-1.5 rounded-full ${open ? "bg-gain" : "bg-ink-4"} ${open ? "animate-pulse" : ""}`} />
+                {open ? "NYSE OPEN" : "NYSE CLOSED"}
+              </span>
+            )}
+
+            <nav className="hidden gap-0.5 sm:flex">
+              {NAV.map(([key, label, href]) => {
+                const on = active === key;
+                return (
+                  <Link key={key} href={href} aria-current={on ? "page" : undefined}
+                    className={`pressable relative rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                      on ? "text-ink-1" : "text-ink-3 hover:text-ink-1"
+                    }`}>
+                    {label}
+                    {/* the gold active underline — the tape running under the tab */}
+                    <span aria-hidden className={`absolute inset-x-2.5 -bottom-[9px] h-[2px] rounded-full transition-opacity ${
+                      on ? "bg-gold opacity-100" : "opacity-0"
+                    }`} />
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-2 md:gap-3">
+            <button
+              onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+              className="pressable hidden items-center gap-1.5 rounded-full border border-hairline px-3 py-1.5 text-[11px] text-ink-4 hover:text-ink-2 md:flex"
+              aria-label="Open command palette">
+              <span>Search</span><span className="tnum rounded bg-bg3 px-1.5 py-0.5">⌘K</span>
+            </button>
+            {xp != null && xp > 0 && (
+              <span className="tnum hidden items-center gap-1.5 rounded-full bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold sm:flex"
+                title="Gold blocks earned in the academy">
+                <Icon.GoldBlock className="h-3.5 w-3.5" />{xp}
+              </span>
+            )}
+            {right}
+            <ThemeToggle />
+            <button onClick={logout}
+              className="pressable min-h-10 rounded-full border border-hairline px-3 py-1.5 text-xs text-ink-2 hover:text-ink-1">
+              Log out
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 md:gap-3">
-          <button
-            onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
-            className="pressable hidden items-center gap-1.5 rounded-full border border-hairline px-3 py-1.5 text-[11px] text-ink-4 hover:text-ink-2 md:flex"
-            aria-label="Open command palette">
-            <span>Search</span><span className="tnum rounded bg-bg3 px-1.5 py-0.5">⌘K</span>
-          </button>
-          {xp != null && xp > 0 && (
-            <span className="tnum hidden rounded-full bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold sm:inline"
-              title="Academy XP earned">{xp} XP</span>
-          )}
-          {right}
-          <ThemeToggle />
-          <button onClick={logout}
-            className="pressable min-h-10 rounded-full border border-hairline px-3 py-1.5 text-xs text-ink-2 hover:text-ink-1">
-            Log out
-          </button>
-        </div>
+        {/* hairline with a gold thread — the masthead's signature */}
+        <div aria-hidden className="h-px w-full bg-gradient-to-r from-transparent via-gold/35 to-transparent" />
       </header>
 
       {/* Mobile bottom tab bar — the five sections, always reachable */}
