@@ -62,7 +62,7 @@ export function AgentActivityToasts() {
     let alive = true;
     const poll = async () => {
       try {
-        const res = await fetch("/api/agents");
+        const res = await fetch("/api/agents/activity");
         if (!res.ok) return;
         const data = await res.json();
         if (!alive || !data.ok) return;

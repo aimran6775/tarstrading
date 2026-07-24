@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { and, eq, desc } from "drizzle-orm";
-import { getBars, getQuote, isUSMarketOpen, type BarPoint } from "./market";
+import { getBars, getQuote, getQuotes, isUSMarketOpen, type BarPoint } from "./market";
 import { placeOrder } from "./exchange";
 
 /*
@@ -310,13 +310,13 @@ export async function agentPnL(userId: string, agentId: string): Promise<number>
     if (o.side === "buy") { cash -= o.qty * px; qty.set(o.symbol, (qty.get(o.symbol) ?? 0) + o.qty); }
     else { cash += o.qty * px; qty.set(o.symbol, (qty.get(o.symbol) ?? 0) - o.qty); }
   }
+  const held = [...qty.entries()].filter(([, q]) => q > 1e-9);
+  // One batched quote fetch instead of N sequential round trips (this runs
+  // per agent in a fan-out, so the N+1 was O(agents × symbols)).
+  const quotes = held.length ? await getQuotes(held.map(([s]) => s)) : [];
+  const price = new Map(quotes.map((qt) => [qt.symbol, qt.price]));
   let value = 0;
-  for (const [symbol, q] of qty) {
-    if (q > 1e-9) {
-      const quote = await getQuote(symbol);
-      if (quote) value += q * quote.price;
-    }
-  }
+  for (const [symbol, q] of held) value += q * (price.get(symbol) ?? 0);
   return cash + value;
 }
 

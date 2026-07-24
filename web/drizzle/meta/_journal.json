@@ -50,6 +50,13 @@
       "when": 1784847495582,
       "tag": "0006_replay-results",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784855157748,
+      "tag": "0007_perf-and-integrity",
+      "breakpoints": true
     }
   ]
 }

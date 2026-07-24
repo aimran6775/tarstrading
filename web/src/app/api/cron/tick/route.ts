@@ -4,6 +4,7 @@ import { tickAllRunningAgents } from "@/server/agents";
 import { purgeExpiredSessions } from "@/server/auth";
 import { backfillTick } from "@/server/backfill";
 import { db, schema } from "@/server/db";
+import { lt } from "drizzle-orm";
 
 /*
   The server-side heartbeat. A scheduled job (Vercel Cron, Supabase pg_cron, or
@@ -29,18 +30,23 @@ async function run(request: Request) {
   }
 
   const t0 = Date.now();
-  let ok = 1;
   let agents = { users: 0, actions: 0 };
   let backfill: Awaited<ReturnType<typeof backfillTick>> | null = null;
-  try {
-    [agents, backfill] = await Promise.all([
-      tickAllRunningAgents(),
-      backfillTick(),
-      purgeExpiredSessions(),
-    ]).then(([a, b]) => [a, b] as const);
-  } catch {
-    ok = 0;
-  }
+  // allSettled: one failing task (a flaky backfill fetch, a purge hiccup) must
+  // not discard the agent metrics that already succeeded, nor falsely mark the
+  // whole run failed.
+  const [aRes, bRes, pRes] = await Promise.allSettled([
+    tickAllRunningAgents(),
+    backfillTick(),
+    purgeExpiredSessions(),
+  ]);
+  if (aRes.status === "fulfilled") agents = aRes.value;
+  if (bRes.status === "fulfilled") backfill = bRes.value;
+  const ok = aRes.status === "fulfilled" && bRes.status === "fulfilled" && pRes.status === "fulfilled" ? 1 : 0;
+
+  // Retention: api_calls is pure telemetry that otherwise grows forever and
+  // slows the admin feed. Keep a week. (Fire-and-forget; never fails a run.)
+  db.delete(schema.apiCalls).where(lt(schema.apiCalls.createdAt, Date.now() - 7 * 86_400_000)).catch(() => {});
 
   const ms = Date.now() - t0;
   await db.insert(schema.cronRuns).values({

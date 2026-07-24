@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     await db.insert(schema.replayResults).values({
       id: randomUUID(), userId: user.id, scenarioId: scenario.id,
       playerReturn, buyHoldReturn, completedAt: now, xp: scenario.xp,
-    });
+    }).onConflictDoNothing();
     return NextResponse.json({ ok: true, xpAwarded: scenario.xp, best: playerReturn });
   }
 

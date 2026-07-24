@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentUser } from "@/server/auth";
+import { currentUser, rateLimit } from "@/server/auth";
 import { assistantHistory, assistantTurn } from "@/server/assistant";
 
 /*
@@ -17,6 +17,12 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
+
+  // Each turn is a model call that can also place trades — cap it per user,
+  // same as the tutor. ~20/min is generous for a real conversation.
+  if (!(await rateLimit(`assistant:${user.id}`, 20, 60_000))) {
+    return NextResponse.json({ ok: false, error: "One at a time — the desk is catching up." }, { status: 429 });
+  }
 
   let body: { text?: unknown };
   try { body = await request.json(); }

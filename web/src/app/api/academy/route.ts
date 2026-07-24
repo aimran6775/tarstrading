@@ -4,17 +4,13 @@ import { currentUser } from "@/server/auth";
 import { db, schema } from "@/server/db";
 import { and, eq } from "drizzle-orm";
 import { findLesson } from "@/lib/academy";
+import { getAcademyProgress } from "@/server/academy-progress";
 
 export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
-  const rows = await db.select().from(schema.lessonProgress)
-    .where(eq(schema.lessonProgress.userId, user.id));
-  return NextResponse.json({
-    ok: true,
-    completed: rows.map((r) => r.lessonId),
-    xp: rows.reduce((s, r) => s + r.xp, 0),
-  });
+  const p = await getAcademyProgress(user.id);
+  return NextResponse.json({ ok: true, completed: p.completed, xp: p.xp });
 }
 
 type SubmittedAnswer = { choice: number; tries?: number };
@@ -68,10 +64,12 @@ export async function POST(request: Request) {
       eq(schema.lessonProgress.lessonId, found.lesson.id),
     ));
   if (!existing) {
+    // onConflictDoNothing + the (userId, lessonId) unique index makes a
+    // double-submit idempotent — no double-banked XP under a race.
     await db.insert(schema.lessonProgress).values({
       id: randomUUID(), userId: user.id, lessonId: found.lesson.id,
       completedAt: now, xp: found.lesson.xp,
-    });
+    }).onConflictDoNothing();
   }
 
   const rows = await db.select().from(schema.lessonProgress)

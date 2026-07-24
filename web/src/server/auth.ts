@@ -1,8 +1,10 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { randomBytes, scryptSync, timingSafeEqual, randomUUID } from "crypto";
+import { cache } from "react";
 import { db, schema } from "./db";
 import { eq, and, gt, lt, sql } from "drizzle-orm";
+import { etDay } from "./market";
 
 /*
   Auth: scrypt-hashed passwords + opaque session tokens in an httpOnly cookie.
@@ -56,7 +58,7 @@ export async function createUser(email: string, name: string, password: string) 
   await db.insert(schema.accounts).values({
     userId, cash: STARTING_CASH, equity: STARTING_CASH,
     dayStartEquity: STARTING_CASH,
-    dayStamp: new Date().toISOString().slice(0, 10),
+    dayStamp: etDay(),
     createdAt: now,
   });
 
@@ -92,7 +94,9 @@ export async function endSession() {
 
 export type SessionUser = { id: string; email: string; name: string; role: "user" | "admin" };
 
-export async function currentUser(): Promise<SessionUser | null> {
+// Request-memoized: a page + its layout + several server components all call
+// currentUser() in one render; cache() collapses that to a single session join.
+export const currentUser = cache(async (): Promise<SessionUser | null> => {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -105,7 +109,7 @@ export async function currentUser(): Promise<SessionUser | null> {
     .where(and(eq(schema.sessions.id, token), gt(schema.sessions.expiresAt, Date.now())))
     .limit(1);
   return row ?? null;
-}
+});
 
 // ---- admin ----
 // Admins are bootstrapped from ADMIN_EMAILS (comma-separated, case-insensitive):

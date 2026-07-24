@@ -121,7 +121,7 @@ export async function checkMission(userId: string, missionId: string): Promise<G
   if (res.passed && !existing) {
     await db.insert(schema.missionProgress).values({
       id: randomUUID(), userId, missionId, completedAt: Date.now(), xp: mission.xp,
-    });
+    }).onConflictDoNothing();
     justCompleted = true;
   }
   return { missionId, complete: res.passed || !!existing, justCompleted, ...res };

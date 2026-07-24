@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { and, eq, desc } from "drizzle-orm";
-import { getQuote, getQuotes, isUSMarketOpen } from "./market";
+import { getQuote, getQuotes, isUSMarketOpen, etDay } from "./market";
 
 /*
   The simulated exchange. Every user trades an isolated $100k account.
@@ -214,14 +214,19 @@ export async function reconcile(userId: string) {
   const resting = await db.select().from(schema.orders)
     .where(and(eq(schema.orders.userId, userId), eq(schema.orders.status, "accepted")));
 
-  // Fetch every quote first (network), then settle any fills in one locked
-  // transaction so we don't hold the account lock across I/O.
+  // Common case — nothing resting — skips all order I/O; just re-mark equity.
+  if (resting.length === 0) { await markEquity(userId); return; }
+
+  // Batch every quote first (network), in ONE call, then settle fills in a
+  // locked transaction so we never hold the account lock across I/O.
+  const open = isUSMarketOpen();
+  const tradable = resting.filter((o) => o.symbol.includes("/") || open);
+  const quotes = await getQuotes([...new Set(tradable.map((o) => o.symbol))]);
+  const bySymbol = new Map(quotes.map((qt) => [qt.symbol, qt.price]));
   const priced: Array<{ order: PlacedOrder; price: number }> = [];
-  for (const order of resting) {
-    const isCrypto = order.symbol.includes("/");
-    if (!isCrypto && !isUSMarketOpen()) continue;
-    const quote = await getQuote(order.symbol);
-    if (quote) priced.push({ order, price: quote.price });
+  for (const order of tradable) {
+    const price = bySymbol.get(order.symbol);
+    if (price != null) priced.push({ order, price });
   }
 
   if (priced.length) {
@@ -254,7 +259,7 @@ export async function markEquity(userId: string) {
     }
   }
   const equity = account.cash + value;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = etDay();
   const rolled = account.dayStamp !== today;
 
   await db.update(schema.accounts).set({

@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
+import dynamic from "next/dynamic";
 import { usd, pct } from "@/components/trading/shared";
 import { Spark } from "@/components/market-card";
-import OrbitalMarket from "@/components/orbital-market";
 import FloorTour from "./tour";
+
+// The three.js/WebGL hero is heavy — keep it out of the Floor's initial JS and
+// hydrate it after paint (the landing does the same).
+const OrbitalMarket = dynamic(() => import("@/components/orbital-market"), { ssr: false });
 
 /*
   The Trading Floor dashboard — home base, glanceable and alive. A 3D orbital

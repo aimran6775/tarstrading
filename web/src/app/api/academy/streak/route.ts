@@ -43,8 +43,11 @@ export async function POST() {
       .set({ day: today, current, longest, updatedAt: now })
       .where(eq(schema.practiceStreaks.userId, user.id));
   } else {
+    // onConflictDoNothing guards the first-visit race: two concurrent POSTs
+    // both see no row; the second would otherwise 500 on the PK.
     await db.insert(schema.practiceStreaks)
-      .values({ userId: user.id, day: today, current, longest, updatedAt: now });
+      .values({ userId: user.id, day: today, current, longest, updatedAt: now })
+      .onConflictDoNothing();
   }
 
   return NextResponse.json({ ok: true, current, longest });

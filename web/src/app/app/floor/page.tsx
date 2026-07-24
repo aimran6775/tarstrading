@@ -6,7 +6,7 @@ import { reconcile } from "@/server/exchange";
 import { getQuotes, isUSMarketOpen } from "@/server/market";
 import { liveFeedStatus } from "@/server/live-feed";
 import { brainStatus } from "@/server/llm";
-import { allLessons, tracks } from "@/lib/academy";
+import { getAcademyProgress } from "@/server/academy-progress";
 import { MISSIONS } from "@/lib/academy/missions";
 import { SCENARIOS } from "@/lib/academy/scenarios";
 import AppNav from "@/components/app-nav";
@@ -33,33 +33,38 @@ export default async function FloorPage() {
 
   await reconcile(user.id).catch(() => { /* stale marks are still worth showing */ });
 
-  const [account] = await db.select().from(schema.accounts).where(eq(schema.accounts.userId, user.id));
-  const [c] = await db.execute<Counts>(dsql`
-    select
-      (select count(*)::int from mission_progress where user_id = ${user.id})                                as missions,
-      (select count(*)::int from replay_results where user_id = ${user.id})                                  as replays,
-      (select coalesce((select current from practice_streaks where user_id = ${user.id}), 0))::int          as streak,
-      (select count(*)::int from orders where user_id = ${user.id} and status = 'accepted')                 as open_orders,
-      (select count(*)::int from agents where user_id = ${user.id} and status = 'running')                  as agents_running,
-      (select coalesce(sum(allocation),0) from agents where user_id = ${user.id} and status = 'running')    as agents_alloc,
-      (select count(*)::int from journal_entries where user_id = ${user.id} and pnl is not null)            as trades,
-      (select count(*)::int from journal_entries where user_id = ${user.id} and pnl > 0)                    as wins,
-      (select coalesce(sum(pnl),0) from journal_entries where user_id = ${user.id})                         as realized_pnl
-  `);
-
-  const positions = await db.select().from(schema.positions).where(eq(schema.positions.userId, user.id));
-  const doneRows = await db.select({ lessonId: schema.lessonProgress.lessonId, xp: schema.lessonProgress.xp })
-    .from(schema.lessonProgress).where(eq(schema.lessonProgress.userId, user.id));
-  const equityRows = await db.select({ equity: schema.equityHistory.equity })
-    .from(schema.equityHistory).where(eq(schema.equityHistory.userId, user.id))
-    .orderBy(asc(schema.equityHistory.time)).limit(240);
-  const journal = await db.select().from(schema.journalEntries)
-    .where(eq(schema.journalEntries.userId, user.id)).orderBy(desc(schema.journalEntries.createdAt)).limit(6);
-  const watch = await db.select({ symbol: schema.watchlistItems.symbol })
-    .from(schema.watchlistItems).where(eq(schema.watchlistItems.userId, user.id))
-    .orderBy(asc(schema.watchlistItems.rank)).limit(6);
-  const [running] = await db.select({ name: schema.agents.name, emoji: schema.agents.emoji })
-    .from(schema.agents).where(and(eq(schema.agents.userId, user.id), eq(schema.agents.status, "running"))).limit(1);
+  // Everything below is independent — one parallel fan-out instead of ~8 serial
+  // round trips before first paint.
+  const [accountRows, cRows, positions, academyProg, equityRows, journal, watch, runningRows] = await Promise.all([
+    db.select().from(schema.accounts).where(eq(schema.accounts.userId, user.id)),
+    db.execute<Counts>(dsql`
+      select
+        (select count(*)::int from mission_progress where user_id = ${user.id})                                as missions,
+        (select count(*)::int from replay_results where user_id = ${user.id})                                  as replays,
+        (select coalesce((select current from practice_streaks where user_id = ${user.id}), 0))::int          as streak,
+        (select count(*)::int from orders where user_id = ${user.id} and status = 'accepted')                 as open_orders,
+        (select count(*)::int from agents where user_id = ${user.id} and status = 'running')                  as agents_running,
+        (select coalesce(sum(allocation),0) from agents where user_id = ${user.id} and status = 'running')    as agents_alloc,
+        (select count(*)::int from journal_entries where user_id = ${user.id} and pnl is not null)            as trades,
+        (select count(*)::int from journal_entries where user_id = ${user.id} and pnl > 0)                    as wins,
+        (select coalesce(sum(pnl),0) from journal_entries where user_id = ${user.id})                         as realized_pnl
+    `),
+    db.select().from(schema.positions).where(eq(schema.positions.userId, user.id)),
+    getAcademyProgress(user.id),
+    db.select({ equity: schema.equityHistory.equity })
+      .from(schema.equityHistory).where(eq(schema.equityHistory.userId, user.id))
+      .orderBy(asc(schema.equityHistory.time)).limit(240),
+    db.select().from(schema.journalEntries)
+      .where(eq(schema.journalEntries.userId, user.id)).orderBy(desc(schema.journalEntries.createdAt)).limit(6),
+    db.select({ symbol: schema.watchlistItems.symbol })
+      .from(schema.watchlistItems).where(eq(schema.watchlistItems.userId, user.id))
+      .orderBy(asc(schema.watchlistItems.rank)).limit(6),
+    db.select({ name: schema.agents.name, emoji: schema.agents.emoji })
+      .from(schema.agents).where(and(eq(schema.agents.userId, user.id), eq(schema.agents.status, "running"))).limit(1),
+  ]);
+  const [account] = accountRows;
+  const [c] = cRows;
+  const [running] = runningRows;
 
   // Mark positions + gather movers in one quote fetch.
   const moverSymbols = watch.length ? watch.map((w) => w.symbol) : DEFAULT_MOVERS;
@@ -73,13 +78,6 @@ export default async function FloorPage() {
   }).sort((a, b) => b.value - a.value);
   const movers = moverSymbols.map((s) => q.get(s)).filter(Boolean)
     .map((x) => ({ symbol: x!.symbol, price: x!.price, changePercent: x!.changePercent }));
-
-  // Academy progress.
-  const done = new Set(doneRows.map((r) => r.lessonId));
-  const academyXP = doneRows.reduce((s, r) => s + r.xp, 0);
-  const lessonsDone = allLessons.filter((l) => done.has(l.id)).length;
-  const next = allLessons.find((l) => !done.has(l.id));
-  const stagesCleared = tracks.filter((t) => t.lessons.every((l) => done.has(l.id))).length;
 
   // Max drawdown from the equity curve (peak-to-trough).
   let peak = -Infinity, maxDD = 0;
@@ -104,11 +102,11 @@ export default async function FloorPage() {
     movers,
     journal: journal.map((j) => ({ symbol: j.symbol, pnl: j.pnl, createdAt: j.createdAt })),
     academy: {
-      xp: academyXP, lessonsDone, totalLessons: allLessons.length,
-      stagesCleared, totalStages: tracks.length,
+      xp: academyProg.xp, lessonsDone: academyProg.lessonsDone, totalLessons: academyProg.totalLessons,
+      stagesCleared: academyProg.stagesCleared, totalStages: academyProg.totalStages,
       streak: c.streak, missions: c.missions, totalMissions: MISSIONS.length,
       replays: c.replays, totalReplays: SCENARIOS.length,
-      nextId: next?.id ?? null, nextTitle: next?.title ?? null,
+      nextId: academyProg.next?.id ?? null, nextTitle: academyProg.next?.title ?? null,
     },
     edge: { trades: c.trades, wins: c.wins, realizedPnl: c.realized_pnl, maxDD },
     system: {

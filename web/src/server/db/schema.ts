@@ -1,4 +1,4 @@
-import { pgTable, text, integer, bigint, doublePrecision, index, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, bigint, doublePrecision, index, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
 
 /*
   Tars Trading data model — Postgres (Supabase).
@@ -40,7 +40,7 @@ export const accounts = pgTable("accounts", {
   dayStartEquity: doublePrecision("day_start_equity").notNull(),
   dayStamp: text("day_stamp").notNull(),
   createdAt: epochMs("created_at").notNull(),
-});
+}, (t) => [index("accounts_equity").on(t.equity)]);
 
 export const positions = pgTable("positions", {
   id: text("id").primaryKey(),
@@ -71,7 +71,12 @@ export const orders = pgTable("orders", {
   agentId: text("agent_id"),
   rejectReason: text("reject_reason"),
   createdAt: epochMs("created_at").notNull(),
-}, (t) => [index("orders_user").on(t.userId), index("orders_status").on(t.status)]);
+}, (t) => [
+  index("orders_user").on(t.userId),
+  index("orders_status").on(t.status),
+  index("orders_user_status").on(t.userId, t.status),
+  index("orders_agent").on(t.agentId),
+]);
 
 export const watchlistItems = pgTable("watchlist_items", {
   id: text("id").primaryKey(),
@@ -135,7 +140,7 @@ export const lessonProgress = pgTable("lesson_progress", {
   lessonId: text("lesson_id").notNull(),
   completedAt: epochMs("completed_at").notNull(),
   xp: integer("xp").notNull(),
-}, (t) => [index("progress_user").on(t.userId)]);
+}, (t) => [index("progress_user").on(t.userId), uniqueIndex("lesson_progress_uq").on(t.userId, t.lessonId)]);
 
 /*
   ---------- The learning backbone ----------
@@ -196,7 +201,7 @@ export const replayResults = pgTable("replay_results", {
   buyHoldReturn: doublePrecision("buy_hold_return").notNull(),
   completedAt: epochMs("completed_at").notNull(),
   xp: integer("xp").notNull(),
-}, (t) => [index("replay_results_user").on(t.userId)]);
+}, (t) => [index("replay_results_user").on(t.userId), uniqueIndex("replay_results_uq").on(t.userId, t.scenarioId)]);
 
 /** A graded sim mission a learner has completed — process demonstrated with a
     real (simulated) trade, not just a quiz passed. One row per mission, once. */
@@ -206,7 +211,7 @@ export const missionProgress = pgTable("mission_progress", {
   missionId: text("mission_id").notNull(),
   completedAt: epochMs("completed_at").notNull(),
   xp: integer("xp").notNull(),
-}, (t) => [index("mission_progress_user").on(t.userId)]);
+}, (t) => [index("mission_progress_user").on(t.userId), uniqueIndex("mission_progress_uq").on(t.userId, t.missionId)]);
 
 /** One row per drill played — the practice-side companion to quiz_attempts.
     Tells us which drills learners play and where they miss. */
@@ -264,7 +269,6 @@ export const bars = pgTable("bars", {
   v: doublePrecision("v").notNull(),
 }, (t) => [
   primaryKey({ columns: [t.symbol, t.timeframe, t.t] }),
-  index("bars_series").on(t.symbol, t.timeframe, t.t),
 ]);
 
 /** Coverage bookkeeping for each stored series. */

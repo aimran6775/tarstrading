@@ -398,6 +398,13 @@ export async function getBars(symbol: string, timeframe: Timeframe): Promise<Bar
 }
 
 // ---------- US market clock (approximate, ET regular session) ----------
+
+/** The trading day as YYYY-MM-DD in US Eastern time — the anchor for day P&L.
+    en-CA formats as ISO, so this is the ET calendar date, not UTC's. */
+export function etDay(at = new Date()): string {
+  return at.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}
+
 export function isUSMarketOpen(at = new Date()): boolean {
   const et = new Date(at.toLocaleString("en-US", { timeZone: "America/New_York" }));
   const day = et.getDay();
