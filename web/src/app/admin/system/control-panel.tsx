@@ -87,6 +87,7 @@ export default function ControlPanel({ initial }: { initial: Cfg }) {
         <p className="mr-2 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-4">Ops</p>
         <OpBtn label="Flush quote cache" busy={busy === "flush-quotes"} onClick={() => op("flush-quotes")} />
         <OpBtn label="Run agent tick now" busy={busy === "run-tick"} onClick={() => op("run-tick")} />
+        <OpBtn label="Sync US tickers" busy={busy === "sync-tickers"} onClick={() => op("sync-tickers")} />
         {note && <span className="ml-auto font-mono text-[11px] text-ink-3">{note}</span>}
       </div>
     </section>

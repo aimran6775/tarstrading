@@ -35,3 +35,4 @@ ALTER TABLE public.game_attempts    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mission_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.replay_results   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.platform_config  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tickers          ENABLE ROW LEVEL SECURITY;

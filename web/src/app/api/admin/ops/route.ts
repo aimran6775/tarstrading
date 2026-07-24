@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { currentAdmin } from "@/server/auth";
 import { db, schema } from "@/server/db";
 import { tickAllRunningAgents } from "@/server/agents";
+import { syncTickers, tickerSyncRunning, countTickers } from "@/server/tickers";
 import { audit } from "@/server/admin-ops";
 
 /*
   One-shot platform operations. Admin-only, audited.
   - flush-quotes: clear the shared L2 quote cache so the next read re-fetches.
   - run-tick: fire the agent heartbeat now (respects the agents-paused switch).
+  - sync-tickers: refresh the full US ticker directory (background — paced by
+    the market token bucket, takes a few minutes; the census shows progress).
 */
 export async function POST(request: Request) {
   const admin = await currentAdmin();
@@ -22,6 +25,12 @@ export async function POST(request: Request) {
     case "run-tick":
       result = await tickAllRunningAgents();
       break;
+    case "sync-tickers": {
+      const already = tickerSyncRunning();
+      if (!already) void syncTickers().catch(() => { /* heartbeat retries weekly */ });
+      result = { started: !already, alreadyRunning: already, have: await countTickers() };
+      break;
+    }
     default:
       return NextResponse.json({ ok: false, error: "Unknown op." }, { status: 400 });
   }

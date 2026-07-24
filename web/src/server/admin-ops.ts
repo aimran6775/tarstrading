@@ -103,7 +103,7 @@ const CENSUS_GROUPS: { group: string; tables: string[] }[] = [
   { group: "Analyst desk", tables: ["agents", "agent_activity", "agent_chats"] },
   { group: "Assistant", tables: ["chat_messages", "tars_memory"] },
   { group: "Academy", tables: ["lesson_progress", "quiz_attempts", "practice_streaks", "card_reviews", "replay_results", "mission_progress", "game_attempts"] },
-  { group: "Market-data vault", tables: ["bars", "quote_history", "quote_cache", "sync_state", "api_calls"] },
+  { group: "Market-data vault", tables: ["bars", "quote_history", "quote_cache", "sync_state", "api_calls", "tickers"] },
   { group: "Infrastructure", tables: ["cron_runs", "rate_limits"] },
 ];
 

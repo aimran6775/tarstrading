@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { searchSymbols, type SymbolEntry } from "@/lib/symbols";
 
 /*
-  Symbol field with instant name+ticker autocomplete. Keyboard-navigable;
-  picking a suggestion (or pressing Enter on free-form text) submits it.
+  Symbol field with autocomplete over the FULL tradable universe: the static
+  curated list answers instantly on every keystroke, then the server directory
+  (every active US-listed stock/ETF) replaces it when the debounced fetch
+  lands. Keyboard-navigable; Enter on free-form text still submits anything.
 */
 export default function SymbolInput({
   value, onChange, onSubmit, placeholder = "Add symbol — name or ticker",
@@ -19,10 +21,28 @@ export default function SymbolInput({
   const [active, setActive] = useState(0);
   const [focused, setFocused] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const seq = useRef(0);
 
   useEffect(() => {
+    // Instant local results now…
     setSuggestions(searchSymbols(value));
     setActive(0);
+    // …full-market results ~150ms later (stale responses discarded).
+    const q = value.trim();
+    if (!q) return;
+    const mine = ++seq.current;
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/symbols?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (mine === seq.current && Array.isArray(d.results) && d.results.length) {
+          setSuggestions(d.results);
+          setActive(0);
+        }
+      } catch { /* local results already shown */ }
+    }, 150);
+    return () => clearTimeout(t);
   }, [value]);
 
   useEffect(() => {

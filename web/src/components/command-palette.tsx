@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { searchSymbols, SYMBOLS as SYMBOL_DICT } from "@/lib/symbols";
+import { searchSymbols, SYMBOLS as SYMBOL_DICT, type SymbolEntry } from "@/lib/symbols";
 
 /*
   ⌘K / Ctrl-K from anywhere: jump to a symbol's chart or navigate the app.
@@ -52,6 +52,25 @@ export default function CommandPalette() {
     if (open) { setQuery(""); setActive(0); setTimeout(() => inputRef.current?.focus(), 0); }
   }, [open]);
 
+  // Full-market results from the server directory (every US-listed ticker),
+  // debounced; the static list still answers instantly between keystrokes.
+  const [serverHits, setServerHits] = useState<SymbolEntry[]>([]);
+  const seq = useRef(0);
+  useEffect(() => {
+    const q = query.trim();
+    const mine = ++seq.current;
+    if (!q) { setServerHits([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/symbols?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (mine === seq.current && Array.isArray(d.results)) setServerHits(d.results);
+      } catch { /* static results stand */ }
+    }, 150);
+    return () => clearTimeout(t);
+  }, [query]);
+
   const items = useMemo<Item[]>(() => {
     const q = query.trim().toUpperCase();
     const go = (href: string) => () => { setOpen(false); router.push(href); };
@@ -60,7 +79,9 @@ export default function CommandPalette() {
       .filter(([label]) => !q || label.toUpperCase().includes(q))
       .map(([label, href]) => ({ id: `s:${href}`, label, sub: "Go to section", run: go(href) }));
 
-    const matches = q ? searchSymbols(q, 6) : DEFAULT_SYMBOLS.map((s) => ({ symbol: s, name: "" }));
+    const matches = q
+      ? (serverHits.length ? serverHits.slice(0, 6) : searchSymbols(q, 6))
+      : DEFAULT_SYMBOLS.map((s) => ({ symbol: s, name: "" }));
     const symMatches = matches.map((m) => ({
       id: `sym:${m.symbol}`, label: m.symbol,
       sub: m.name || "Open market", run: go(`/app/m/${encodeURIComponent(m.symbol)}`),
@@ -74,7 +95,7 @@ export default function CommandPalette() {
       : [];
 
     return [...freeform, ...symMatches, ...sections];
-  }, [query, router]);
+  }, [query, router, serverHits]);
 
   useEffect(() => { setActive(0); }, [query]);
 

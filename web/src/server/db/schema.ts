@@ -284,6 +284,19 @@ export const bars = pgTable("bars", {
   primaryKey({ columns: [t.symbol, t.timeframe, t.t] }),
 ]);
 
+/** The tradable-universe directory — every active US-listed stock and ETF,
+    synced from Massive's reference API, plus the curated crypto pairs. This is
+    what autocomplete searches, so discovery covers the WHOLE market, not a
+    hand-picked list. `kind` is the upstream type (CS, ETF, ADRC…, or CRYPTO). */
+export const tickers = pgTable("tickers", {
+  symbol: text("symbol").primaryKey(),
+  name: text("name").notNull(),
+  kind: text("kind").notNull().default("CS"),
+  exchange: text("exchange"),
+  active: integer("active").notNull().default(1),
+  updatedAt: epochMs("updated_at").notNull(),
+}, (t) => [index("tickers_name").on(t.name)]);
+
 /** Coverage bookkeeping for each stored series. */
 export const syncState = pgTable("sync_state", {
   /** `${symbol}:${timeframe}` */
