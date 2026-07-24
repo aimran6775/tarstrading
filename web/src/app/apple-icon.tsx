@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { markDataUri } from "./_brand/mark";
 
-// The iOS home-screen / touch icon — the Horizon on the canonical dark room.
+// The iOS home-screen / touch icon — the Ascent mark on the canonical dark room.
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 

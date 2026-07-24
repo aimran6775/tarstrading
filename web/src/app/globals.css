@@ -225,16 +225,19 @@ html, body {
   }
 }
 
-/* The Tars mark, booting like an attitude indicator: the bezel draws in, the
-   horizon rolls level with a touch of overshoot, then the reference lights up. */
-@keyframes tm-draw { from { stroke-dashoffset: 164; } to { stroke-dashoffset: 0; } }
-@keyframes tm-level { 0% { transform: rotate(-17deg); } 62% { transform: rotate(3.5deg); } 100% { transform: rotate(0); } }
-@keyframes tm-pop { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
-.tars-anim .tm-ring { stroke-dasharray: 164; animation: tm-draw 0.8s var(--ease-spring) both; }
-.tars-anim .tm-h { transform-box: view-box; transform-origin: 32px 32px; animation: tm-level 1s var(--ease-spring) 0.18s both; }
-.tars-anim .tm-tick, .tars-anim .tm-core { transform-box: view-box; transform-origin: 32px 33px; animation: tm-pop 0.5s var(--ease-spring) 0.66s both; }
+/* The Tars mark, booting like a machined part settling into place: the body
+   rises with a touch of overshoot, the ridge draws down from the apex, the
+   spark lights, and the cast shadow fades in under it. */
+@keyframes am-rise { from { opacity: 0; transform: translateY(7px) scale(0.9); } to { opacity: 1; transform: none; } }
+@keyframes am-draw { from { stroke-dashoffset: 21; } to { stroke-dashoffset: 0; } }
+@keyframes am-pop { from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: scale(1); } }
+@keyframes am-fade { from { opacity: 0; } to { opacity: 1; } }
+.tars-anim .am-body { transform-box: view-box; transform-origin: 32px 30px; animation: am-rise 0.7s var(--ease-spring) both; }
+.tars-anim .am-ridge { stroke-dasharray: 21; animation: am-draw 0.5s var(--ease-spring) 0.34s both; }
+.tars-anim .am-spark { transform-box: view-box; transform-origin: 32px 11px; animation: am-pop 0.45s var(--ease-spring) 0.62s both; }
+.tars-anim .am-cast { animation: am-fade 0.6s ease 0.3s both; }
 @media (prefers-reduced-motion: reduce) {
-  .tars-anim .tm-ring, .tars-anim .tm-h, .tars-anim .tm-tick, .tars-anim .tm-core { animation: none; }
+  .tars-anim .am-body, .tars-anim .am-ridge, .tars-anim .am-spark, .tars-anim .am-cast { animation: none; }
 }
 
 ::selection { background: oklch(from var(--gold) l c h / 0.32); }
