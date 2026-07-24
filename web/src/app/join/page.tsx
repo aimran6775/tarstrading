@@ -26,7 +26,7 @@ export default function Join() {
     });
     const data = await res.json();
     if (data.ok) {
-      router.push("/app?welcome=1");
+      router.push("/app/floor?welcome=1");
     } else {
       setError(data.error ?? "Something went wrong.");
       setBusy(false);

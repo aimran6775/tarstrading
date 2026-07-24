@@ -13,6 +13,7 @@ import { searchSymbols, SYMBOLS as SYMBOL_DICT } from "@/lib/symbols";
 type Item = { id: string; label: string; sub: string; run: () => void };
 
 const SECTIONS: [string, string][] = [
+  ["Trading Floor — your dashboard", "/app/floor"],
   ["Markets — browse", "/app"],
   ["Academy", "/app/academy"],
   ["Placement test — skip what you know", "/app/academy/placement"],

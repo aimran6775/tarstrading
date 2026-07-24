@@ -24,7 +24,7 @@ export default function Login() {
     });
     const data = await res.json();
     if (data.ok) {
-      router.push("/app");
+      router.push("/app/floor");
     } else {
       setError(data.error ?? "Couldn't log in.");
       setBusy(false);

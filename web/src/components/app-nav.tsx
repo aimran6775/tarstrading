@@ -13,9 +13,10 @@ import TarsWordmark from "./tars-wordmark";
   bar on mobile so the four sections are always reachable on a phone.
 */
 
-export type Section = "terminal" | "academy" | "assistant" | "standings";
+export type Section = "floor" | "terminal" | "academy" | "assistant" | "standings";
 
 const NAV: [Section, string, string][] = [
+  ["floor", "Floor", "/app/floor"],
   ["terminal", "Markets", "/app"],
   ["academy", "Academy", "/app/academy"],
   ["assistant", "Assistant", "/app/assistant"],
@@ -23,6 +24,7 @@ const NAV: [Section, string, string][] = [
 ];
 
 const ICON: Record<Section, string> = {
+  floor: "M4 4h7v7H4zM13 4h7v4h-7zM13 11h7v9h-7zM4 13h7v7H4z", // dashboard tiles
   terminal: "M3 17l5-6 4 3 6-8", // sparkline
   academy: "M12 4L2 9l10 5 8-4v6M6 12v4c0 1 3 2 6 2s6-1 6-2v-4",
   // chat bubble — the assistant you talk to
@@ -56,7 +58,7 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
       <CommandPalette />
       <header className="glass sticky top-0 z-50 flex items-center justify-between px-4 py-2.5 md:px-6">
         <div className="flex items-center gap-3">
-          <Link href="/app" className="pressable"><TarsWordmark size={22} /></Link>
+          <Link href="/app/floor" className="pressable"><TarsWordmark size={22} /></Link>
           <Link href="/disclosures" className="sim-mark" title="All capital on Tars is simulated — no real money.">
             SIMULATED
           </Link>
