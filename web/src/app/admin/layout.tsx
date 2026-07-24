@@ -14,7 +14,7 @@ const NAV: [string, string][] = [
   ["Academy", "/admin/academy"],
   ["Data ops", "/admin/data"],
   ["Users", "/admin/users"],
-  ["System", "/admin/system"],
+  ["Controls", "/admin/system"],
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

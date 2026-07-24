@@ -22,7 +22,18 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   /** "user" | "admin" — admins are bootstrapped from ADMIN_EMAILS at login. */
   role: text("role").$type<"user" | "admin">().notNull().default("user"),
+  /** 1 = suspended: login blocked, sessions revoked. Admin-controlled. */
+  suspended: integer("suspended").notNull().default(0),
   createdAt: epochMs("created_at").notNull(),
+});
+
+/** Runtime platform config the admin control-center writes and the app reads —
+    kill switches (trading halt, agents paused) and a broadcast banner. */
+export const platformConfig = pgTable("platform_config", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedBy: text("updated_by"),
+  updatedAt: epochMs("updated_at").notNull(),
 });
 
 export const sessions = pgTable("sessions", {

@@ -13,7 +13,10 @@ export async function POST(request: Request) {
     await purgeExpiredSessions();
     await startSession(userId);
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.message === "suspended") {
+      return NextResponse.json({ ok: false, error: "This account is suspended. Contact support." }, { status: 403 });
+    }
     // One message for both wrong-email and wrong-password: no account probing.
     return NextResponse.json(
       { ok: false, error: "Email or password didn't match." },

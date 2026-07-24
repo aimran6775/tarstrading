@@ -1,18 +1,22 @@
 import { db, schema } from "@/server/db";
 import { desc, eq } from "drizzle-orm";
+import { getPlatformConfig } from "@/server/platform";
+import ControlPanel from "./control-panel";
 
 /*
-  System — the machine's own logbook: cron heartbeats, rate-limit buckets,
-  and the admin audit trail.
+  Controls & system — the operational control center: platform kill switches, a
+  broadcast banner, and one-shot ops up top; the machine's own logbook (cron
+  heartbeats, rate-limit buckets, and the admin audit trail) below.
 */
-export const metadata = { title: "System" };
+export const metadata = { title: "Controls" };
 export const dynamic = "force-dynamic";
 
 const when = (ms: number) =>
   new Date(ms).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export default async function AdminSystem() {
-  const [runs, limits, audit] = await Promise.all([
+  const [config, runs, limits, audit] = await Promise.all([
+    getPlatformConfig(),
     db.select().from(schema.cronRuns).orderBy(desc(schema.cronRuns.createdAt)).limit(20),
     db.select().from(schema.rateLimits).limit(50),
     db.select({
@@ -21,14 +25,15 @@ export default async function AdminSystem() {
       email: schema.users.email,
     }).from(schema.adminAudit)
       .innerJoin(schema.users, eq(schema.adminAudit.userId, schema.users.id))
-      .orderBy(desc(schema.adminAudit.createdAt)).limit(20),
+      .orderBy(desc(schema.adminAudit.createdAt)).limit(40),
   ]);
 
   return (
     <>
-      <h1 className="font-mono text-xs uppercase tracking-[0.3em] text-ink-4">System</h1>
+      <h1 className="font-mono text-xs uppercase tracking-[0.3em] text-ink-4">Controls</h1>
+      <ControlPanel initial={config} />
 
-      <h2 className="mt-5 font-mono text-[11px] uppercase tracking-[0.25em] text-ink-4">Cron heartbeats</h2>
+      <h2 className="mt-8 font-mono text-[11px] uppercase tracking-[0.25em] text-ink-4">Cron heartbeats</h2>
       <section className="panel mt-2 overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead>

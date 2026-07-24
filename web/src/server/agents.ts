@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { and, eq, desc } from "drizzle-orm";
 import { getBars, getQuote, getQuotes, isUSMarketOpen, type BarPoint } from "./market";
+import { getPlatformConfig } from "./platform";
 import { placeOrder } from "./exchange";
 
 /*
@@ -346,6 +347,8 @@ export async function tickAgents(userId: string): Promise<number> {
  * rate limit; each user's tick keeps its own in-flight lock.
  */
 export async function tickAllRunningAgents(): Promise<{ users: number; actions: number }> {
+  // Admin pause switch — freeze every analyst platform-wide without killing them.
+  if ((await getPlatformConfig()).agentsPaused) return { users: 0, actions: 0 };
   const rows = await db.selectDistinct({ userId: schema.agents.userId })
     .from(schema.agents).where(eq(schema.agents.status, "running"));
   let actions = 0;

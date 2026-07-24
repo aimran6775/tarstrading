@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { and, eq, desc } from "drizzle-orm";
 import { getQuote, getQuotes, isUSMarketOpen, etDay } from "./market";
+import { getPlatformConfig } from "./platform";
 
 /*
   The simulated exchange. Every user trades an isolated $100k account.
@@ -66,6 +67,9 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     return reject("Limit orders need a limit price.");
   if (input.type === "stop" && !(input.stopPrice && input.stopPrice > 0))
     return reject("Stop orders need a stop price.");
+
+  // Platform kill switch — admins can halt all order flow.
+  if ((await getPlatformConfig()).tradingHalted) return reject("Trading is temporarily halted by the platform.");
 
   // Fetch the quote BEFORE the transaction — never hold a lock across network.
   const quote = await getQuote(symbol);

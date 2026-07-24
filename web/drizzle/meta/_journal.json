@@ -57,6 +57,13 @@
       "when": 1784855157748,
       "tag": "0007_perf-and-integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784857352483,
+      "tag": "0008_admin-control",
+      "breakpoints": true
     }
   ]
 }

@@ -144,6 +144,7 @@ export async function loginWithPassword(email: string, password: string): Promis
   // exists — so response time doesn't leak account membership.
   const ok = verifyPassword(password, user ? user.passwordHash : DUMMY_HASH);
   if (!user || !ok) throw new Error("bad-credentials");
+  if (user.suspended) throw new Error("suspended");
   return user.id;
 }
 
