@@ -10,7 +10,7 @@ import TarsWordmark from "./tars-wordmark";
 /*
   The authenticated shell: a sticky top header (wordmark, simulated marker,
   desktop nav, optional right slot, theme, logout) plus a fixed bottom tab
-  bar on mobile so the four sections are always reachable on a phone.
+  bar on mobile so the five sections are always reachable on a phone.
 */
 
 export type Section = "floor" | "terminal" | "academy" | "assistant" | "standings";
@@ -87,13 +87,13 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
           {right}
           <ThemeToggle />
           <button onClick={logout}
-            className="pressable min-h-9 rounded-full border border-hairline px-3 py-1.5 text-xs text-ink-2 hover:text-ink-1">
+            className="pressable min-h-10 rounded-full border border-hairline px-3 py-1.5 text-xs text-ink-2 hover:text-ink-1">
             Log out
           </button>
         </div>
       </header>
 
-      {/* Mobile bottom tab bar — the four sections, always reachable */}
+      {/* Mobile bottom tab bar — the five sections, always reachable */}
       <nav className="glass fixed inset-x-0 bottom-0 z-50 flex justify-around border-t border-hairline pb-[env(safe-area-inset-bottom)] sm:hidden">
         {NAV.map(([key, label, href]) => (
           <Link key={key} href={href}
@@ -101,7 +101,7 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
               active === key ? "text-gold" : "text-ink-3"
             }`}
             aria-current={active === key ? "page" : undefined}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+            <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d={ICON[key]} />
             </svg>

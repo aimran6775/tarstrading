@@ -76,7 +76,8 @@ export default function Floor({ data }: { data: Data }) {
   const winRate = data.edge.trades ? data.edge.wins / data.edge.trades : 0;
 
   return (
-    <main className="flex-1 px-4 pb-24 pt-4 md:px-6 md:pb-10">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-4 md:px-6 md:pb-10">
+      <h1 className="sr-only">Trading Floor</h1>
       <FloorTour hasAgents={data.agentsRunning > 0} />
 
       {/* ---- hero ---- */}
@@ -117,7 +118,7 @@ export default function Floor({ data }: { data: Data }) {
       </motion.section>
 
       {/* ---- KPI strip ---- */}
-      <motion.div {...(rm ? {} : rise(1))} className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <motion.div {...(rm ? {} : rise(1))} className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
         <Kpi label="Cash" value={usd(data.cash, 0)} />
         <Kpi label="Invested" value={usd(data.invested, 0)} />
         <Kpi label="Open P&L" value={usd(data.openPnl)} tone={tone(data.openPnl)} />
@@ -228,8 +229,8 @@ export default function Floor({ data }: { data: Data }) {
         </Panel>
 
         {/* Pulse */}
-        <Panel i={7} title="Pulse">
-          <div className="flex flex-col gap-2.5 text-sm">
+        <Panel i={7} title="Pulse" wide>
+          <div className="grid gap-2.5 text-sm sm:grid-cols-3 sm:gap-6">
             <Pulse label="US market" value={data.system.marketOpen ? "Open" : "Closed"} ok={data.system.marketOpen} />
             <Pulse label="Live feed" value={data.system.feed} ok={data.system.feed === "live"} warn={data.system.feed === "connecting"} />
             <Pulse label="AI brain" value={data.system.brain} ok={data.system.brain !== "scripted"} />
@@ -253,12 +254,12 @@ function Kpi({ label, value, tone = "ink-1" }: { label: string; value: string; t
     </div>
   );
 }
-function Panel({ i, title, href, cta, accent, children }: {
-  i: number; title: string; href?: string; cta?: string; accent?: string; children: React.ReactNode;
+function Panel({ i, title, href, cta, accent, wide, children }: {
+  i: number; title: string; href?: string; cta?: string; accent?: string; wide?: boolean; children: React.ReactNode;
 }) {
   const rm = useReducedMotion();
   return (
-    <motion.section {...(rm ? {} : rise(i))} className={`card p-5 ${accent ? `border-l-2 border-l-${accent}` : ""}`}>
+    <motion.section {...(rm ? {} : rise(i))} className={`card p-5 ${wide ? "lg:col-span-2" : ""} ${accent ? `border-l-2 border-l-${accent}` : ""}`}>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-display text-base font-bold text-ink-1">{title}</h2>
         {href && cta && <Link href={href} className="text-[11px] text-ink-4 hover:text-gold">{cta} →</Link>}

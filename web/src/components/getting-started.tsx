@@ -57,7 +57,7 @@ export default function GettingStarted() {
                 className={`flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-bg3/50 ${complete ? "opacity-55" : ""}`}>
                 <span aria-hidden
                   className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${
-                    complete ? "border-transparent bg-gain text-onfill" : "border-gold/50 text-transparent"
+                    complete ? "border-transparent bg-gain text-bg0" : "border-gold/50 text-transparent"
                   }`}>
                   ✓
                 </span>

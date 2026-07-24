@@ -60,7 +60,7 @@ export default function MarketCard({ symbol, name, quote, spark }: {
         {quote
           ? <span className="tnum text-lg font-semibold text-ink-1">{usd(quote.price)}</span>
           : <span className="skeleton h-6 w-20" />}
-        <span className="text-[11px] text-ink-4 opacity-0 transition-opacity group-hover:opacity-100">Trade →</span>
+        <span className="text-[11px] text-ink-4 opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-70">Trade →</span>
       </div>
     </Link>
   );

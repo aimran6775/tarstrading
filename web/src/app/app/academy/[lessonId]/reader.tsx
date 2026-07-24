@@ -305,7 +305,7 @@ function Quiz({ section, quizIndex, result, onResult }: {
         })}
       </div>
       {answered && (
-        <div className="mt-3 flex items-start justify-between gap-3" aria-live="polite">
+        <div className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3" aria-live="polite">
           <p className={`text-sm leading-relaxed ${picked === section.answer ? "text-gain" : "text-ink-2"}`}>
             {picked === section.answer ? "Right. " : "Not quite. "}{section.explain}
           </p>

@@ -24,8 +24,9 @@ export default function AssistantChat({ onDeskChanged }: { onDeskChanged: () => 
   const scroller = useRef<HTMLDivElement>(null);
 
   const scrollDown = useCallback(() => {
+    const smooth = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     requestAnimationFrame(() => {
-      scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
+      scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: smooth ? "smooth" : "auto" });
     });
   }, []);
 
@@ -80,7 +81,7 @@ export default function AssistantChat({ onDeskChanged }: { onDeskChanged: () => 
         </span>
       </div>
 
-      <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto p-4">
+      <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto p-4" role="log" aria-live="polite" aria-label="Analyst conversation">
         {phase === "loading" && <div className="skeleton h-24 w-full" />}
         {phase === "error" && (
           <p className="py-8 text-center text-xs text-loss">Couldn&apos;t load the conversation. Refresh to retry.</p>

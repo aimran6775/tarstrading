@@ -155,7 +155,7 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
       )}
 
       {/* Category strip — markets are the content */}
-      <div className="sticky top-[52px] z-40 border-b border-hairline bg-bg0/85 px-4 backdrop-blur-md md:px-6">
+      <div className="sticky top-14 z-40 border-b border-hairline bg-bg0/85 px-4 backdrop-blur-md md:px-6">
         <nav className="flex gap-1 overflow-x-auto py-2" aria-label="Market categories">
           {CATEGORIES.map((c) => (
             <button key={c} onClick={() => setCategory(c)}
@@ -203,7 +203,7 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
                 <MarketCard symbol={s} name={NAME.get(s)} quote={quotes.get(s)} spark={sparks[s]} />
                 {category === "Watchlist" && (
                   <button onClick={() => removeFromWatchlist(s)}
-                    className="pressable absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-bg3/80 text-ink-4 hover:text-loss"
+                    className="pressable absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center rounded-full bg-bg3/80 text-ink-4 hover:text-loss"
                     aria-label={`Remove ${s} from watchlist`}>
                     ×
                   </button>

@@ -55,7 +55,11 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
     initialTray === "perf" || initialTray === "orders" || initialTray === "alerts" ? initialTray as TrayTab : "positions");
   const [presetSide, setPresetSide] = useState<"buy" | "sell" | null>(
     initialSide === "sell" ? "sell" : initialSide === "buy" ? "buy" : null);
-  const [chartHeight, setChartHeight] = useState(420);
+  // Lazy-init to the correct height so mobile doesn't render 420 then snap to
+  // 300 after hydration. The chart is client-only (dynamic ssr:false), so window
+  // is defined on the first render that mounts it — no layout shift.
+  const [chartHeight, setChartHeight] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? 300 : 420);
 
   const watchlistRef = useRef<string[]>([]);
   const positionsRef = useRef<Position[]>([]);
@@ -345,7 +349,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
 
         {/* ---------- the portfolio tray ---------- */}
         <section className="panel mt-4 overflow-hidden">
-          <nav className="flex gap-1 border-b border-hairline px-2 pt-2" aria-label="Portfolio tray">
+          <nav className="flex gap-1 overflow-x-auto border-b border-hairline px-2 pt-2 [&>button]:shrink-0" aria-label="Portfolio tray">
             {([
               ["positions", `Positions${positions.length ? ` · ${positions.length}` : ""}`],
               ["orders", `Orders${openOrders.length ? ` · ${openOrders.length}` : ""}`],

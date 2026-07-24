@@ -85,7 +85,7 @@ export default function CommandPalette() {
       onClick={() => setOpen(false)}>
       <div aria-hidden className="absolute inset-0 bg-bg0/70 backdrop-blur-sm" />
       <div
-        role="dialog" aria-label="Command palette"
+        role="dialog" aria-modal="true" aria-label="Command palette"
         className="glass relative w-full max-w-lg overflow-hidden rounded-2xl border border-hairline shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >

@@ -70,7 +70,7 @@ export default function FloorTour({ hasAgents }: { hasAgents?: boolean }) {
       <motion.div className="fixed inset-0 z-[110] flex items-center justify-center p-4"
         initial={rm ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
         <div className="absolute inset-0 bg-bg0/70 backdrop-blur-sm" onClick={close} aria-hidden />
-        <motion.div role="dialog" aria-label="Welcome tour"
+        <motion.div role="dialog" aria-modal="true" aria-label="Welcome tour"
           initial={rm ? false : { opacity: 0, y: 18, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: rm ? 0 : 0.3, ease: [0.32, 0.72, 0, 1] }}
           className="glass relative w-full max-w-md overflow-hidden rounded-3xl border border-hairline p-7 shadow-2xl">
@@ -86,7 +86,7 @@ export default function FloorTour({ hasAgents }: { hasAgents?: boolean }) {
             </div>
             <div className="flex items-center gap-2">
               {!last && <button onClick={close} className="pressable rounded-full px-3 py-2 text-xs text-ink-4 hover:text-ink-2">Skip</button>}
-              <button onClick={() => (last ? close() : setI((n) => n + 1))}
+              <button autoFocus onClick={() => (last ? close() : setI((n) => n + 1))}
                 className="pressable cta-gold rounded-full px-5 py-2 text-sm font-semibold">
                 {last ? "Start trading" : "Next"}
               </button>

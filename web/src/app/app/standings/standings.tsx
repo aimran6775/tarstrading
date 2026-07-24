@@ -42,7 +42,7 @@ export default function Standings() {
 
   if (error) {
     return (
-      <main className="mx-auto w-full max-w-6xl px-4 py-10 pb-24 sm:px-6">
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 pb-24 sm:px-6">
         <p className="text-sm text-ink-3">Couldn&apos;t load standings. <button onClick={() => location.reload()} className="text-gold underline">Retry</button></p>
       </main>
     );

@@ -96,7 +96,7 @@ export default function LessonTutor({ lessonId, lessonTitle }: { lessonId: strin
                 <button onClick={() => setOpen(false)} className="pressable rounded-full px-2 py-1 text-ink-3 hover:text-ink-1" aria-label="Close tutor">✕</button>
               </div>
 
-              <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+              <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4" role="log" aria-live="polite" aria-label="Tutor conversation">
                 {messages.length === 0 && (
                   <div className="text-sm leading-relaxed text-ink-3">
                     <p className="text-ink-2">Stuck on anything here? Ask me — I know this lesson and what you&apos;ve found tricky before.</p>

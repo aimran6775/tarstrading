@@ -42,11 +42,16 @@ export default function PriceChart({ bars, height = 420 }: { bars: ChartBar[]; h
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const [themeTick, setThemeTick] = useState(0);
 
-  // Rebuild chart colors when the theme attribute flips.
+  // Rebuild chart colors when the theme changes — either the explicit toggle
+  // (data-theme attribute) OR, in "auto" mode, an OS light/dark switch that
+  // fires prefers-color-scheme but no attribute mutation.
   useEffect(() => {
-    const observer = new MutationObserver(() => setThemeTick((t) => t + 1));
+    const bump = () => setThemeTick((t) => t + 1);
+    const observer = new MutationObserver(bump);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => observer.disconnect();
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", bump);
+    return () => { observer.disconnect(); mq.removeEventListener("change", bump); };
   }, []);
 
   useEffect(() => {

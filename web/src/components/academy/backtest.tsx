@@ -39,7 +39,7 @@ export function RuleBuilder() {
       </div>
       <div className="mt-2 rounded-lg border border-hairline bg-bg2 p-3">
         <p className="text-[10px] uppercase tracking-[0.2em] text-ink-4">The engine runs</p>
-        <p className="tnum mt-1 overflow-x-auto whitespace-pre text-[11px] text-gain">{json}</p>
+        <p className="tnum mt-1 overflow-x-auto whitespace-pre text-[11px] text-gold">{json}</p>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-ink-4">
         Nothing hidden. Your plain English becomes a transparent rule the engine can check on every bar — and you can read exactly what it&apos;s doing.
