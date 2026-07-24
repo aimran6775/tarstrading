@@ -1,28 +1,35 @@
 ;; ============================================================
-;; tarstrading.com — BIND zone file for Cloudflare import
+;; tarstrading.com — BIND zone file for Cloudflare import (FINAL)
 ;; Upload: Cloudflare dashboard → tarstrading.com → DNS → Records
 ;;         → Import and Export → Import DNS records → this file.
 ;;
-;; ONE substitution required before upload:
-;;   Replace RAILWAY_TARGET.up.railway.app with the CNAME target
-;;   Railway prints when the custom domains are added to the service
-;;   (Settings → Networking → Custom Domain, or `railway domain`).
-;;   Apex + www + admin may share one target or get per-domain
-;;   targets — use exactly what Railway shows for each hostname.
+;; Targets are the live Railway values for project "tars-trading"
+;; (service: web). Nothing to edit — import as-is.
 ;;
-;; Cloudflare flattens the apex CNAME automatically (legal on
-;; Cloudflare even though classic BIND forbids apex CNAMEs).
-;; Keep the orange-cloud (proxy) ON for apex/www/admin: you get
-;; TLS, HTTP/3 and caching in front of Railway.
+;; Cloudflare flattens the apex CNAME automatically. Keep the
+;; orange-cloud (proxy) ON for @, www and admin — TLS, HTTP/3 and
+;; caching in front of Railway. The _railway-verify TXT records
+;; prove domain ownership to Railway; leave them grey-cloud (DNS
+;; only, which is automatic for TXT).
+;;
+;; www strategy: Railway's plan allows two custom domains, spent on
+;; @ and admin. www points at the apex and needs ONE redirect rule
+;; in Cloudflare (Rules → Redirect Rules → create):
+;;   When hostname equals www.tarstrading.com
+;;   → 301 to https://tarstrading.com$1 (preserve path).
 ;; ============================================================
 
 $ORIGIN tarstrading.com.
 $TTL 300
 
-;; ---------- Web (Railway) ----------
-@       IN CNAME RAILWAY_TARGET.up.railway.app.
-www     IN CNAME RAILWAY_TARGET.up.railway.app.
-admin   IN CNAME RAILWAY_TARGET.up.railway.app.
+;; ---------- Web (Railway: tars-trading/web) ----------
+@       IN CNAME 9bhwmtj8.up.railway.app.
+admin   IN CNAME 8g1835s1.up.railway.app.
+www     IN CNAME tarstrading.com.
+
+;; Railway domain-ownership verification
+_railway-verify        IN TXT "railway-verify=railway-verify=6e5adc1b777f96616a32c4006bab53ad68ad0329dd1f99f094ea640e345df3be"
+_railway-verify.admin  IN TXT "railway-verify=railway-verify=f6374de78419869c8277ff55e274124d563c3b71a6986d25be0e034bdae47185"
 
 ;; ---------- Email ----------
 ;; Plan: Cloudflare Email Routing (free) receives mail for
@@ -41,8 +48,3 @@ admin   IN CNAME RAILWAY_TARGET.up.railway.app.
 ;; dropped while the domain builds reputation; tighten to
 ;; p=quarantine after a clean week of reports.
 _dmarc  IN TXT   "v=DMARC1; p=none; rua=mailto:tarsitgroup@outlook.com; fo=1"
-
-;; Outlook/Microsoft sometimes wants explicit null-MX semantics before
-;; Email Routing is enabled; harmless once routing adds real MX.
-;; (Delete this line if Cloudflare complains about coexisting MX.)
-;; @    IN MX 0  .
