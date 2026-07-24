@@ -47,6 +47,49 @@ export function SectionHeader({ children, right }: { children: React.ReactNode; 
   );
 }
 
+/** The page title bar — dense mono label, optional right-aligned action slot. */
+export function PageHeader({ title, right }: { title: string; right?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h1 className="font-mono text-xs uppercase tracking-[0.3em] text-ink-4">{title}</h1>
+      {right}
+    </div>
+  );
+}
+
+type Col = { label: string; align?: "right" };
+
+/*
+  The shared table chrome for static rows — one rounded panel, hairline rules,
+  a row hover. Cells are ReactNode, so callers still drop in colored status
+  spans; the first column reads as the row's subject (medium, ink-1).
+*/
+export function DataTable({ cols, rows, empty, minWidth }: {
+  cols: Col[]; rows: React.ReactNode[][]; empty: string; minWidth?: number;
+}) {
+  return (
+    <section className="panel mt-2 overflow-x-auto">
+      <table className="w-full text-left text-xs" style={minWidth ? { minWidth } : undefined}>
+        <thead>
+          <tr className="border-b border-hairline font-mono text-[10px] uppercase tracking-[0.15em] text-ink-4">
+            {cols.map((c, i) => <th key={i} className={`px-4 py-2.5 ${c.align === "right" ? "text-right" : ""}`}>{c.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && <tr><td colSpan={cols.length} className="px-4 py-8 text-center text-ink-4">{empty}</td></tr>}
+          {rows.map((r, ri) => (
+            <tr key={ri} className="border-b border-hairline last:border-0 hover:bg-bg3/30">
+              {r.map((cell, ci) => (
+                <td key={ci} className={`tnum px-4 py-2 ${cols[ci]?.align === "right" ? "text-right" : ""} ${ci === 0 ? "font-medium text-ink-1" : "text-ink-2"}`}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 /*
   A dependency-free sparkline. Normalizes `data` into a 100×28 viewBox with a
   soft area fill under the agent-colored stroke and an emphasized endpoint —

@@ -1,5 +1,6 @@
 import { db, schema } from "@/server/db";
 import { desc, eq, sql as dsql } from "drizzle-orm";
+import { PageHeader } from "../ui";
 import UsersRoster from "./roster";
 
 /*
@@ -27,7 +28,7 @@ export default async function AdminUsers() {
 
   return (
     <>
-      <h1 className="font-mono text-xs uppercase tracking-[0.3em] text-ink-4">Users · {rows.length}</h1>
+      <PageHeader title={`Users · ${rows.length}`} right={<span className="font-mono text-[11px] text-ink-4">click a trader to manage</span>} />
       <UsersRoster rows={rows} />
     </>
   );

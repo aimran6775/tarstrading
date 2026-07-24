@@ -1,6 +1,7 @@
 import { db } from "@/server/db";
 import { sql as dsql } from "drizzle-orm";
 import { findLesson } from "@/lib/academy";
+import { PageHeader, StatCard, SectionHeader, DataTable } from "../ui";
 
 /*
   Academy analytics — where learners struggle, so content decisions are made on
@@ -55,77 +56,45 @@ export default async function AdminAcademy() {
     from game_attempts group by variant order by attempts desc
   `);
 
-  const KPIS: [string, string | number, string][] = [
-    ["Completions", kpi.completions, `${kpi.learners} learners`],
-    ["Quiz checks", kpi.quiz_attempts, `${kpi.quiz_pass_pct}% passed`],
-    ["Drills played", kpi.game_attempts, `${kpi.game_pass_pct}% correct`],
-    ["On a streak", kpi.streakers, `longest ${kpi.top_streak} days`],
-    ["Cards scheduled", kpi.review_rows, "in spaced repetition"],
-  ];
+  const pct = (miss: number, att: number) => att ? Math.round((miss / att) * 100) : 0;
 
   return (
     <>
-      <h1 className="font-mono text-xs uppercase tracking-[0.3em] text-ink-4">Academy</h1>
+      <PageHeader title="Academy" right={<span className="font-mono text-[11px] text-ink-4">learning analytics</span>} />
 
       <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
-        {KPIS.map(([label, value, sub]) => (
-          <div key={label} className="panel p-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-4">{label}</p>
-            <p className="tnum mt-1 text-2xl font-semibold text-ink-1">{value}</p>
-            <p className="mt-0.5 text-[11px] text-ink-4">{sub}</p>
-          </div>
-        ))}
+        <StatCard label="Completions" value={kpi.completions} sub={`${kpi.learners} learners`} tone="accent" />
+        <StatCard label="Quiz checks" value={kpi.quiz_attempts} sub={`${kpi.quiz_pass_pct}% passed`} tone={kpi.quiz_pass_pct >= 70 ? "gain" : kpi.quiz_pass_pct > 0 ? "warn" : "default"} />
+        <StatCard label="Drills played" value={kpi.game_attempts} sub={`${kpi.game_pass_pct}% correct`} tone={kpi.game_pass_pct >= 70 ? "gain" : kpi.game_pass_pct > 0 ? "warn" : "default"} />
+        <StatCard label="On a streak" value={kpi.streakers} sub={`longest ${kpi.top_streak} days`} />
+        <StatCard label="Cards scheduled" value={kpi.review_rows} sub="in spaced repetition" />
       </div>
 
-      <h2 className="mt-8 font-mono text-xs uppercase tracking-[0.3em] text-ink-4">Hardest checks · ranked by miss rate</h2>
-      {hard.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-4">No quiz attempts logged yet. Numbers appear as learners answer checks.</p>
-      ) : (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead>
-              <tr className="border-b border-hairline text-left font-mono text-[10px] uppercase tracking-[0.15em] text-ink-4">
-                <th className="py-2 pr-4">Lesson · check</th>
-                <th className="py-2 pr-4 text-right">Attempts</th>
-                <th className="py-2 pr-4 text-right">Miss rate</th>
-                <th className="py-2 text-right">Avg tries</th>
-              </tr>
-            </thead>
-            <tbody>
-              {hard.map((h) => {
-                const info = quizInfo(h.lesson_id, h.quiz_index);
-                const missRate = Math.round((h.misses / h.attempts) * 100);
-                return (
-                  <tr key={`${h.lesson_id}-${h.quiz_index}`} className="border-b border-hairline/50 align-top">
-                    <td className="py-2.5 pr-4">
-                      <p className="font-medium text-ink-1">{info.title}</p>
-                      <p className="text-xs text-ink-4">{info.question}</p>
-                    </td>
-                    <td className="tnum py-2.5 pr-4 text-right text-ink-2">{h.attempts}</td>
-                    <td className={`tnum py-2.5 pr-4 text-right font-semibold ${missRate >= 50 ? "text-loss" : missRate >= 25 ? "text-gold" : "text-ink-2"}`}>{missRate}%</td>
-                    <td className="tnum py-2.5 text-right text-ink-2">{h.avg_tries}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <SectionHeader right={<span className="font-mono text-[11px] text-ink-4">ranked by miss rate</span>}>Hardest checks</SectionHeader>
+      <DataTable
+        empty="No quiz attempts logged yet — numbers appear as learners answer checks."
+        minWidth={640}
+        cols={[{ label: "Lesson · check" }, { label: "Attempts", align: "right" }, { label: "Miss rate", align: "right" }, { label: "Avg tries", align: "right" }]}
+        rows={hard.map((h) => {
+          const info = quizInfo(h.lesson_id, h.quiz_index);
+          const missRate = pct(h.misses, h.attempts);
+          return [
+            <div key="l"><p className="font-medium text-ink-1">{info.title}</p><p className="text-[11px] text-ink-4">{info.question}</p></div>,
+            h.attempts,
+            <span key="m" className={`font-semibold ${missRate >= 50 ? "text-loss" : missRate >= 25 ? "text-gold" : "text-ink-2"}`}>{missRate}%</span>,
+            h.avg_tries,
+          ];
+        })}
+      />
 
-      <h2 className="mt-8 font-mono text-xs uppercase tracking-[0.3em] text-ink-4">Drills</h2>
+      <SectionHeader>Drills</SectionHeader>
       {drills.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-4">No drills played yet.</p>
+        <p className="mt-2 text-sm text-ink-4">No drills played yet.</p>
       ) : (
-        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
           {drills.map((d) => {
-            const missRate = d.attempts ? Math.round((d.misses / d.attempts) * 100) : 0;
-            return (
-              <div key={d.variant} className="panel p-4">
-                <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-4">{d.variant}</p>
-                <p className="tnum mt-1 text-2xl font-semibold text-ink-1">{d.attempts}</p>
-                <p className="mt-0.5 text-[11px] text-ink-4">{missRate}% missed</p>
-              </div>
-            );
+            const missRate = pct(d.misses, d.attempts);
+            return <StatCard key={d.variant} label={d.variant} value={d.attempts} sub={`${missRate}% missed`} tone={missRate >= 50 ? "loss" : missRate >= 25 ? "warn" : "default"} />;
           })}
         </div>
       )}

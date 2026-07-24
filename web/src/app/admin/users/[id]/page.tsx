@@ -2,6 +2,7 @@ import { currentAdmin } from "@/server/auth";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { userDetail } from "@/server/admin-ops";
+import { StatCard, SectionHeader, DataTable } from "../../ui";
 import UserActions from "./user-actions";
 
 export const dynamic = "force-dynamic";
@@ -49,79 +50,63 @@ export default async function AdminUserDetail(props: { params: Promise<{ id: str
       </section>
 
       {/* Trading book */}
-      <SectionLabel>Trading book</SectionLabel>
+      <SectionHeader>Trading book</SectionHeader>
       <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Equity" value={d.account ? usd(d.account.equity) : "—"} />
-        <Stat label="Return" value={ret != null ? `${ret >= 0 ? "+" : ""}${(ret * 100).toFixed(2)}%` : "—"} tone={ret == null ? "ink-2" : ret >= 0 ? "gain" : "loss"} />
-        <Stat label="Cash" value={d.account ? usd(d.account.cash) : "—"} />
-        <Stat label="Closed trades" value={String(d.counts.trades)} />
-        <Stat label="Positions" value={String(d.positions.length)} />
-        <Stat label="Analysts" value={String(d.agents.length)} />
-        <Stat label="Alerts" value={String(d.counts.alerts)} />
-        <Stat label="Watchlist" value={String(d.watchlist.length)} />
+        <StatCard label="Equity" value={d.account ? usd(d.account.equity) : "—"} tone="accent" />
+        <StatCard label="Return" value={ret != null ? `${ret >= 0 ? "+" : ""}${(ret * 100).toFixed(2)}%` : "—"} tone={ret == null ? "default" : ret >= 0 ? "gain" : "loss"} />
+        <StatCard label="Cash" value={d.account ? usd(d.account.cash) : "—"} />
+        <StatCard label="Closed trades" value={d.counts.trades} />
+        <StatCard label="Positions" value={d.positions.length} />
+        <StatCard label="Analysts" value={d.agents.length} />
+        <StatCard label="Alerts" value={d.counts.alerts} />
+        <StatCard label="Watchlist" value={d.watchlist.length} />
       </div>
 
       {/* Learning + conversations — the layer that used to be invisible */}
-      <SectionLabel>Learning &amp; conversations</SectionLabel>
+      <SectionHeader>Learning &amp; conversations</SectionHeader>
       <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Lessons" value={`${d.academy.lessonsDone}/${d.academy.totalLessons}`} />
-        <Stat label="XP" value={String(d.academy.xp)} />
-        <Stat label="Streak" value={`${d.streak.current}d · best ${d.streak.longest}`} />
-        <Stat label="Missions" value={String(d.counts.missions)} />
-        <Stat label="Quiz attempts" value={String(d.counts.quizzes)} />
-        <Stat label="Drills · replays" value={`${d.counts.drills} · ${d.counts.replays}`} />
-        <Stat label="Flashcards" value={String(d.counts.cards)} />
-        <Stat label="Messages" value={`${d.counts.tarsMsgs + d.counts.deskMsgs}${d.counts.memory ? " · mem" : ""}`} />
+        <StatCard label="Lessons" value={`${d.academy.lessonsDone}/${d.academy.totalLessons}`} />
+        <StatCard label="XP" value={d.academy.xp} tone="accent" />
+        <StatCard label="Streak" value={`${d.streak.current}d`} sub={`best ${d.streak.longest}`} />
+        <StatCard label="Missions" value={d.counts.missions} />
+        <StatCard label="Quiz attempts" value={d.counts.quizzes} />
+        <StatCard label="Drills · replays" value={`${d.counts.drills} · ${d.counts.replays}`} />
+        <StatCard label="Flashcards" value={d.counts.cards} />
+        <StatCard label="Messages" value={d.counts.tarsMsgs + d.counts.deskMsgs} sub={d.counts.memory ? "Tars has memory" : "desk + Tars"} />
       </div>
 
-      <TableCard title="Positions" cols={["Symbol", "Qty", "Avg entry"]}
-        rows={d.positions.map((p) => [p.symbol, String(p.qty), usd(p.avgEntryPrice)])} empty="No open positions." />
-      <TableCard title="Watchlist" cols={["Rank", "Symbol"]}
-        rows={d.watchlist.map((w) => [String(w.rank + 1), w.symbol])} empty="Watchlist is empty." />
-      <TableCard title="Recent orders" cols={["When", "Side", "Type", "Symbol", "Qty", "Status"]}
-        rows={d.orders.map((o) => [when(o.createdAt), o.side, o.type, o.symbol, String(o.qty), o.status])} empty="No orders." />
-      <TableCard title="Analysts" cols={["Name", "Status", "Allocation"]}
-        rows={d.agents.map((a) => [`${a.emoji} ${a.name}`, a.status, usd(a.allocation)])} empty="No analysts." />
-      <TableCard title="Recent closes" cols={["When", "Symbol", "P&L"]}
-        rows={d.journal.map((j) => [when(j.createdAt), j.symbol, j.pnl == null ? "—" : usd(j.pnl)])} empty="No closed trades." />
-    </>
-  );
-}
+      <SectionHeader>Positions</SectionHeader>
+      <DataTable empty="No open positions."
+        cols={[{ label: "Symbol" }, { label: "Qty", align: "right" }, { label: "Avg entry", align: "right" }]}
+        rows={d.positions.map((p) => [p.symbol, p.qty, usd(p.avgEntryPrice)])} />
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <h2 className="mt-6 font-mono text-[11px] uppercase tracking-[0.25em] text-ink-4">{children}</h2>;
-}
+      <SectionHeader>Watchlist</SectionHeader>
+      <DataTable empty="Watchlist is empty."
+        cols={[{ label: "Rank" }, { label: "Symbol" }]}
+        rows={d.watchlist.map((w) => [w.rank + 1, w.symbol])} />
 
-function Stat({ label, value, tone = "ink-1" }: { label: string; value: string; tone?: string }) {
-  return (
-    <div className="panel p-3">
-      <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-4">{label}</p>
-      <p className={`tnum mt-0.5 text-base font-semibold text-${tone}`}>{value}</p>
-    </div>
-  );
-}
+      <SectionHeader>Recent orders</SectionHeader>
+      <DataTable empty="No orders."
+        cols={[{ label: "When" }, { label: "Side" }, { label: "Type" }, { label: "Symbol" }, { label: "Qty", align: "right" }, { label: "Status" }]}
+        rows={d.orders.map((o) => [
+          when(o.createdAt),
+          <span key="s" className={`font-mono text-[10px] uppercase ${o.side === "buy" ? "text-gain" : "text-loss"}`}>{o.side}</span>,
+          o.type, o.symbol, o.qty,
+          <span key="st" className={`font-mono text-[10px] uppercase ${o.status === "filled" ? "text-gain" : o.status === "rejected" ? "text-loss" : "text-ink-4"}`}>{o.status}</span>,
+        ])} />
 
-function TableCard({ title, cols, rows, empty }: { title: string; cols: string[]; rows: string[][]; empty: string }) {
-  return (
-    <>
-      <h2 className="mt-6 font-mono text-[11px] uppercase tracking-[0.25em] text-ink-4">{title}</h2>
-      <section className="panel mt-2 overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-hairline font-mono text-[10px] uppercase tracking-[0.15em] text-ink-4">
-              {cols.map((c) => <th key={c} className="px-4 py-2.5">{c}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && <tr><td colSpan={cols.length} className="px-4 py-6 text-center text-ink-4">{empty}</td></tr>}
-            {rows.map((r, i) => (
-              <tr key={i} className="border-b border-hairline last:border-0">
-                {r.map((cell, j) => <td key={j} className="tnum px-4 py-2 text-ink-2 first:font-medium first:text-ink-1">{cell}</td>)}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+      <SectionHeader>Analysts</SectionHeader>
+      <DataTable empty="No analysts."
+        cols={[{ label: "Name" }, { label: "Status" }, { label: "Allocation", align: "right" }]}
+        rows={d.agents.map((a) => [`${a.emoji} ${a.name}`, a.status, usd(a.allocation)])} />
+
+      <SectionHeader>Recent closes</SectionHeader>
+      <DataTable empty="No closed trades."
+        cols={[{ label: "When" }, { label: "Symbol" }, { label: "P&L", align: "right" }]}
+        rows={d.journal.map((j) => [
+          when(j.createdAt), j.symbol,
+          <span key="p" className={j.pnl == null ? "text-ink-4" : j.pnl >= 0 ? "text-gain" : "text-loss"}>{j.pnl == null ? "—" : usd(j.pnl)}</span>,
+        ])} />
     </>
   );
 }
