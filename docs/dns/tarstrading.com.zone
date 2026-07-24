@@ -12,23 +12,27 @@
 ;; prove domain ownership to Railway; leave them grey-cloud (DNS
 ;; only, which is automatic for TXT).
 ;;
-;; www strategy: Railway's plan allows two custom domains, spent on
-;; @ and admin. www points at the apex and needs ONE redirect rule
-;; in Cloudflare (Rules → Redirect Rules → create):
-;;   When hostname equals www.tarstrading.com
-;;   → 301 to https://tarstrading.com$1 (preserve path).
+;; Architecture: TWO Railway services from one codebase.
+;;   web (frontend)  → tarstrading.com, www.tarstrading.com
+;;   api (backend)   → admin.tarstrading.com — the control center
+;;                     AND the entire API surface; the frontend
+;;                     proxies /api/* to it over Railway's private
+;;                     network.
 ;; ============================================================
 
 $ORIGIN tarstrading.com.
 $TTL 300
 
-;; ---------- Web (Railway: tars-trading/web) ----------
+;; ---------- Frontend (Railway: tars-trading/web) ----------
 @       IN CNAME 9bhwmtj8.up.railway.app.
-admin   IN CNAME 8g1835s1.up.railway.app.
-www     IN CNAME tarstrading.com.
+www     IN CNAME x1ilpehf.up.railway.app.
+
+;; ---------- Backend (Railway: tars-trading/api) ----------
+admin   IN CNAME 7znbzn9q.up.railway.app.
 
 ;; Railway domain-ownership verification
 _railway-verify        IN TXT "railway-verify=railway-verify=6e5adc1b777f96616a32c4006bab53ad68ad0329dd1f99f094ea640e345df3be"
+_railway-verify.www    IN TXT "railway-verify=railway-verify=f51c313d31c924131c8797808bd049251dc6f95e9a0a7eb7b72f71f73c9e627b"
 _railway-verify.admin  IN TXT "railway-verify=railway-verify=f6374de78419869c8277ff55e274124d563c3b71a6986d25be0e034bdae47185"
 
 ;; ---------- Email ----------

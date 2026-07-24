@@ -73,6 +73,11 @@ export async function createUser(email: string, name: string, password: string) 
   return userId;
 }
 
+/** Production sets COOKIE_DOMAIN=.tarstrading.com so the session works on both
+    the frontend (tarstrading.com) and the backend (admin.tarstrading.com).
+    Unset locally → host-only cookie, exactly as before. */
+const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
+
 export async function startSession(userId: string) {
   const token = randomBytes(32).toString("hex");
   await db.insert(schema.sessions).values({
@@ -81,7 +86,7 @@ export async function startSession(userId: string) {
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_TTL_MS / 1000, path: "/",
+    maxAge: SESSION_TTL_MS / 1000, path: "/", domain: cookieDomain,
   });
 }
 
@@ -89,7 +94,8 @@ export async function endSession() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
-  jar.delete(SESSION_COOKIE);
+  // Clearing must carry the SAME domain attribute the cookie was set with.
+  jar.set(SESSION_COOKIE, "", { maxAge: 0, path: "/", domain: cookieDomain });
 }
 
 export type SessionUser = { id: string; email: string; name: string; role: "user" | "admin" };
