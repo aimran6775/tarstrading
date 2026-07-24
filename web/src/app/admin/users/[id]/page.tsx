@@ -43,11 +43,14 @@ export default async function AdminUserDetail(props: { params: Promise<{ id: str
       <section className="panel mt-4 p-4">
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-4">Actions</p>
         <div className="mt-3">
-          <UserActions id={d.user.id} role={d.user.role} suspended={d.user.suspended} isSelf={d.user.id === admin.id} />
+          <UserActions id={d.user.id} role={d.user.role} suspended={d.user.suspended} isSelf={d.user.id === admin.id}
+            name={d.user.name} email={d.user.email} note={d.user.adminNote} />
         </div>
       </section>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      {/* Trading book */}
+      <SectionLabel>Trading book</SectionLabel>
+      <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Equity" value={d.account ? usd(d.account.equity) : "—"} />
         <Stat label="Return" value={ret != null ? `${ret >= 0 ? "+" : ""}${(ret * 100).toFixed(2)}%` : "—"} tone={ret == null ? "ink-2" : ret >= 0 ? "gain" : "loss"} />
         <Stat label="Cash" value={d.account ? usd(d.account.cash) : "—"} />
@@ -55,11 +58,26 @@ export default async function AdminUserDetail(props: { params: Promise<{ id: str
         <Stat label="Positions" value={String(d.positions.length)} />
         <Stat label="Analysts" value={String(d.agents.length)} />
         <Stat label="Alerts" value={String(d.counts.alerts)} />
-        <Stat label="Academy" value={`${d.academy.lessonsDone}/${d.academy.totalLessons} · ${d.academy.xp}xp`} />
+        <Stat label="Watchlist" value={String(d.watchlist.length)} />
+      </div>
+
+      {/* Learning + conversations — the layer that used to be invisible */}
+      <SectionLabel>Learning &amp; conversations</SectionLabel>
+      <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Stat label="Lessons" value={`${d.academy.lessonsDone}/${d.academy.totalLessons}`} />
+        <Stat label="XP" value={String(d.academy.xp)} />
+        <Stat label="Streak" value={`${d.streak.current}d · best ${d.streak.longest}`} />
+        <Stat label="Missions" value={String(d.counts.missions)} />
+        <Stat label="Quiz attempts" value={String(d.counts.quizzes)} />
+        <Stat label="Drills · replays" value={`${d.counts.drills} · ${d.counts.replays}`} />
+        <Stat label="Flashcards" value={String(d.counts.cards)} />
+        <Stat label="Messages" value={`${d.counts.tarsMsgs + d.counts.deskMsgs}${d.counts.memory ? " · mem" : ""}`} />
       </div>
 
       <TableCard title="Positions" cols={["Symbol", "Qty", "Avg entry"]}
         rows={d.positions.map((p) => [p.symbol, String(p.qty), usd(p.avgEntryPrice)])} empty="No open positions." />
+      <TableCard title="Watchlist" cols={["Rank", "Symbol"]}
+        rows={d.watchlist.map((w) => [String(w.rank + 1), w.symbol])} empty="Watchlist is empty." />
       <TableCard title="Recent orders" cols={["When", "Side", "Type", "Symbol", "Qty", "Status"]}
         rows={d.orders.map((o) => [when(o.createdAt), o.side, o.type, o.symbol, String(o.qty), o.status])} empty="No orders." />
       <TableCard title="Analysts" cols={["Name", "Status", "Allocation"]}
@@ -68,6 +86,10 @@ export default async function AdminUserDetail(props: { params: Promise<{ id: str
         rows={d.journal.map((j) => [when(j.createdAt), j.symbol, j.pnl == null ? "—" : usd(j.pnl)])} empty="No closed trades." />
     </>
   );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <h2 className="mt-6 font-mono text-[11px] uppercase tracking-[0.25em] text-ink-4">{children}</h2>;
 }
 
 function Stat({ label, value, tone = "ink-1" }: { label: string; value: string; tone?: string }) {

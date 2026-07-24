@@ -24,6 +24,8 @@ export const users = pgTable("users", {
   role: text("role").$type<"user" | "admin">().notNull().default("user"),
   /** 1 = suspended: login blocked, sessions revoked. Admin-controlled. */
   suspended: integer("suspended").notNull().default(0),
+  /** Free-text admin annotation ("watch this account", why suspended…). */
+  adminNote: text("admin_note"),
   createdAt: epochMs("created_at").notNull(),
 });
 

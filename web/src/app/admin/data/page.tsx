@@ -1,5 +1,6 @@
 import { db, schema } from "@/server/db";
 import { desc } from "drizzle-orm";
+import { dataCensus } from "@/server/admin-ops";
 import BackfillButton from "./backfill-button";
 
 /*
@@ -14,9 +15,10 @@ const d = (s: number | null) => s ? new Date(s * 1000).toISOString().slice(0, 10
 const t = (ms: number | null) => ms ? new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "—";
 
 export default async function DataOps() {
-  const [series, calls] = await Promise.all([
+  const [series, calls, census] = await Promise.all([
     db.select().from(schema.syncState).orderBy(schema.syncState.symbol, schema.syncState.timeframe),
     db.select().from(schema.apiCalls).orderBy(desc(schema.apiCalls.createdAt)).limit(40),
+    dataCensus(),
   ]);
 
   return (
@@ -24,6 +26,32 @@ export default async function DataOps() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-mono text-xs uppercase tracking-[0.3em] text-ink-4">Data ops</h1>
         <BackfillButton />
+      </div>
+
+      {/* Data census — every table we hold, nothing dark */}
+      <div className="mt-4 flex items-baseline justify-between">
+        <h2 className="font-mono text-xs uppercase tracking-[0.3em] text-ink-4">Data census</h2>
+        <span className="font-mono text-[11px] text-ink-4">
+          {census.tableCount} tables · {census.total.toLocaleString()} rows
+        </span>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {census.groups.map((g) => (
+          <section key={g.group} className="panel p-4">
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-sm font-semibold text-ink-1">{g.group}</h3>
+              <span className="tnum font-mono text-[11px] text-ink-4">{g.total.toLocaleString()}</span>
+            </div>
+            <dl className="mt-2 space-y-1">
+              {g.tables.map((t) => (
+                <div key={t.table} className="flex items-baseline justify-between gap-2">
+                  <dt className="font-mono text-[11px] text-ink-3">{t.table}</dt>
+                  <dd className={`tnum font-mono text-[11px] ${t.rows === 0 ? "text-ink-4" : "text-ink-1"}`}>{t.rows.toLocaleString()}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ))}
       </div>
 
       {/* Coverage map */}
