@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { and, asc, eq, inArray, sql as dsql } from "drizzle-orm";
-import { livePrice } from "./live-feed";
+import { livePrice, ensureLiveFeed } from "./live-feed";
 
 /*
   Market data service. Massive (formerly Polygon.io) proxied server-side ONLY —
@@ -196,6 +196,10 @@ function withLive(q: Quote): Quote {
  * gets null NOW — the UI shows an honest gap and the next poll fills it.
  */
 export async function getQuote(symbol: string): Promise<Quote | null> {
+  // Subscribe the symbol to the live tick stream on EVERY request — even a cache
+  // hit — so anything we price (a held position, a marked account) keeps getting
+  // real-time ticks, not just symbols on the watchlist poll. Cheap + deduped.
+  ensureLiveFeed([symbol]);
   const key = `q:${symbol}`;
   const hit = cached<Quote>(key, QUOTE_TTL);
   if (hit) return withLive(hit);             // L1 (+ live tick overlay)
@@ -218,6 +222,10 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
 }
 
 export async function getQuotes(symbols: string[]): Promise<Quote[]> {
+  // Keep every requested symbol subscribed to the live feed — this is what makes
+  // markEquity/reconcile mark held positions to the real-time tick, not the EOD
+  // close. The feed dedupes and no-ops without a key.
+  ensureLiveFeed(symbols);
   const out: Quote[] = [];
   const need: string[] = [];
   for (const s of symbols) {

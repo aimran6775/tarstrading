@@ -35,21 +35,26 @@ type Data = {
   system: { marketOpen: boolean; feed: string; brain: string };
 };
 
+// Count toward `target`, always animating from wherever the number currently
+// is (a ref), so the first mount eases up from `from` AND every live update
+// glides smoothly from the last shown value instead of snapping or restarting.
 function useCountUp(target: number, from: number, ms = 1100) {
   const rm = useReducedMotion();
   const [v, setV] = useState(rm ? target : from);
+  const vRef = useRef(rm ? target : from);
   useEffect(() => {
-    if (rm) { setV(target); return; }
-    let raf = 0; const t0 = performance.now();
+    if (rm) { setV(target); vRef.current = target; return; }
+    const start = vRef.current; let raf = 0; const t0 = performance.now();
     const tick = (t: number) => {
       const k = Math.min(1, (t - t0) / ms);
       const e = 1 - Math.pow(1 - k, 3); // ease-out cubic
-      setV(from + (target - from) * e);
+      const val = start + (target - start) * e;
+      setV(val); vRef.current = val;
       if (k < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [target, from, ms, rm]);
+  }, [target, ms, rm]);
   return v;
 }
 
@@ -61,9 +66,25 @@ const rise = (i: number) => ({
 
 export default function Floor({ data }: { data: Data }) {
   const rm = useReducedMotion();
-  const dayPnl = data.equity - data.dayStart;
-  const dayPct = data.dayStart ? dayPnl / data.dayStart : 0;
-  const shown = useCountUp(data.equity, data.dayStart);
+  // The headline equity ticks live: poll the account (which reconciles + marks
+  // every held position to the real-time feed) and glide the count-up to it.
+  const [acct, setAcct] = useState({ equity: data.equity, dayStart: data.dayStart });
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/account", { cache: "no-store" });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (alive && d?.account) setAcct({ equity: d.account.equity, dayStart: d.account.dayStartEquity });
+      } catch { /* a missed poll is fine — the next one heals it */ }
+    };
+    const id = setInterval(load, 12_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+  const dayPnl = acct.equity - acct.dayStart;
+  const dayPct = acct.dayStart ? dayPnl / acct.dayStart : 0;
+  const shown = useCountUp(acct.equity, data.dayStart);
   const tone = (n: number) => (n > 0 ? "gain" : n < 0 ? "loss" : "ink-2");
 
   const greeting = (() => {
