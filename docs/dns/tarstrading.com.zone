@@ -1,0 +1,48 @@
+;; ============================================================
+;; tarstrading.com — BIND zone file for Cloudflare import
+;; Upload: Cloudflare dashboard → tarstrading.com → DNS → Records
+;;         → Import and Export → Import DNS records → this file.
+;;
+;; ONE substitution required before upload:
+;;   Replace RAILWAY_TARGET.up.railway.app with the CNAME target
+;;   Railway prints when the custom domains are added to the service
+;;   (Settings → Networking → Custom Domain, or `railway domain`).
+;;   Apex + www + admin may share one target or get per-domain
+;;   targets — use exactly what Railway shows for each hostname.
+;;
+;; Cloudflare flattens the apex CNAME automatically (legal on
+;; Cloudflare even though classic BIND forbids apex CNAMEs).
+;; Keep the orange-cloud (proxy) ON for apex/www/admin: you get
+;; TLS, HTTP/3 and caching in front of Railway.
+;; ============================================================
+
+$ORIGIN tarstrading.com.
+$TTL 300
+
+;; ---------- Web (Railway) ----------
+@       IN CNAME RAILWAY_TARGET.up.railway.app.
+www     IN CNAME RAILWAY_TARGET.up.railway.app.
+admin   IN CNAME RAILWAY_TARGET.up.railway.app.
+
+;; ---------- Email ----------
+;; Plan: Cloudflare Email Routing (free) receives mail for
+;; you@tarstrading.com and forwards to your real inbox. After this
+;; import, flip it on: dashboard → Email → Email Routing → Enable,
+;; then add addresses (e.g. abdullah@, support@, hello@) and their
+;; forwarding destinations. Cloudflare inserts its three MX records
+;; itself at that moment — do NOT hand-enter MX records here.
+;;
+;; SPF — authorizes Cloudflare's relay for this domain. If you later
+;; move to real mailboxes (Google Workspace / Zoho / iCloud+), replace
+;; this include with the provider's and add their MX + DKIM records.
+@       IN TXT   "v=spf1 include:_spf.mx.cloudflare.net ~all"
+
+;; DMARC — start at p=none (monitor only) so nothing legitimate is
+;; dropped while the domain builds reputation; tighten to
+;; p=quarantine after a clean week of reports.
+_dmarc  IN TXT   "v=DMARC1; p=none; rua=mailto:tarsitgroup@outlook.com; fo=1"
+
+;; Outlook/Microsoft sometimes wants explicit null-MX semantics before
+;; Email Routing is enabled; harmless once routing adds real MX.
+;; (Delete this line if Cloudflare complains about coexisting MX.)
+;; @    IN MX 0  .
