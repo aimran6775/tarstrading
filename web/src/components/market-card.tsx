@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import Link from "next/link";
-import { usd, pct, categoryOf, type Quote } from "./trading/shared";
+import { usd, pct, categoryOf, type Quote, type MarketCategory } from "./trading/shared";
 
 /*
   A market card — the unit of the browse page. Sparkline from the bar vault,
@@ -50,9 +50,11 @@ export function Spark({ points, className = "h-10 w-full", fill = false }: {
   );
 }
 
-export default function MarketCard({ symbol, name, quote, spark }: {
+export default function MarketCard({ symbol, name, kind, quote, spark }: {
   symbol: string;
   name?: string;
+  /** Curated category from the house board; falls back to the shape heuristic. */
+  kind?: MarketCategory;
   quote?: Quote;
   spark?: number[];
 }) {
@@ -62,7 +64,7 @@ export default function MarketCard({ symbol, name, quote, spark }: {
       className="raised lift group flex flex-col gap-3 p-4 active:scale-[0.98] active:brightness-95">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-ink-4">{categoryOf(symbol)}</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-ink-4">{kind ?? categoryOf(symbol)}</p>
           <p className="mt-0.5 truncate text-sm font-semibold tracking-tight text-ink-1">{symbol}</p>
           {name && <p className="truncate text-[11px] text-ink-4">{name}</p>}
         </div>

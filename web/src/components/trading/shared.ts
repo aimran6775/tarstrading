@@ -14,9 +14,17 @@ export const usd = (v: number, digits = 2) =>
   v.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: digits });
 export const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 
+/** The pills the browse page groups markets under. */
+export type MarketCategory = "Crypto" | "ETFs" | "Stocks";
+
+/** One row of the curated house board, as served to the client by the server. */
+export type BoardEntry = { symbol: string; category: MarketCategory; featured: boolean };
+
 const ETFS = new Set(["SPY", "QQQ", "DIA", "IWM", "VTI", "VOO", "GLD"]);
 
-export function categoryOf(symbol: string): "Crypto" | "ETFs" | "Stocks" {
+/** Shape-based fallback classification — used for off-board symbols (watchlist
+    additions) and when the curated board is unavailable. */
+export function categoryOf(symbol: string): MarketCategory {
   if (symbol.includes("/")) return "Crypto";
   if (ETFS.has(symbol)) return "ETFs";
   return "Stocks";

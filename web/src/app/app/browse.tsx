@@ -8,38 +8,28 @@ import GettingStarted from "@/components/getting-started";
 import SymbolInput from "@/components/symbol-input";
 import MarketCard from "@/components/market-card";
 import { SYMBOLS } from "@/lib/symbols";
-import { usd, pct, categoryOf, type Quote, type Account } from "@/components/trading/shared";
+import { usd, pct, categoryOf, type Quote, type Account, type BoardEntry, type MarketCategory } from "@/components/trading/shared";
 
 /*
   Browse — the markets-first home. A category strip up top, the day's biggest
   mover as a featured hero, then the grid of market cards. The watchlist is a
   first-class category, not a sidebar. Sparklines come from the bar vault;
   quotes ride the shared poll.
-*/
 
-/* The house board — a real desk's watch universe, not just the Mag 7.
-   Backfill + the 5-min heartbeat keep charts warm for everything listed. */
-const HOUSE = [
-  // Mega-cap tech
-  "AAPL", "NVDA", "TSLA", "MSFT", "AMZN", "META", "GOOG", "AMD", "NFLX", "AVGO",
-  // Blue chips & industrials
-  "JPM", "V", "WMT", "JNJ", "PG", "DIS", "BA", "CAT", "XOM", "CVX",
-  // Growth & momentum
-  "PLTR", "COIN", "SQ", "SHOP", "UBER", "ABNB", "SNOW", "CRWD", "PANW", "SMCI",
-  // Semis & AI complex
-  "INTC", "MU", "TSM", "ARM", "QCOM",
-  // ETFs — index, sector, vol
-  "SPY", "QQQ", "DIA", "IWM", "XLF", "XLE", "XLK", "SMH", "GLD", "TLT",
-  // Crypto — 24/7
-  "BTC/USD", "ETH/USD", "SOL/USD", "DOGE/USD", "AVAX/USD", "LINK/USD",
-];
+  The house board arrives as a prop from the server (src/server/board.ts), which
+  reads the control center's curated universe — categories and the featured slot
+  are curation, not guesses about the symbol string. Off-board symbols (watchlist
+  additions) still fall back to shape-based classification.
+*/
 
 type Category = "Trending" | "Stocks" | "Crypto" | "ETFs" | "Watchlist";
 const CATEGORIES: Category[] = ["Trending", "Stocks", "Crypto", "ETFs", "Watchlist"];
 
 const NAME = new Map(SYMBOLS.map((e) => [e.symbol, e.name]));
 
-export default function Browse({ userName, welcome }: { userName: string; welcome: boolean }) {
+export default function Browse({ userName, welcome, board }: {
+  userName: string; welcome: boolean; board: BoardEntry[];
+}) {
   const rm = useReducedMotion();
   const [category, setCategory] = useState<Category>("Trending");
   const [account, setAccount] = useState<Account | null>(null);
@@ -51,9 +41,22 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
   const [adding, setAdding] = useState("");
   const watchRef = useRef<string[]>([]);
 
+  // The curated board, unpacked once: order, categories, featured eligibility.
+  const house = useMemo(() => board.map((b) => b.symbol), [board]);
+  const boardCategory = useMemo(
+    () => new Map(board.map((b) => [b.symbol, b.category] as const)),
+    [board]);
+  const featuredSet = useMemo(
+    () => new Set(board.filter((b) => b.featured).map((b) => b.symbol)),
+    [board]);
+  /** Curated category first; off-board symbols fall back to the shape heuristic. */
+  const categoryFor = useCallback(
+    (s: string) => boardCategory.get(s) ?? categoryOf(s),
+    [boardCategory]);
+
   const allSymbols = useMemo(
-    () => Array.from(new Set([...HOUSE, ...watchlist])),
-    [watchlist]);
+    () => Array.from(new Set([...house, ...watchlist])),
+    [house, watchlist]);
 
   const loadAccount = useCallback(async () => {
     try {
@@ -68,7 +71,7 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
   }, []);
 
   const loadQuotes = useCallback(async () => {
-    const symbols = Array.from(new Set([...HOUSE, ...watchRef.current])).slice(0, 24);
+    const symbols = Array.from(new Set([...house, ...watchRef.current])).slice(0, 24);
     try {
       const res = await fetch(`/api/market/quotes?symbols=${encodeURIComponent(symbols.join(","))}`);
       if (!res.ok) { setStale(true); return; }
@@ -83,16 +86,16 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
         setStale(false);
       } else setStale(true);
     } catch { setStale(true); }
-  }, []);
+  }, [house]);
 
   const loadSparks = useCallback(async () => {
-    const symbols = Array.from(new Set([...HOUSE, ...watchRef.current])).slice(0, 32);
+    const symbols = Array.from(new Set([...house, ...watchRef.current])).slice(0, 32);
     try {
       const res = await fetch(`/api/market/sparks?symbols=${encodeURIComponent(symbols.join(","))}`);
       const data = await res.json();
       if (data.ok) setSparks(data.sparks);
     } catch { /* sparklines are decoration — cards still work */ }
-  }, []);
+  }, [house]);
 
   useEffect(() => {
     loadAccount().then(() => { loadQuotes(); loadSparks(); });
@@ -130,7 +133,7 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
     const base = category === "Watchlist" ? watchlist : allSymbols;
     const filtered = category === "Trending" || category === "Watchlist"
       ? base
-      : base.filter((s) => categoryOf(s) === category);
+      : base.filter((s) => categoryFor(s) === category);
     return [...filtered].sort((a, b) => {
       const qa = quotes.get(a), qb = quotes.get(b);
       if (!qa && !qb) return 0;
@@ -138,10 +141,14 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
       if (!qb) return -1;
       return Math.abs(qb.changePercent) - Math.abs(qa.changePercent);
     });
-  }, [category, allSymbols, watchlist, quotes]);
+  }, [category, allSymbols, watchlist, quotes, categoryFor]);
 
-  // Featured hero: the biggest mover we have a quote for.
-  const featured = category === "Trending" ? visible.find((s) => quotes.get(s)) : undefined;
+  // Featured hero: the biggest mover among the board's featured symbols — and if
+  // none of those are quoted yet, the biggest mover overall. (visible is already
+  // sorted by |move|, so the first match is the biggest.)
+  const featured = category !== "Trending" ? undefined
+    : visible.find((s) => featuredSet.has(s) && quotes.get(s))
+      ?? visible.find((s) => quotes.get(s));
   const gridSymbols = featured ? visible.filter((s) => s !== featured) : visible;
 
   const dayPnL = account ? account.equity - account.dayStartEquity : 0;
@@ -204,7 +211,7 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-24 md:px-6 md:pb-10">
         {/* Featured hero — the day's biggest mover */}
         {featured && (
-          <FeaturedCard symbol={featured} name={NAME.get(featured)}
+          <FeaturedCard symbol={featured} name={NAME.get(featured)} kind={categoryFor(featured)}
             quote={quotes.get(featured)} spark={sparks[featured] ?? []} />
         )}
 
@@ -227,7 +234,8 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {gridSymbols.map((s, i) => (
               <div key={s} className="rise-in relative" style={{ "--i": Math.min(i, 8) } as CSSProperties}>
-                <MarketCard symbol={s} name={NAME.get(s)} quote={quotes.get(s)} spark={sparks[s]} />
+                <MarketCard symbol={s} name={NAME.get(s)} kind={categoryFor(s)}
+                  quote={quotes.get(s)} spark={sparks[s]} />
                 {category === "Watchlist" && (
                   <button onClick={() => removeFromWatchlist(s)}
                     className="pressable absolute right-1.5 top-1.5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-bg3/80 text-ink-4 hover:text-loss"
@@ -248,8 +256,8 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
   );
 }
 
-function FeaturedCard({ symbol, name, quote, spark }: {
-  symbol: string; name?: string; quote?: Quote; spark: number[];
+function FeaturedCard({ symbol, name, kind, quote, spark }: {
+  symbol: string; name?: string; kind?: MarketCategory; quote?: Quote; spark: number[];
 }) {
   const chg = quote?.changePercent ?? 0;
   return (
@@ -264,7 +272,7 @@ function FeaturedCard({ symbol, name, quote, spark }: {
         className="raised raised-2 edge-gold lift group relative z-10 block overflow-hidden">
         <div className="grid gap-4 p-5 md:grid-cols-[1fr_400px] md:items-center md:p-6 lg:p-7">
           <div className="min-w-0">
-            <p className="kicker">Featured · {categoryOf(symbol)} · biggest move</p>
+            <p className="kicker">Featured · {kind ?? categoryOf(symbol)} · biggest move</p>
             <h2 className="display mt-2 break-words text-[2.25rem] text-ink-1 sm:text-5xl md:text-6xl">
               {name ?? symbol}
             </h2>
