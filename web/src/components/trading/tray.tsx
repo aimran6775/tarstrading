@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import HoldButton from "@/components/hold-button";
+import AnalyticsBoard from "./analytics-board";
 import { usd, type Quote, type Position, type Order } from "./shared";
 
 /*
@@ -270,7 +271,9 @@ export function Performance() {
   const closed = journal.filter((j) => j.pnl != null).length;
 
   return (
-    <div className="grid gap-0 md:grid-cols-[1fr_1fr]">
+    <>
+    <AnalyticsBoard />
+    <div className="grid gap-0 border-t border-hairline md:grid-cols-[1fr_1fr]">
       <div className="border-b border-hairline p-4 md:border-b-0 md:border-r md:p-5">
         {history == null ? (
           <div className="skeleton h-16 w-full" />
@@ -318,6 +321,7 @@ export function Performance() {
         <p className="px-6 py-10 text-center text-xs text-ink-4">Closed trades will journal themselves here.</p>
       )}
     </div>
+    </>
   );
 }
 
