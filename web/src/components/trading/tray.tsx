@@ -21,9 +21,10 @@ export function Positions({ positions, quotes, onSelect, onClosed }: {
   async function close(p: Position) {
     setClosing(p.id);
     try {
+      // Close by trading the opposite side: a long sells, a SHORT buys to cover.
       await fetch("/api/orders", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol: p.symbol, side: "sell", type: "market", qty: p.qty }),
+        body: JSON.stringify({ symbol: p.symbol, side: p.qty < 0 ? "buy" : "sell", type: "market", qty: Math.abs(p.qty) }),
       });
     } finally {
       setClosing(null);
@@ -48,8 +49,11 @@ export function Positions({ positions, quotes, onSelect, onClosed }: {
         return (
           <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3 md:px-5">
             <button onClick={() => onSelect(p.symbol)} className="pressable min-h-11 min-w-[110px] text-left">
-              <p className="text-sm font-semibold text-ink-1">{p.symbol}</p>
-              <p className="tnum text-[11px] text-ink-3">{p.qty} @ {usd(p.avgEntryPrice)}</p>
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-1">
+                {p.symbol}
+                {p.qty < 0 && <span className="rounded bg-loss/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-loss">Short</span>}
+              </p>
+              <p className="tnum text-[11px] text-ink-3">{p.qty < 0 ? p.qty : `+${p.qty}`} @ {usd(p.avgEntryPrice)}</p>
             </button>
             <div className="min-w-[110px] text-right md:text-left">
               <p className="tnum text-sm text-ink-1">{usd(value)}</p>

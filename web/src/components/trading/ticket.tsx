@@ -13,10 +13,14 @@ import { usd, type Quote, type Order } from "./shared";
   buying-power meter, and the hold-to-submit gold button. `presetSide` lets
   inline Buy/Sell buttons elsewhere open the ticket pre-armed.
 */
-export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, presetSide }: {
+export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, marketOpen, onPlaced, presetSide }: {
   symbol: string;
   quote: Quote | undefined;
   cash: number;
+  /** Reg-T buying power (margin). Falls back to cash until the account loads. */
+  buyingPower?: number | null;
+  /** Current signed position in this symbol — lets the ticket say Short / Cover. */
+  held?: number;
   marketOpen: boolean | null;
   onPlaced: () => void;
   presetSide?: "buy" | "sell" | null;
@@ -35,8 +39,15 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
   const qtyNum = Number(qty) || 0;
   const estPrice = type === "limit" ? Number(limitPrice) || quote?.price || 0 : quote?.price || 0;
   const estCost = qtyNum * estPrice;
-  const capacity = cash > 0 ? estCost / cash : 0;
-  const blocked = side === "buy" && estCost > cash;
+  // Buying power (margin) drives the buy limit; fall back to cash pre-load.
+  const power = buyingPower ?? cash;
+  const capacity = power > 0 ? estCost / power : 0;
+  const blocked = side === "buy" && estCost > power + 1e-6;
+  // Intent labels: a sell beyond what you hold OPENS a short; a buy against a
+  // short COVERS it. Pure labeling — the engine enforces the margin.
+  const opensShort = side === "sell" && !symbol.includes("/") && qtyNum > Math.max(0, held);
+  const coversShort = side === "buy" && held < -1e-9;
+  const actionLabel = side === "buy" ? (coversShort ? "Cover" : "Buy") : (opensShort ? "Short" : "Sell");
   const valid = qtyNum > 0 && estPrice > 0 && !blocked
     && (type !== "limit" || Number(limitPrice) > 0)
     && (type !== "stop" || Number(stopPrice) > 0);
@@ -62,11 +73,12 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
         setPhase({ kind: "done", order: data.order });
         const o = data.order as Order;
         if (o.status === "filled") {
+          const past = { Buy: "Bought", Sell: "Sold", Short: "Shorted", Cover: "Covered" }[actionLabel];
           toast({ kind: side === "buy" ? "gain" : "loss",
-            title: `${side === "buy" ? "Bought" : "Sold"} ${o.qty} ${symbol}`,
+            title: `${past} ${o.qty} ${symbol}`,
             body: `Filled @ ${usd(o.filledPrice ?? 0)}` });
         } else {
-          toast({ kind: "info", title: `${side === "buy" ? "Buy" : "Sell"} ${o.qty} ${symbol} resting`,
+          toast({ kind: "info", title: `${actionLabel} ${o.qty} ${symbol} resting`,
             body: "It'll fill when price agrees." });
         }
         onPlaced();
@@ -183,7 +195,9 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
           <p className="tnum mt-1.5 text-[11px] text-ink-3">
             {blocked
               ? "Exceeds your buying power — reduce quantity."
-              : `Uses ${(capacity * 100).toFixed(0)}% of ${usd(cash, 0)} buying power`}
+              : side === "sell"
+                ? (opensShort ? "Opens a short — margin, not cash." : `Uses ${(capacity * 100).toFixed(0)}% of ${usd(power, 0)} buying power`)
+                : `Uses ${(capacity * 100).toFixed(0)}% of ${usd(power, 0)} buying power`}
           </p>
         </div>
 
@@ -197,7 +211,7 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
           </div>
         ) : (
           <HoldButton
-            label={`${side === "buy" ? "Buy" : "Sell"} ${qtyNum || ""} ${symbol}`}
+            label={`${actionLabel} ${qtyNum || ""} ${symbol}`}
             holdLabel="Keep holding…"
             tone={side === "buy" ? "gold" : "loss"}
             disabled={!valid || phase.kind === "sending" || !quote}

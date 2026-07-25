@@ -28,6 +28,20 @@ import { getPlatformConfig } from "./platform";
 
 const SLIPPAGE = 0.0005;
 
+/*
+  Margin model (Reg-T, educational). Positions are SIGNED: qty > 0 is long,
+  qty < 0 is short. Shorting is allowed on equities/ETFs; crypto stays cash,
+  long-only (crypto shorting is exotic and we keep the sim honest about it).
+
+  - Equities: 50% initial margin → up to 2:1 gross leverage. 25% maintenance.
+  - Crypto:   100% — full cash, no leverage, no short.
+  Buying power and requirements are computed from account EQUITY (which already
+  includes unrealized P&L, marked live), exactly as a real margin desk does.
+*/
+const isCryptoSym = (s: string) => s.includes("/");
+const initialRate = (s: string) => (isCryptoSym(s) ? 1 : 0.5);
+const maintRate = (s: string) => (isCryptoSym(s) ? 1 : 0.25);
+
 /** Any drizzle executor — the base db or a transaction handle. */
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -101,25 +115,39 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
       return r;
     };
 
-    if (input.side === "sell") {
-      const [pos] = await tx.select().from(schema.positions)
-        .where(and(eq(schema.positions.userId, userId), eq(schema.positions.symbol, symbol)));
-      const lockedForSale = resting
-        .filter((o) => o.side === "sell" && o.symbol === symbol)
-        .reduce((s, o) => s + o.qty, 0);
-      const available = (pos?.qty ?? 0) - lockedForSale;
-      if (available < input.qty) {
-        return rejectIn("You can't sell more than you hold (some may be committed to resting orders).");
-      }
-    } else {
-      const estPrice = input.type === "limit" ? input.limitPrice! : quote.price * (1 + SLIPPAGE);
-      const reservedByResting = resting
-        .filter((o) => o.side === "buy")
-        .reduce((s, o) => s + (o.limitPrice ?? o.stopPrice ?? quote.price * (1 + SLIPPAGE)) * o.qty, 0);
-      const available = (account?.cash ?? 0) - reservedByResting;
-      if (available < estPrice * input.qty) {
-        return rejectIn("This order exceeds your buying power (some is committed to resting orders).");
-      }
+    // ---- Margin gate (Reg-T). Signed positions; sells beyond holdings open
+    // shorts, gated by equity, not blocked outright. ----
+    const positions = await tx.select().from(schema.positions).where(eq(schema.positions.userId, userId));
+    const equity = account?.equity ?? account?.cash ?? 0;
+    const delta = input.side === "buy" ? input.qty : -input.qty;
+    const cur = positions.find((p) => p.symbol === symbol);
+    const q0 = cur?.qty ?? 0;
+    const q1 = q0 + delta;
+
+    // Crypto is cash + long-only.
+    if (isCrypto && q1 < -1e-9) {
+      return rejectIn("Crypto can't be shorted here — it trades cash and long-only.");
+    }
+
+    // Mark each symbol: this order's symbol at the live quote, others at cost.
+    const markOf = (s: string, avg: number) => (s === symbol ? quote.price : avg);
+    // Initial requirement over all positions with the target updated, plus a
+    // conservative reservation for resting orders (assume they fill).
+    let requirement = 0;
+    for (const p of positions) {
+      const qty = p.symbol === symbol ? q1 : p.qty;
+      requirement += initialRate(p.symbol) * Math.abs(qty * markOf(p.symbol, p.avgEntryPrice));
+    }
+    if (!cur && Math.abs(q1) > 1e-9) requirement += initialRate(symbol) * Math.abs(q1 * quote.price);
+    for (const o of resting) {
+      const px = o.limitPrice ?? o.stopPrice ?? quote.price;
+      requirement += initialRate(o.symbol) * px * o.qty;
+    }
+    // Deleveraging (shrinking the target's absolute exposure) is always allowed;
+    // otherwise you must hold enough equity to meet the initial requirement.
+    const reducing = Math.abs(q1) < Math.abs(q0) - 1e-9;
+    if (!reducing && requirement > equity + 1e-6) {
+      return rejectIn("This order exceeds your buying power (Reg-T margin: 2:1 equities, cash on crypto).");
     }
 
     await tx.insert(schema.orders).values(row);
@@ -157,52 +185,119 @@ async function tryFill(tx: Tx, order: PlacedOrder, price: number): Promise<{ sta
   return patch;
 }
 
-/** Apply a fill to cash + positions + journal. The only money mutation path. */
+/*
+  Apply a fill to cash + positions + journal — the only money mutation path.
+  Signed-position accounting handles every case with one code path:
+
+  - Cash always moves by side: a BUY debits fillPrice·qty, a SELL credits it
+    (true whether opening a long, adding, covering a short, or opening a short).
+  - Positions carry a signed qty and the avg price of the CURRENT open exposure.
+  - When a fill REDUCES existing exposure (opposite sign), the overlapping
+    quantity realizes P&L to the journal — (fill − avg) for a long close,
+    (avg − fill) for a short cover. A fill that crosses zero closes the old
+    side and opens the residual on the new side at the fill price.
+*/
+/*
+  The pure position-math kernel — no DB, no side effects, fully unit-tested.
+  Given the current signed position (q0 @ p0) and a fill, returns the new
+  position, the cash flow, and any realized P&L. Every trading case — open
+  long/short, add, reduce, close, cover, cross-zero — flows through here.
+*/
+export type FillResult = {
+  q1: number; avg: number; cashFlow: number; realized: number; closedQty: number; flat: boolean;
+};
+export function applyFill(
+  q0: number, p0: number, side: "buy" | "sell", qty: number, fill: number,
+): FillResult {
+  const delta = side === "buy" ? qty : -qty;
+  const cashFlow = side === "buy" ? -fill * qty : fill * qty; // buy debits, sell credits
+  const q1 = q0 + delta;
+
+  let realized = 0, closedQty = 0;
+  if (q0 !== 0 && Math.sign(delta) === -Math.sign(q0)) {
+    closedQty = Math.min(Math.abs(delta), Math.abs(q0));
+    realized = q0 > 0 ? (fill - p0) * closedQty : (p0 - fill) * closedQty;
+  }
+
+  const flat = Math.abs(q1) < 1e-9;
+  let avg: number;
+  if (flat) avg = 0;
+  else if (q0 !== 0 && Math.sign(q1) === Math.sign(q0)) {
+    avg = Math.sign(delta) === Math.sign(q0)
+      ? (Math.abs(q0) * p0 + qty * fill) / (Math.abs(q0) + qty) // added same direction
+      : p0; // reduced, not crossed
+  } else avg = fill; // crossed zero or opened from flat
+  return { q1, avg, cashFlow, realized, closedQty, flat };
+}
+
 async function settle(tx: Tx, order: PlacedOrder, fillPrice: number) {
-  const { userId, symbol, qty } = order;
+  const { userId, symbol } = order;
   const [account] = await tx.select().from(schema.accounts).where(eq(schema.accounts.userId, userId));
   if (!account) return;
   const [pos] = await tx.select().from(schema.positions)
     .where(and(eq(schema.positions.userId, userId), eq(schema.positions.symbol, symbol)));
   const now = Date.now();
 
-  if (order.side === "buy") {
-    await tx.update(schema.accounts)
-      .set({ cash: account.cash - fillPrice * qty })
-      .where(eq(schema.accounts.userId, userId));
-    if (pos) {
-      const newQty = pos.qty + qty;
-      const blended = (pos.avgEntryPrice * pos.qty + fillPrice * qty) / newQty;
-      await tx.update(schema.positions)
-        .set({ qty: newQty, avgEntryPrice: blended, updatedAt: now })
-        .where(eq(schema.positions.id, pos.id));
-    } else {
-      await tx.insert(schema.positions).values({
-        id: randomUUID(), userId, symbol, qty, avgEntryPrice: fillPrice, updatedAt: now,
-      });
-    }
-  } else {
-    await tx.update(schema.accounts)
-      .set({ cash: account.cash + fillPrice * qty })
-      .where(eq(schema.accounts.userId, userId));
-    if (pos) {
-      const remaining = pos.qty - qty;
-      // Realized P&L → journal, every close is a learning artifact.
-      await tx.insert(schema.journalEntries).values({
-        id: randomUUID(), userId, symbol, side: "sell", qty,
-        entryPrice: pos.avgEntryPrice, exitPrice: fillPrice,
-        pnl: (fillPrice - pos.avgEntryPrice) * qty,
-        thesis: null, agentId: order.agentId, createdAt: now,
-      });
-      if (remaining > 1e-9) {
-        await tx.update(schema.positions)
-          .set({ qty: remaining, updatedAt: now })
-          .where(eq(schema.positions.id, pos.id));
-      } else {
-        await tx.delete(schema.positions).where(eq(schema.positions.id, pos.id));
-      }
-    }
+  const r = applyFill(pos?.qty ?? 0, pos?.avgEntryPrice ?? 0, order.side, order.qty, fillPrice);
+
+  await tx.update(schema.accounts)
+    .set({ cash: account.cash + r.cashFlow })
+    .where(eq(schema.accounts.userId, userId));
+
+  if (r.closedQty > 0) {
+    // Realized P&L → journal, every close/cover is a learning artifact.
+    await tx.insert(schema.journalEntries).values({
+      id: randomUUID(), userId, symbol,
+      side: (pos?.qty ?? 0) > 0 ? "sell" : "cover", qty: r.closedQty,
+      entryPrice: pos?.avgEntryPrice ?? 0, exitPrice: fillPrice, pnl: r.realized,
+      thesis: null, agentId: order.agentId, createdAt: now,
+    });
   }
+
+  if (r.flat) {
+    if (pos) await tx.delete(schema.positions).where(eq(schema.positions.id, pos.id));
+  } else if (pos) {
+    await tx.update(schema.positions).set({ qty: r.q1, avgEntryPrice: r.avg, updatedAt: now })
+      .where(eq(schema.positions.id, pos.id));
+  } else {
+    await tx.insert(schema.positions).values({
+      id: randomUUID(), userId, symbol, qty: r.q1, avgEntryPrice: r.avg, updatedAt: now,
+    });
+  }
+}
+
+/*
+  Account risk snapshot for the UI — the numbers a margin desk watches. Equity
+  is marked live by markEquity; here we split it into long/short market value,
+  gross/net exposure, the maintenance requirement, and remaining buying power.
+*/
+export type AccountRisk = {
+  equity: number; cash: number; longValue: number; shortValue: number;
+  gross: number; net: number; maintenance: number; buyingPower: number; marginUsedPct: number;
+};
+
+export async function accountRisk(userId: string): Promise<AccountRisk> {
+  const [account] = await db.select().from(schema.accounts).where(eq(schema.accounts.userId, userId));
+  const positions = await db.select().from(schema.positions).where(eq(schema.positions.userId, userId));
+  const cash = account?.cash ?? 0;
+  let longValue = 0, shortValue = 0, initialReq = 0, maintenance = 0;
+  const quotes = positions.length ? await getQuotes(positions.map((p) => p.symbol)) : [];
+  const mark = new Map(quotes.map((q) => [q.symbol, q.price]));
+  for (const p of positions) {
+    const px = mark.get(p.symbol) ?? p.avgEntryPrice;
+    const val = p.qty * px; // signed
+    if (val >= 0) longValue += val; else shortValue += -val;
+    initialReq += initialRate(p.symbol) * Math.abs(val);
+    maintenance += maintRate(p.symbol) * Math.abs(val);
+  }
+  const equity = cash + longValue - shortValue;
+  const gross = longValue + shortValue;
+  // Buying power: extra equity-notional you can still add at the initial rate.
+  const buyingPower = Math.max(0, (equity - initialReq) / 0.5);
+  return {
+    equity, cash, longValue, shortValue, gross, net: longValue - shortValue,
+    maintenance, buyingPower, marginUsedPct: equity > 0 ? Math.min(1, initialReq / equity) : 0,
+  };
 }
 
 export async function cancelOrder(userId: string, orderId: string): Promise<boolean> {

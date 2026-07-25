@@ -38,6 +38,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
   const toast = useToast();
 
   const [account, setAccount] = useState<Account | null>(null);
+  const [buyingPower, setBuyingPower] = useState<number | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [quotes, setQuotes] = useState<Map<string, Quote>>(new Map());
@@ -94,6 +95,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
       const data = await res.json();
       if (data.ok) {
         setAccount(data.account);
+        setBuyingPower(data.risk?.buyingPower ?? null);
         setPositions(data.positions);
         positionsRef.current = data.positions;
         setWatchlist(data.watchlist);
@@ -319,6 +321,8 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
               symbol={symbol}
               quote={quote}
               cash={account?.cash ?? 0}
+              buyingPower={buyingPower}
+              held={position?.qty ?? 0}
               marketOpen={marketOpen}
               onPlaced={refreshAfterTrade}
               presetSide={presetSide}

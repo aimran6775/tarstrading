@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/server/auth";
-import { reconcile } from "@/server/exchange";
+import { reconcile, accountRisk } from "@/server/exchange";
 import { db, schema } from "@/server/db";
 import { asc, eq } from "drizzle-orm";
 
@@ -20,11 +20,15 @@ export async function GET() {
     .where(eq(schema.watchlistItems.userId, user.id))
     .orderBy(asc(schema.watchlistItems.rank));
 
+  // The margin desk's numbers: buying power, gross/net exposure, margin used.
+  const risk = await accountRisk(user.id);
+
   return NextResponse.json({
     ok: true,
     user: { name: user.name, email: user.email },
     account,
     positions,
+    risk,
     watchlist: watchlist.map((w) => w.symbol),
   });
 }
