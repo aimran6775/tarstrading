@@ -24,8 +24,10 @@ export type Rank = {
 export type Standings = { top: Rank[]; you: Rank | null; totalTraders: number };
 
 const firstName = (n: string | null) => (n || "Trader").split(" ")[0];
-const toRank = (equity: number, rank: number, name: string | null, isYou: boolean): Rank => ({
-  rank, name: firstName(name), returnPct: (equity - STARTING_CASH) / STARTING_CASH, equity, isYou,
+/** The board name: your FUND if you've named one, else first name only. */
+const boardName = (fund: string | null, name: string | null) => fund || firstName(name);
+const toRank = (equity: number, rank: number, name: string, isYou: boolean): Rank => ({
+  rank, name, returnPct: (equity - STARTING_CASH) / STARTING_CASH, equity, isYou,
 });
 
 /** Top `limit` traders by return, plus the caller's own row if off the board. */
@@ -34,6 +36,7 @@ export async function getLeaderboard(userId: string, limit = 20): Promise<Standi
     id: schema.accounts.userId,
     equity: schema.accounts.equity,
     name: schema.users.name,
+    fundName: schema.users.fundName,
   })
     .from(schema.accounts)
     .innerJoin(schema.users, eq(schema.accounts.userId, schema.users.id))
@@ -41,20 +44,20 @@ export async function getLeaderboard(userId: string, limit = 20): Promise<Standi
     .limit(limit);
 
   const [{ total }] = await db.execute<{ total: number }>(dsql`select count(*)::int as total from accounts`);
-  const top = rows.map((r, i) => toRank(r.equity, i + 1, r.name, r.id === userId));
+  const top = rows.map((r, i) => toRank(r.equity, i + 1, boardName(r.fundName, r.name), r.id === userId));
 
   // If the caller isn't on the visible board, compute just their rank (a single
   // indexed count of accounts richer than them) — no full scan.
   let you: Rank | null = null;
   if (!top.some((r) => r.isYou)) {
-    const [me] = await db.select({ equity: schema.accounts.equity, name: schema.users.name })
+    const [me] = await db.select({ equity: schema.accounts.equity, name: schema.users.name, fundName: schema.users.fundName })
       .from(schema.accounts)
       .innerJoin(schema.users, eq(schema.accounts.userId, schema.users.id))
       .where(eq(schema.accounts.userId, userId));
     if (me) {
       const [{ ahead }] = await db.execute<{ ahead: number }>(
         dsql`select count(*)::int as ahead from accounts where equity > ${me.equity}`);
-      you = toRank(me.equity, ahead + 1, me.name, true);
+      you = toRank(me.equity, ahead + 1, boardName(me.fundName, me.name), true);
     }
   }
 

@@ -26,6 +26,9 @@ export const users = pgTable("users", {
   suspended: integer("suspended").notNull().default(0),
   /** Free-text admin annotation ("watch this account", why suspended…). */
   adminNote: text("admin_note"),
+  /** The user's fund name — their desk's identity on the Floor and the
+      standings board ("Ivy Capital", "Momentum Partners"). Optional. */
+  fundName: text("fund_name"),
   createdAt: epochMs("created_at").notNull(),
 });
 

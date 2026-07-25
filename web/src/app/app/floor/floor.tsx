@@ -22,7 +22,7 @@ const VideoHero = dynamic(() => import("@/components/video-hero"), { ssr: false 
 */
 
 type Data = {
-  name: string; equity: number; cash: number; dayStart: number; curve: number[];
+  name: string; fundName: string | null; equity: number; cash: number; dayStart: number; curve: number[];
   positions: { symbol: string; qty: number; value: number; openPnl: number }[];
   openPnl: number; invested: number; openOrders: number;
   agentsRunning: number; agentsAlloc: number; agentName: string | null;
@@ -151,7 +151,7 @@ export default function Floor({ data }: { data: Data }) {
                 themes — scene-ink only, never theme ink tokens. */}
             <div className="relative flex min-h-[360px] flex-col p-4 sm:p-6 md:min-h-[440px] md:p-8">
               <motion.div variants={item} className="flex items-center justify-between gap-3">
-                <p className="scene-ink-2 text-sm">{greeting}, {data.name.split(" ")[0]}.</p>
+                <FundMasthead greeting={greeting} name={data.name} fundName={data.fundName} />
                 <div className="flex shrink-0 items-center gap-2.5">
                   <span className="scene-ink-3 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em]">
                     <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${data.system.marketOpen ? "bg-gain pulse-ring" : "bg-ink-4"}`} />
@@ -356,6 +356,65 @@ export default function Floor({ data }: { data: Data }) {
 }
 
 /* ---- primitives ---- */
+/*
+  The fund masthead — your desk's identity, over the hero footage. Unnamed
+  desks get the greeting plus a quiet "Name your fund" affordance; named ones
+  fly the fund's flag with the greeting beneath. Renaming is inline: click the
+  name (or the affordance), type, Enter. Scene contract: scene-ink only.
+*/
+function FundMasthead({ greeting, name, fundName }: { greeting: string; name: string; fundName: string | null }) {
+  const [fund, setFund] = useState(fundName);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(fundName ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const next = draft.replace(/\s+/g, " ").trim().slice(0, 40);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/account", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fundName: next }),
+      });
+      const d = await res.json();
+      if (d.ok) { setFund(d.fundName); setEditing(false); }
+    } finally { setSaving(false); }
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={(e) => { e.preventDefault(); void save(); }}
+        className="scene-panel flex min-h-11 items-center gap-2 rounded-full border border-white/10 px-4 py-1.5">
+        <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Escape") setEditing(false); }}
+          placeholder="Name your fund…" maxLength={40}
+          className="scene-ink w-44 bg-transparent text-sm outline-none placeholder:text-[oklch(0.55_0.02_264)] sm:w-56"
+          aria-label="Fund name" />
+        <button type="submit" disabled={saving}
+          className="pressable font-mono text-[10px] uppercase tracking-[0.15em] text-gold disabled:opacity-50">
+          {saving ? "…" : "Save"}
+        </button>
+      </form>
+    );
+  }
+
+  return fund ? (
+    <button onClick={() => { setDraft(fund); setEditing(true); }}
+      className="pressable min-h-11 text-left" title="Rename your fund">
+      <span className="scene-ink font-display text-base font-extrabold uppercase tracking-wide sm:text-lg">{fund}</span>
+      <span className="scene-ink-3 block text-xs">{greeting}, {name.split(" ")[0]}.</span>
+    </button>
+  ) : (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+      <p className="scene-ink-2 text-sm">{greeting}, {name.split(" ")[0]}.</p>
+      <button onClick={() => { setDraft(""); setEditing(true); }}
+        className="pressable scene-ink-3 min-h-11 font-mono text-[10px] uppercase tracking-[0.2em] underline decoration-dotted underline-offset-4 hover:text-gold">
+        Name your fund
+      </button>
+    </div>
+  );
+}
+
 function Kpi({ label, value, tone = "ink-1", spark }: { label: string; value: string; tone?: Tone; spark?: number[] }) {
   const hasSpark = !!spark && spark.length > 1;
   return (

@@ -88,6 +88,7 @@ export default async function FloorPage() {
 
   const data = {
     name: user.name,
+    fundName: user.fundName ?? null,
     equity,
     cash: account?.cash ?? 0,
     dayStart,

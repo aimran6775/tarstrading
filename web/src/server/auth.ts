@@ -106,7 +106,7 @@ export async function endSession() {
   jar.set(SESSION_COOKIE, "", { maxAge: 0, path: "/", domain: await cookieDomain() });
 }
 
-export type SessionUser = { id: string; email: string; name: string; role: "user" | "admin" };
+export type SessionUser = { id: string; email: string; name: string; role: "user" | "admin"; fundName: string | null };
 
 // Request-memoized: a page + its layout + several server components all call
 // currentUser() in one render; cache() collapses that to a single session join.
@@ -116,7 +116,7 @@ export const currentUser = cache(async (): Promise<SessionUser | null> => {
   if (!token) return null;
   const [row] = await db.select({
     id: schema.users.id, email: schema.users.email, name: schema.users.name,
-    role: schema.users.role,
+    role: schema.users.role, fundName: schema.users.fundName,
   })
     .from(schema.sessions)
     .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))

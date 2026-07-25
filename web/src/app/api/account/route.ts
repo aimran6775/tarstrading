@@ -25,10 +25,24 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    user: { name: user.name, email: user.email },
+    user: { name: user.name, email: user.email, fundName: user.fundName ?? null },
     account,
     positions,
     risk,
     watchlist: watchlist.map((w) => w.symbol),
   });
+}
+
+/** Name (or rename) your fund — the desk's identity on the Floor & standings. */
+export async function PATCH(req: Request) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ ok: false }, { status: 401 });
+  const body = await req.json().catch(() => ({}));
+  const raw = typeof body.fundName === "string" ? body.fundName : "";
+  // Keep it printable and board-sized; empty clears the name.
+  const fundName = raw.replace(/\s+/g, " ").trim().slice(0, 40);
+  await db.update(schema.users)
+    .set({ fundName: fundName || null })
+    .where(eq(schema.users.id, user.id));
+  return NextResponse.json({ ok: true, fundName: fundName || null });
 }

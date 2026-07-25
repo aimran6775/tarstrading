@@ -17,8 +17,22 @@ import { usd, pct, categoryOf, type Quote, type Account } from "@/components/tra
   quotes ride the shared poll.
 */
 
-const HOUSE = ["AAPL", "NVDA", "TSLA", "MSFT", "AMZN", "META", "GOOG", "AMD",
-  "NFLX", "SPY", "QQQ", "DIA", "BTC/USD", "ETH/USD"];
+/* The house board — a real desk's watch universe, not just the Mag 7.
+   Backfill + the 5-min heartbeat keep charts warm for everything listed. */
+const HOUSE = [
+  // Mega-cap tech
+  "AAPL", "NVDA", "TSLA", "MSFT", "AMZN", "META", "GOOG", "AMD", "NFLX", "AVGO",
+  // Blue chips & industrials
+  "JPM", "V", "WMT", "JNJ", "PG", "DIS", "BA", "CAT", "XOM", "CVX",
+  // Growth & momentum
+  "PLTR", "COIN", "SQ", "SHOP", "UBER", "ABNB", "SNOW", "CRWD", "PANW", "SMCI",
+  // Semis & AI complex
+  "INTC", "MU", "TSM", "ARM", "QCOM",
+  // ETFs — index, sector, vol
+  "SPY", "QQQ", "DIA", "IWM", "XLF", "XLE", "XLK", "SMH", "GLD", "TLT",
+  // Crypto — 24/7
+  "BTC/USD", "ETH/USD", "SOL/USD", "DOGE/USD", "AVAX/USD", "LINK/USD",
+];
 
 type Category = "Trending" | "Stocks" | "Crypto" | "ETFs" | "Watchlist";
 const CATEGORIES: Category[] = ["Trending", "Stocks", "Crypto", "ETFs", "Watchlist"];
