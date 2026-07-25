@@ -212,7 +212,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 pb-24 md:px-6 md:pb-8">
         {/* ---------- headline: the number IS the header ---------- */}
         <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">
               <button onClick={() => router.push("/app")} className="pressable hover:text-ink-2">Markets</button>
               {" · "}{categoryOf(symbol)}
@@ -250,7 +250,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
             </div>
           </div>
           <button onClick={toggleWatch}
-            className={`pressable flex min-h-10 items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium ${
+            className={`pressable flex min-h-11 items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium ${
               watched ? "border-gold/40 bg-gold/10 text-gold" : "border-hairline text-ink-3 hover:text-ink-1"
             }`}
             aria-pressed={watched}>
@@ -286,7 +286,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
               <div className="flex gap-1">
                 {(["1D", "1W", "1M", "3M", "1Y", "5Y"] as Timeframe[]).map((tf) => (
                   <button key={tf} onClick={() => setTimeframe(tf)}
-                    className={`pressable tnum rounded-full px-3 py-1.5 text-xs ${
+                    className={`pressable tnum min-h-10 rounded-full px-3 py-1.5 text-xs sm:min-h-0 ${
                       tf === timeframe ? "bg-bg3 text-ink-1" : "text-ink-3 hover:text-ink-1"
                     }`}
                     aria-pressed={tf === timeframe}>
@@ -349,7 +349,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
 
         {/* ---------- the portfolio tray ---------- */}
         <section className="panel mt-4 overflow-hidden">
-          <nav className="flex gap-1 overflow-x-auto border-b border-hairline px-2 pt-2 [&>button]:shrink-0" aria-label="Portfolio tray">
+          <nav className="flex gap-1 overflow-x-auto border-b border-hairline px-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>button]:shrink-0" aria-label="Portfolio tray">
             {([
               ["positions", `Positions${positions.length ? ` · ${positions.length}` : ""}`],
               ["orders", `Orders${openOrders.length ? ` · ${openOrders.length}` : ""}`],
@@ -357,7 +357,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
               ["perf", "Performance"],
             ] as const).map(([key, label]) => (
               <button key={key} onClick={() => setTray(key)}
-                className={`pressable rounded-t-lg px-4 py-2.5 text-xs font-medium ${
+                className={`pressable min-h-11 rounded-t-lg px-4 py-2.5 text-xs font-medium ${
                   tray === key
                     ? "border-b-2 border-gold text-ink-1"
                     : "text-ink-3 hover:text-ink-1"

@@ -38,29 +38,26 @@ export default function Landing() {
   const reduced = useReducedMotion();
   return (
     <main className="flex min-h-screen flex-col">
-      <header className="glass fixed inset-x-0 top-0 z-50 flex items-center justify-between px-5 py-3 md:px-10">
-        <TarsWordmark size={26} animate />
+      <header className="glass fixed inset-x-0 top-0 z-50 flex items-center justify-between gap-2 px-4 py-2.5 sm:px-5 sm:py-3 md:px-10">
+        <TarsWordmark size={22} animate className="shrink-0 [&_span]:!text-sm sm:[&_span]:!text-base" />
 
-        <nav className="flex items-center gap-2">
+        <nav className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <ThemeToggle />
-          <Link href="/login" className="pressable rounded-full px-4 py-2 text-sm text-ink-2 hover:text-ink-1">
+          <Link href="/login" className="pressable whitespace-nowrap rounded-full px-3 py-2 text-sm text-ink-2 hover:text-ink-1 sm:px-4">
             Log in
           </Link>
-          <Link href="/join" className="pressable cta-gold rounded-full px-5 py-2 text-sm font-semibold">
-            Start with $100k
+          <Link href="/join" className="pressable cta-gold whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold sm:px-5 sm:text-sm">
+            <span className="sm:hidden">Start free</span>
+            <span className="hidden sm:inline">Start with $100k</span>
           </Link>
         </nav>
       </header>
 
-      {/* ---------- HERO: the real tape, in motion ---------- */}
+      {/* ---------- HERO: the real tape, in motion (a committed dark scene) ---------- */}
       <section className="relative flex min-h-[100svh] flex-col justify-end overflow-hidden">
-        <VideoHero dim={0.45} />
+        <VideoHero dim={0.5} blend={false} />
 
-        {/* Legibility scrim over the footage floor */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3"
-          style={{ background: "linear-gradient(to top, var(--bg0) 12%, transparent)" }} />
-
-        <div className="relative z-10 px-5 pb-16 pt-28 md:px-10 md:pb-20">
+        <div className="relative z-10 px-5 pb-12 pt-24 sm:pb-16 sm:pt-28 md:px-10 md:pb-20">
           <motion.p
             initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 0.9 }}
             className="kicker mb-5"
@@ -70,7 +67,7 @@ export default function Landing() {
           <motion.h1
             initial={reduced ? false : { opacity: 0, y: 34 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.45, duration: 0.9, ease: [0.32, 0.72, 0, 1] }}
-            className="display max-w-5xl text-[clamp(2.6rem,9.5vw,7.5rem)] leading-[0.97] text-ink-1"
+            className="display scene-ink max-w-5xl text-[clamp(2.4rem,9vw,7.5rem)] leading-[0.97]"
           >
             Learn to trade
             <br />
@@ -79,9 +76,9 @@ export default function Landing() {
           <motion.p
             initial={reduced ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7, duration: 0.8, ease: [0.32, 0.72, 0, 1] }}
-            className="mt-6 max-w-xl text-lg leading-relaxed text-ink-2"
+            className="scene-ink-2 mt-6 max-w-xl text-base leading-relaxed sm:text-lg"
           >
-            Tars hands you <span className="tnum text-ink-1">$100,000</span>{" "}in simulated
+            Tars hands you <span className="tnum scene-ink">$100,000</span>{" "}in simulated
             capital, real market data, an academy that starts at zero, and an
             assistant that hires analysts to trade your ideas. Every fill is
             practice. That&apos;s the point.
@@ -89,19 +86,19 @@ export default function Landing() {
           <motion.div
             initial={reduced ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9, duration: 0.7, ease: [0.32, 0.72, 0, 1] }}
-            className="mt-9 flex flex-wrap items-center gap-4"
+            className="mt-8 flex flex-wrap items-center gap-3 sm:mt-9 sm:gap-4"
           >
-            <Link href="/join" className="pressable cta-gold rounded-full px-8 py-4 text-base font-semibold">
+            <Link href="/join" className="pressable cta-gold rounded-full px-6 py-3.5 text-sm font-semibold sm:px-8 sm:py-4 sm:text-base">
               Start with $100,000
             </Link>
-            <a href="#terminal" className="pressable rounded-full border border-hairline px-8 py-4 text-base text-ink-2 hover:border-ink-4 hover:text-ink-1">
+            <a href="#terminal" className="pressable scene-ink-2 rounded-full border border-white/25 px-6 py-3.5 text-sm hover:border-white/50 sm:px-8 sm:py-4 sm:text-base">
               See the terminal
             </a>
           </motion.div>
         </div>
 
-        {/* The tape */}
-        <div className="relative z-10 overflow-hidden border-t border-hairline py-3">
+        {/* The tape — the boundary element: themed backing, hands the scene to the page */}
+        <div className="glass relative z-10 overflow-hidden border-t border-hairline py-3">
           <div className="tape flex w-max gap-10 pl-6">
             {[...TAPE, ...TAPE].map(([sym, chg], i) => (
               <span key={i} className="tnum flex items-baseline gap-2 text-xs text-ink-3">

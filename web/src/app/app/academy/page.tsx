@@ -69,7 +69,7 @@ export default async function AcademyHome() {
         {next && (
           <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2">
             <Link href={`/app/academy/${next.id}`}
-              className="pressable cta-gold inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold">
+              className="pressable cta-gold inline-flex max-w-full items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold">
               {done.size > 0 ? "Continue" : "Start learning"}: {next.title}
             </Link>
             {doneCount === 0 && (
@@ -102,7 +102,7 @@ export default async function AcademyHome() {
             return (
               <section key={track.id} className={`card overflow-hidden ${locked ? "opacity-60" : ""}`}>
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-5 py-4">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">
                       Stage {ti + 1} · {track.covers}
                       {cleared && <span className="ml-2 rounded-full bg-gold/15 px-2 py-0.5 text-[9px] font-semibold tracking-[0.15em] text-gold">CLEARED</span>}
@@ -135,7 +135,7 @@ export default async function AcademyHome() {
                           href={`/app/academy/${lesson.id}`}
                           className="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-bg3/40"
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex min-w-0 items-center gap-3">
                             <span
                               aria-hidden
                               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${

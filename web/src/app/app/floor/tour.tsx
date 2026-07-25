@@ -74,7 +74,7 @@ export default function FloorTour({ hasAgents }: { hasAgents?: boolean }) {
         <motion.div role="dialog" aria-modal="true" aria-label="Welcome tour"
           initial={rm ? false : { opacity: 0, y: 18, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: rm ? 0 : 0.3, ease: [0.32, 0.72, 0, 1] }}
-          className="glass relative w-full max-w-md overflow-hidden rounded-3xl border border-hairline p-7 shadow-2xl">
+          className="glass relative w-full max-w-md overflow-hidden rounded-3xl border border-hairline p-5 shadow-2xl sm:p-7">
           <div aria-hidden>{step.icon}</div>
           <h2 className="mt-4 font-display text-xl font-bold text-ink-1">{step.title}</h2>
           <p className="mt-2 text-sm leading-relaxed text-ink-2">{step.body}</p>
@@ -86,9 +86,9 @@ export default function FloorTour({ hasAgents }: { hasAgents?: boolean }) {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              {!last && <button onClick={close} className="pressable rounded-full px-3 py-2 text-xs text-ink-4 hover:text-ink-2">Skip</button>}
+              {!last && <button onClick={close} className="pressable min-h-11 rounded-full px-3 py-2 text-xs text-ink-4 hover:text-ink-2">Skip</button>}
               <button autoFocus onClick={() => (last ? close() : setI((n) => n + 1))}
-                className="pressable cta-gold rounded-full px-5 py-2 text-sm font-semibold">
+                className="pressable cta-gold min-h-11 rounded-full px-5 py-2 text-sm font-semibold">
                 {last ? "Start trading" : "Next"}
               </button>
             </div>

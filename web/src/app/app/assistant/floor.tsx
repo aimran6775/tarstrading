@@ -136,7 +136,7 @@ export default function AnalystFloor() {
                 <span className="shrink-0 rounded-full bg-agent/12 px-2.5 py-0.5 text-[11px] font-medium text-agent">
                   {a.agentName}
                 </span>
-                <span className="text-xs leading-relaxed text-ink-2">{a.text}</span>
+                <span className="min-w-0 flex-1 break-words text-xs leading-relaxed text-ink-2">{a.text}</span>
                 <span className="tnum ml-auto shrink-0 text-[10px] text-ink-4">
                   {new Date(a.createdAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                 </span>
@@ -194,7 +194,7 @@ function AnalystCard({ agent, busy, onAction, onDelete }: {
         </span>
       </div>
 
-      <p className="mt-3 text-xs leading-relaxed text-ink-3">{agent.thesis}</p>
+      <p className="mt-3 break-words text-xs leading-relaxed text-ink-3">{agent.thesis}</p>
 
       {bt && (
         <div className="mt-4">
@@ -273,7 +273,7 @@ function BacktestStrip({ bt }: { bt: Backtest }) {
         <line x1={splitX} x2={splitX} y1="0" y2={H} stroke="var(--gold)" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
         <polyline points={pts} fill="none" stroke="var(--agent)" strokeWidth="1.5" />
       </svg>
-      <div className="tnum mt-2 grid grid-cols-2 gap-2 text-[11px]">
+      <div className="tnum mt-2 grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2">
         <div className="rounded-md bg-bg3/60 px-2.5 py-1.5">
           <span className="text-ink-4">In-sample · </span>
           <span className={bt.inSample.return >= 0 ? "text-gain" : "text-loss"}>{pctf(bt.inSample.return)}</span>

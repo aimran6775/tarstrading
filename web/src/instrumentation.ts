@@ -1,15 +1,17 @@
 /*
-  Server-boot hook (Next instrumentation). On the BACKEND service this starts
-  the in-process scheduler: the platform heartbeat every 5 minutes, first run
-  shortly after boot. That makes Railway fully self-sufficient — agents trade
-  24/7, the vault heals, sessions sweep, and the ticker directory stays fresh
-  with NO external cron and no browser required.
+  Server-boot hook (Next instrumentation). On the BACKEND service this arms
+  the in-process scheduler: every 5 minutes it calls its OWN /api/cron/tick
+  over loopback (CRON_SECRET-authed), which runs the platform heartbeat —
+  agents trade 24/7, the vault heals, sessions sweep, the ticker directory
+  stays fresh. No external cron, no browser required.
 
-  Guards:
-  - APP_ROLE === "backend" only — the frontend service and local dev never
-    double-tick (dev keeps the on-demand /api/cron/tick + in-app tickers).
-  - nodejs runtime only (instrumentation also evaluates for edge).
-  - globalThis flag — dev HMR or duplicate registers never stack intervals.
+  Deliberately import-free: instrumentation is compiled for edge and client
+  fallback bundles too, where node builtins (crypto/net/tls via the server
+  graph) don't resolve. A loopback fetch keeps the module graph empty and the
+  scheduler bulletproof across every compile target.
+
+  Guards: backend role only, nodejs runtime only, globalThis flag so HMR or
+  duplicate registers never stack intervals.
 */
 
 const EVERY_MS = 5 * 60_000;
@@ -22,13 +24,19 @@ declare global {
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (process.env.APP_ROLE !== "backend") return;
+  if (!process.env.CRON_SECRET) return; // fail closed, same as the route
   if (globalThis.__tarsHeartbeat) return;
   globalThis.__tarsHeartbeat = true;
 
-  const { runHeartbeat } = await import("./server/heartbeat");
-  const beat = () => runHeartbeat("auto").catch(() => { /* logged in cron_runs; next beat retries */ });
+  const port = process.env.PORT ?? "3000";
+  const beat = () => {
+    fetch(`http://127.0.0.1:${port}/api/cron/tick`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
+    }).catch(() => { /* logged in cron_runs when it lands; next beat retries */ });
+  };
 
   setTimeout(beat, FIRST_MS);
   setInterval(beat, EVERY_MS);
-  console.log(`[tars] backend heartbeat armed — every ${EVERY_MS / 60_000}m`);
+  console.log(`[tars] backend heartbeat armed — every ${EVERY_MS / 60_000}m via loopback cron`);
 }

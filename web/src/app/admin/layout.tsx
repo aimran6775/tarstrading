@@ -23,7 +23,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <span className="hidden shrink-0 rounded-full border border-agent/40 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-agent sm:block">
             Control center
           </span>
-          <div className="min-w-0 overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <AdminNav />
           </div>
         </div>

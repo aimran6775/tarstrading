@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { randomBytes, scryptSync, timingSafeEqual, randomUUID } from "crypto";
 import { cache } from "react";
 import { db, schema } from "./db";
@@ -73,10 +73,18 @@ export async function createUser(email: string, name: string, password: string) 
   return userId;
 }
 
-/** Production sets COOKIE_DOMAIN=.tarstrading.com so the session works on both
-    the frontend (tarstrading.com) and the backend (admin.tarstrading.com).
-    Unset locally → host-only cookie, exactly as before. */
-const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
+/** The session cookie's Domain attribute, decided PER REQUEST from the Host:
+    on tarstrading.com hosts we scope to COOKIE_DOMAIN (.tarstrading.com) so
+    one login spans the frontend and admin.tarstrading.com; on any other host
+    (Railway's built-in *.up.railway.app URLs, localhost) a domain attribute
+    would make the browser REJECT the cookie, so we omit it (host-only). */
+async function cookieDomain(): Promise<string | undefined> {
+  const want = process.env.COOKIE_DOMAIN; // e.g. ".tarstrading.com"
+  if (!want) return undefined;
+  const host = ((await headers()).get("host") ?? "").split(":")[0].toLowerCase();
+  const bare = want.replace(/^\./, "");
+  return host === bare || host.endsWith("." + bare) ? want : undefined;
+}
 
 export async function startSession(userId: string) {
   const token = randomBytes(32).toString("hex");
@@ -86,7 +94,7 @@ export async function startSession(userId: string) {
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_TTL_MS / 1000, path: "/", domain: cookieDomain,
+    maxAge: SESSION_TTL_MS / 1000, path: "/", domain: await cookieDomain(),
   });
 }
 
@@ -95,7 +103,7 @@ export async function endSession() {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
   // Clearing must carry the SAME domain attribute the cookie was set with.
-  jar.set(SESSION_COOKIE, "", { maxAge: 0, path: "/", domain: cookieDomain });
+  jar.set(SESSION_COOKIE, "", { maxAge: 0, path: "/", domain: await cookieDomain() });
 }
 
 export type SessionUser = { id: string; email: string; name: string; role: "user" | "admin" };

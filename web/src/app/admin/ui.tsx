@@ -67,9 +67,12 @@ type Col = { label: string; align?: "right" };
 export function DataTable({ cols, rows, empty, minWidth }: {
   cols: Col[]; rows: React.ReactNode[][]; empty: string; minWidth?: number;
 }) {
+  // Wide tables scroll inside the panel instead of squishing on phones: with
+  // no explicit minWidth, give many-column tables a sane floor (~110px/col).
+  const floor = minWidth ?? (cols.length >= 5 ? cols.length * 110 : undefined);
   return (
     <section className="panel mt-2 overflow-x-auto">
-      <table className="w-full text-left text-xs" style={minWidth ? { minWidth } : undefined}>
+      <table className="w-full text-left text-xs" style={floor ? { minWidth: floor } : undefined}>
         <thead>
           <tr className="border-b border-hairline font-mono text-[10px] uppercase tracking-[0.15em] text-ink-4">
             {cols.map((c, i) => <th key={i} className={`px-4 py-2.5 ${c.align === "right" ? "text-right" : ""}`}>{c.label}</th>)}
@@ -78,7 +81,7 @@ export function DataTable({ cols, rows, empty, minWidth }: {
         <tbody>
           {rows.length === 0 && <tr><td colSpan={cols.length} className="px-4 py-8 text-center text-ink-4">{empty}</td></tr>}
           {rows.map((r, ri) => (
-            <tr key={ri} className="border-b border-hairline last:border-0 hover:bg-bg3/30">
+            <tr key={ri} className="border-b border-hairline last:border-0 hover:bg-bg3/50">
               {r.map((cell, ci) => (
                 <td key={ci} className={`tnum px-4 py-2 ${cols[ci]?.align === "right" ? "text-right" : ""} ${ci === 0 ? "font-medium text-ink-1" : "text-ink-2"}`}>{cell}</td>
               ))}

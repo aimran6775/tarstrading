@@ -78,10 +78,12 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
     <>
       <CommandPalette />
       <header className="glass sticky top-0 z-50">
-        <div className="flex items-center justify-between px-4 py-2.5 md:px-6">
+        <div className="flex items-center justify-between px-3 py-2.5 sm:px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-4">
-            <Link href="/app/floor" className="pressable shrink-0">
-              <TarsWordmark size={22} text="TARS TRADING" />
+            <Link href="/app/floor" className="pressable shrink-0 whitespace-nowrap">
+              {/* Full lockup everywhere; below ~400px space truly forbids it */}
+              <TarsWordmark size={22} text="TARS TRADING" className="hidden min-[400px]:inline-flex" />
+              <TarsWordmark size={22} text="TARS" className="min-[400px]:hidden" />
             </Link>
 
             {/* Market pulse — a real desk always shows session state */}

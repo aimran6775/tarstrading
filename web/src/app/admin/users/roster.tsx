@@ -24,11 +24,11 @@ export default function UsersRoster({ rows }: { rows: Row[] }) {
         <input value={q} onChange={(e) => setQ(e.target.value)}
           placeholder="Search name or email…"
           className="w-full max-w-sm rounded-lg border border-hairline bg-bg2 px-3 py-2 text-sm text-ink-1 outline-none placeholder:text-ink-4 focus:border-agent/50" />
-        <span className="font-mono text-[11px] text-ink-4">{filtered.length} shown</span>
+        <span className="shrink-0 font-mono text-[11px] text-ink-4">{filtered.length} shown</span>
       </div>
 
       <section className="panel mt-3 overflow-x-auto">
-        <table className="w-full text-left text-xs">
+        <table className="w-full min-w-[640px] text-left text-xs">
           <thead>
             <tr className="border-b border-hairline font-mono text-[10px] uppercase tracking-[0.15em] text-ink-4">
               <th className="px-4 py-2.5">Trader</th>
@@ -45,7 +45,7 @@ export default function UsersRoster({ rows }: { rows: Row[] }) {
               const ret = u.equity != null ? (u.equity - STARTING) / STARTING : null;
               return (
                 <tr key={u.id} onClick={() => router.push(`/admin/users/${u.id}`)}
-                  className="cursor-pointer border-b border-hairline last:border-0 hover:bg-bg3/40">
+                  className="cursor-pointer border-b border-hairline last:border-0 hover:bg-bg3/60">
                   <td className="px-4 py-2">
                     <p className="flex items-center gap-2 font-medium text-ink-1">
                       {u.name}

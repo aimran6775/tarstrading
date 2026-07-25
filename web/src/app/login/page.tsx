@@ -44,20 +44,21 @@ export default function Login() {
         <AuthField label="Password" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
 
         {error && (
-          <p role="alert" className="rounded-lg border border-loss/40 bg-loss/10 px-3 py-2 text-sm text-loss">
+          /* Fixed loss red — must read on the dark scene in both themes. */
+          <p role="alert" className="rounded-lg border border-[oklch(0.67_0.185_22/0.4)] bg-[oklch(0.67_0.185_22/0.12)] px-3 py-2 text-sm text-[oklch(0.72_0.16_22)]">
             {error}
           </p>
         )}
 
         <button
           type="submit" disabled={busy}
-          className="pressable cta-gold mt-2 rounded-full px-6 py-3.5 text-base font-semibold disabled:opacity-60"
+          className="pressable cta-gold mt-2 min-h-12 rounded-full px-6 py-3.5 text-base font-semibold disabled:opacity-60"
         >
           {busy ? "Authenticating…" : "Enter the terminal"}
         </button>
-        <p className="text-center text-xs text-ink-3">
+        <p className="scene-ink-3 text-center text-xs">
           New here?{" "}
-          <Link href="/join" className="text-gold hover:underline">Start with $100,000</Link>
+          <Link href="/join" className="-m-3 inline-block p-3 align-baseline text-gold hover:underline">Start with $100,000</Link>
         </p>
       </form>
     </AuthScene>

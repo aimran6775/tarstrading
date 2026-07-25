@@ -156,7 +156,9 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
 
       {/* Category strip — markets are the content */}
       <div className="sticky top-14 z-40 border-b border-hairline bg-bg0/85 px-4 backdrop-blur-md md:px-6">
-        <nav className="flex gap-1 overflow-x-auto py-2" aria-label="Market categories">
+        <nav
+          className="-mx-4 flex gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none] md:-mx-6 md:px-6 [&::-webkit-scrollbar]:hidden"
+          aria-label="Market categories">
           {CATEGORIES.map((c) => (
             <button key={c} onClick={() => setCategory(c)}
               className={`pressable shrink-0 rounded-full px-4 py-1.5 text-sm font-medium ${
@@ -197,7 +199,7 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
             Nothing on your watchlist yet. Add a ticker above and it follows you everywhere.
           </p>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {gridSymbols.map((s) => (
               <div key={s} className="relative">
                 <MarketCard symbol={s} name={NAME.get(s)} quote={quotes.get(s)} spark={sparks[s]} />
@@ -228,14 +230,14 @@ function FeaturedCard({ symbol, name, quote, spark }: {
   return (
     <Link href={`/app/m/${encodeURIComponent(symbol)}`}
       className="pressable mb-6 grid gap-4 rounded-2xl border border-hairline bg-bg1 p-5 transition-colors hover:bg-bg2/60 md:grid-cols-[1fr_380px] md:items-center md:p-6">
-      <div>
+      <div className="min-w-0">
         <p className="text-[10px] uppercase tracking-[0.25em] text-ink-4">
           Featured · {categoryOf(symbol)} · biggest move
         </p>
         <h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink-1 md:text-3xl">
           {name ?? symbol}
         </h2>
-        <div className="mt-2 flex items-baseline gap-3">
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           {quote ? (
             <>
               <span className="tnum text-3xl font-semibold text-ink-1 md:text-4xl">{usd(quote.price)}</span>

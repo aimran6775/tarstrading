@@ -106,31 +106,33 @@ export default function Floor({ data }: { data: Data }) {
       <motion.section {...(rm ? {} : rise(0))}
         className="relative overflow-hidden rounded-3xl border border-hairline">
         <VideoHero dim={0.5} />
-        <div className="relative flex flex-col gap-6 p-6 md:flex-row md:items-end md:justify-between md:p-8">
+        {/* Scene contract: everything below sits over dark footage in BOTH
+            themes — scene-ink only, never theme ink tokens. */}
+        <div className="relative flex flex-col gap-6 p-4 sm:p-6 md:flex-row md:items-end md:justify-between md:p-8">
           <div>
-            <p className="text-sm text-ink-3">{greeting}, {data.name.split(" ")[0]}.</p>
+            <p className="scene-ink-2 text-sm">{greeting}, {data.name.split(" ")[0]}.</p>
             <div className="mt-1 flex items-center gap-3">
               <span className="sim-mark">PAPER</span>
-              <span className="text-[11px] uppercase tracking-[0.25em] text-ink-4">Total equity</span>
+              <span className="scene-ink-3 text-[11px] uppercase tracking-[0.25em]">Total equity</span>
             </div>
-            <p className="tnum mt-2 font-display text-5xl font-bold text-ink-1 md:text-6xl">{usd(shown, 0)}</p>
-            <div className={`tnum mt-2 flex items-center gap-2 text-sm text-${tone(dayPnl)}`}>
+            <p className="scene-ink tnum mt-2 font-display text-4xl font-bold sm:text-5xl md:text-6xl">{usd(shown, 0)}</p>
+            <div className={`tnum mt-2 flex items-center gap-2 text-sm ${dayPnl > 0 ? "text-gain" : dayPnl < 0 ? "text-loss" : "scene-ink-2"}`}>
               <span>{dayPnl >= 0 ? "▲" : "▼"}</span>
               <span>{usd(Math.abs(dayPnl))}</span>
-              <span className="text-ink-4">·</span>
+              <span className="scene-ink-3">·</span>
               <span>{pct(dayPct)}</span>
-              <span className="text-ink-4">today</span>
+              <span className="scene-ink-3">today</span>
             </div>
-            <p className="tnum mt-1 text-xs text-ink-4">{usd(data.cash, 0)} buying power · {usd(data.invested, 0)} invested</p>
+            <p className="scene-ink-3 tnum mt-1 text-xs">{usd(data.cash, 0)} buying power · {usd(data.invested, 0)} invested</p>
           </div>
           <div className="w-full md:w-72">
             {data.curve.length > 1 ? (
-              <div className="rounded-2xl border border-hairline bg-bg1/60 p-3 backdrop-blur">
-                <p className="mb-1 text-[10px] uppercase tracking-[0.2em] text-ink-4">Equity curve</p>
+              <div className="scene-panel rounded-2xl border border-white/10 p-3">
+                <p className="scene-ink-3 mb-1 text-[10px] uppercase tracking-[0.2em]">Equity curve</p>
                 <Spark points={data.curve} className="h-16 w-full" />
               </div>
             ) : (
-              <div className="rounded-2xl border border-hairline bg-bg1/60 p-3 text-xs text-ink-4 backdrop-blur">
+              <div className="scene-panel scene-ink-3 rounded-2xl border border-white/10 p-3 text-xs">
                 Your equity curve draws itself as you trade.
               </div>
             )}

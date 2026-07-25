@@ -213,7 +213,7 @@ function WorldClock() {
         className="pressable flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] text-ink-2 hover:text-ink-1"
       >
         <Icon.Globe className="h-3.5 w-3.5 text-ink-3" />
-        <span className="hidden font-mono uppercase tracking-[0.14em] text-ink-3 md:inline">
+        <span className="hidden font-mono uppercase tracking-[0.14em] text-ink-2 md:inline">
           {city?.name ?? ""}
         </span>
         <span className="tnum text-ink-1">
@@ -261,7 +261,7 @@ function TapeItems({ symbols, quotes, hidden }: {
         const up = (q?.changePercent ?? 0) >= 0;
         return (
           <span key={sym} className="mx-4 flex items-center gap-2 whitespace-nowrap text-[11px]">
-            <span className="font-mono tracking-wide text-ink-3">{sym}</span>
+            <span className="font-mono tracking-wide text-ink-2">{sym}</span>
             <span className="tnum text-ink-1">{q ? fmtPrice(q.price) : "—"}</span>
             <span className={`tnum ${q ? (up ? "text-gain" : "text-loss") : "text-ink-4"}`}>
               {q ? fmtChange(q.changePercent) : "· ·"}
@@ -352,14 +352,15 @@ export function MarketFooter() {
 
   return (
     <footer
-      className="glass fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 flex h-9 items-center gap-2 border-t border-hairline px-2 sm:bottom-0 sm:gap-3 sm:px-3"
+      className="glass fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-40 flex h-9 items-center gap-2 border-t border-hairline px-2 sm:bottom-0 sm:gap-3 sm:px-3"
       style={{ borderBottom: "none" }}
       aria-label="Market ticker"
     >
-      {/* Paper-mode truth, always in view. Small, constant, never a banner. */}
+      {/* Paper-mode truth, always in view. Small, constant, never a banner.
+          Opaque backing + z-10 so the tape can never read through or under it. */}
       <Link
         href="/disclosures"
-        className="sim-mark pressable shrink-0 whitespace-nowrap no-underline hover:border-gold/60"
+        className="sim-mark pressable relative z-10 shrink-0 whitespace-nowrap bg-bg1 no-underline hover:border-gold/60"
         title="Simulated exchange — real prices, practice money. Read the disclosures."
       >
         SIMULATED

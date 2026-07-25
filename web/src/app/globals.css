@@ -54,16 +54,16 @@
   --bg1: oklch(1 0 0);
   --bg2: oklch(0.955 0.006 252);
   --bg3: oklch(0.925 0.009 252);
-  --glass: oklch(1 0 0 / 0.7);
+  --glass: oklch(1 0 0 / 0.85);
 
   --ink-1: oklch(0.24 0.022 274);
   --ink-2: oklch(0.46 0.02 268);
-  --ink-3: oklch(0.60 0.016 264);
-  --ink-4: oklch(0.72 0.012 264);
-  --hairline: oklch(0 0 0 / 0.08);
-  --hairline-strong: oklch(0 0 0 / 0.16);
+  --ink-3: oklch(0.55 0.016 264);
+  --ink-4: oklch(0.62 0.012 264);
+  --hairline: oklch(0 0 0 / 0.1);
+  --hairline-strong: oklch(0 0 0 / 0.18);
 
-  --gold: oklch(0.72 0.125 80);
+  --gold: oklch(0.66 0.125 80);
   --gold-deep: oklch(0.62 0.13 74);
   --on-gold: oklch(0.99 0 0);
 
@@ -79,14 +79,14 @@
     --bg1: oklch(1 0 0);
     --bg2: oklch(0.955 0.006 252);
     --bg3: oklch(0.925 0.009 252);
-    --glass: oklch(1 0 0 / 0.7);
+    --glass: oklch(1 0 0 / 0.85);
     --ink-1: oklch(0.24 0.022 274);
     --ink-2: oklch(0.46 0.02 268);
-    --ink-3: oklch(0.60 0.016 264);
-    --ink-4: oklch(0.72 0.012 264);
-    --hairline: oklch(0 0 0 / 0.08);
-    --hairline-strong: oklch(0 0 0 / 0.16);
-    --gold: oklch(0.72 0.125 80);
+    --ink-3: oklch(0.55 0.016 264);
+    --ink-4: oklch(0.62 0.012 264);
+    --hairline: oklch(0 0 0 / 0.1);
+    --hairline-strong: oklch(0 0 0 / 0.18);
+    --gold: oklch(0.66 0.125 80);
     --gold-deep: oklch(0.62 0.13 74);
     --on-gold: oklch(0.99 0 0);
     --gain: oklch(0.58 0.14 158);
@@ -194,6 +194,17 @@ html, body {
   border-radius: 999px;
   padding: 3px 9px;
 }
+/* On white the gold outline needs more weight to read as a chip. */
+:root[data-theme="light"] .sim-mark {
+  color: var(--gold-deep);
+  border-color: oklch(from var(--gold-deep) l c h / 0.5);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) .sim-mark {
+    color: var(--gold-deep);
+    border-color: oklch(from var(--gold-deep) l c h / 0.5);
+  }
+}
 
 /* Ticker tape */
 @keyframes tape-scroll {
@@ -239,6 +250,16 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .tars-anim .am-body, .tars-anim .am-ridge, .tars-anim .am-spark, .tars-anim .am-cast { animation: none; }
 }
+
+/* ---------- The Scene ----------
+   Video/cinematic surfaces (landing hero, floor hero, auth) are a COMMITTED
+   dark world in BOTH themes: the footage stays dark, text inside is always
+   light, and only the boundary blends into the page theme. These tokens do
+   NOT flip with the theme — that's the point. */
+.scene-ink   { color: oklch(0.96 0.008 264); }
+.scene-ink-2 { color: oklch(0.82 0.015 264); }
+.scene-ink-3 { color: oklch(0.68 0.018 264); }
+.scene-panel { background: oklch(0.16 0.02 280 / 0.62); backdrop-filter: blur(14px); }
 
 ::selection { background: oklch(from var(--gold) l c h / 0.32); }
 

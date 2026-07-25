@@ -4,13 +4,20 @@ import { useEffect, useRef } from "react";
 import { useReducedMotion } from "framer-motion";
 
 /*
-  The hero backdrop — the real market-footage loop (public/main-search-video.mp4)
-  under a legibility scrim, replacing the old WebGL orbital. Cheap (one <video>,
-  no three.js in the bundle), muted/inline/looping, and honest about motion:
-  with prefers-reduced-motion the video holds its first frame instead of
-  playing. Always paired with a gradient so foreground text passes contrast.
+  The hero backdrop — real market-footage loop under a legibility scrim.
+
+  THEME CONTRACT: the scene is a committed dark world in BOTH themes. Scrims
+  are fixed dark constants (never theme vars — var(--bg0) is near-white in
+  light mode and turned the footage into fog). Copy placed over this backdrop
+  must use the .scene-ink utilities, never theme ink tokens. Only `blend`
+  fades the bottom edge into the CURRENT page background so the scene hands
+  off cleanly to themed content below.
+
+  Honest about motion: prefers-reduced-motion holds the first frame.
 */
-export default function VideoHero({ className = "", dim = 0.55 }: { className?: string; dim?: number }) {
+export default function VideoHero({
+  className = "", dim = 0.55, blend = true,
+}: { className?: string; dim?: number; blend?: boolean }) {
   const rm = useReducedMotion();
   const ref = useRef<HTMLVideoElement>(null);
 
@@ -34,9 +41,15 @@ export default function VideoHero({ className = "", dim = 0.55 }: { className?: 
         autoPlay={!rm}
         preload="metadata"
       />
-      {/* uniform dim + upward scrim so copy stays readable on any frame */}
+      {/* fixed DARK dim — identical in both themes, keeps scene-ink legible */}
       <div className="absolute inset-0" style={{ background: `oklch(0.13 0.02 280 / ${dim})` }} />
-      <div className="absolute inset-0 bg-gradient-to-t from-bg0 via-transparent to-bg0/40" />
+      <div className="absolute inset-0"
+        style={{ background: "linear-gradient(to top, oklch(0.13 0.02 280 / 0.55), transparent 45%, oklch(0.13 0.02 280 / 0.35))" }} />
+      {/* boundary: a short fade into the PAGE theme so the handoff is seamless */}
+      {blend && (
+        <div className="absolute inset-x-0 bottom-0 h-24"
+          style={{ background: "linear-gradient(to top, var(--bg0), transparent)" }} />
+      )}
     </div>
   );
 }
