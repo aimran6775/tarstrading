@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import AppNav from "@/components/app-nav";
@@ -200,7 +200,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
       {accountError && (
         <p role="alert" className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-lg border border-loss/40 bg-loss/10 px-4 py-2.5 text-sm text-loss md:mx-6">
           Couldn&apos;t reach your account. Your positions are safe — retrying.
-          <button onClick={() => loadAccount()} className="pressable rounded-full border border-loss/40 px-3 py-1 text-xs">Retry now</button>
+          <button onClick={() => loadAccount()} className="pressable min-h-11 shrink-0 rounded-full border border-loss/40 px-4 text-xs">Retry now</button>
         </p>
       )}
       {quotesStale && (
@@ -211,8 +211,12 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 pb-24 md:px-6 md:pb-8">
         {/* ---------- headline: the number IS the header ---------- */}
-        <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
+        <header className="rise-in relative mb-4 flex flex-wrap items-end justify-between gap-4 overflow-hidden">
+          {/* the ticker echoed huge behind the price — editorial, aria-hidden */}
+          <span aria-hidden className="ghost pointer-events-none absolute -top-4 right-0 z-0 hidden select-none text-[6.5rem] leading-none sm:block md:text-[8.5rem]">
+            {symbol.replace("/", "")}
+          </span>
+          <div className="relative z-10 min-w-0">
             <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">
               <button onClick={() => router.push("/app")} className="pressable hover:text-ink-2">Markets</button>
               {" · "}{categoryOf(symbol)}
@@ -224,7 +228,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
             <div className="mt-1.5 flex flex-wrap items-baseline gap-3">
               {quote ? (
                 <>
-                  <span className="tnum text-4xl font-semibold tracking-tight text-ink-1 md:text-5xl">
+                  <span className="lumina tnum text-4xl font-semibold tracking-tight text-ink-1 md:text-5xl">
                     {usd(quote.price)}
                   </span>
                   <span className={`tnum text-lg font-semibold ${chg > 0 ? "text-gain" : chg < 0 ? "text-loss" : "text-ink-3"}`}>
@@ -250,7 +254,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
             </div>
           </div>
           <button onClick={toggleWatch}
-            className={`pressable flex min-h-11 items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium ${
+            className={`pressable relative z-10 flex min-h-11 items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium ${
               watched ? "border-gold/40 bg-gold/10 text-gold" : "border-hairline text-ink-3 hover:text-ink-1"
             }`}
             aria-pressed={watched}>
@@ -258,23 +262,35 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
           </button>
         </header>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
-          {/* ---------- the chart, full-bleed with tabs in its footer ---------- */}
-          <section className="panel overflow-hidden">
-            {barsError ? (
-              <div className="flex h-[300px] flex-col items-center justify-center gap-3 px-6 text-center md:h-[420px]">
-                <p className="text-sm text-ink-2">{barsError}</p>
-                <button onClick={() => setReloadNonce((n) => n + 1)}
-                  className="pressable rounded-full border border-hairline px-4 py-2 text-xs text-ink-2">
-                  Retry
-                </button>
-              </div>
-            ) : bars.length ? (
-              <PriceChart bars={bars} height={chartHeight} />
-            ) : (
-              <div className="skeleton m-4 h-[300px] md:h-[420px]" />
-            )}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline px-4 py-2">
+        <div className="rise-in grid gap-4 lg:grid-cols-[1fr_340px]" style={{ "--i": 1 } as CSSProperties}>
+          {/* ---------- the chart, framed like an instrument ---------- */}
+          <section className="raised overflow-hidden">
+            <div className="relative">
+              {/* bezel — an inner hairline and four corner ticks, like a scope face */}
+              <span aria-hidden className="pointer-events-none absolute inset-1.5 z-10 rounded-[10px] border border-hairline" />
+              {(["left-1.5 top-1.5 border-l-2 border-t-2 rounded-tl-[10px]",
+                 "right-1.5 top-1.5 border-r-2 border-t-2 rounded-tr-[10px]",
+                 "left-1.5 bottom-1.5 border-l-2 border-b-2 rounded-bl-[10px]",
+                 "right-1.5 bottom-1.5 border-r-2 border-b-2 rounded-br-[10px]"] as const
+              ).map((cls) => (
+                <span key={cls} aria-hidden
+                  className={`pointer-events-none absolute z-10 h-4 w-4 border-[var(--hairline-strong)] ${cls}`} />
+              ))}
+              {barsError ? (
+                <div className="flex h-[300px] flex-col items-center justify-center gap-3 px-6 text-center md:h-[420px]">
+                  <p className="text-sm text-ink-2">{barsError}</p>
+                  <button onClick={() => setReloadNonce((n) => n + 1)}
+                    className="pressable min-h-11 rounded-full border border-hairline px-5 text-xs text-ink-2">
+                    Retry
+                  </button>
+                </div>
+              ) : bars.length ? (
+                <PriceChart bars={bars} height={chartHeight} />
+              ) : (
+                <div className="skeleton m-4 h-[300px] md:h-[420px]" />
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline px-4 py-1.5">
               <span className="flex items-center gap-2">
                 <span className="tnum text-[11px] text-ink-4">
                   {bars.length ? `${bars.length} bars` : "—"}
@@ -286,7 +302,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
               <div className="flex gap-1">
                 {(["1D", "1W", "1M", "3M", "1Y", "5Y"] as Timeframe[]).map((tf) => (
                   <button key={tf} onClick={() => setTimeframe(tf)}
-                    className={`pressable tnum min-h-10 rounded-full px-3 py-1.5 text-xs sm:min-h-0 ${
+                    className={`pressable tnum min-h-11 rounded-full px-3 text-xs ${
                       tf === timeframe ? "bg-bg3 text-ink-1" : "text-ink-3 hover:text-ink-1"
                     }`}
                     aria-pressed={tf === timeframe}>
@@ -339,7 +355,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
               </dl>
               {position && (
                 <button onClick={() => setPresetSide("sell")}
-                  className="pressable mt-3 w-full rounded-full border border-loss/40 py-2 text-xs font-medium text-loss hover:bg-loss/10">
+                  className="pressable mt-3 min-h-11 w-full rounded-full border border-loss/40 text-xs font-medium text-loss hover:bg-loss/10">
                   Sell this position
                 </button>
               )}
@@ -357,13 +373,15 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
               ["perf", "Performance"],
             ] as const).map(([key, label]) => (
               <button key={key} onClick={() => setTray(key)}
-                className={`pressable min-h-11 rounded-t-lg px-4 py-2.5 text-xs font-medium ${
-                  tray === key
-                    ? "border-b-2 border-gold text-ink-1"
-                    : "text-ink-3 hover:text-ink-1"
+                className={`pressable relative min-h-11 rounded-t-lg px-4 py-2.5 text-xs font-medium transition-colors ${
+                  tray === key ? "text-gold" : "text-ink-3 hover:text-ink-1"
                 }`}
                 aria-selected={tray === key}>
                 {label}
+                {/* the gold active underline — the same tape that runs under the app nav */}
+                <span aria-hidden className={`absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-gold transition-opacity ${
+                  tray === key ? "opacity-100 shadow-[0_0_10px_-1px_var(--gold)]" : "opacity-0"
+                }`} />
               </button>
             ))}
           </nav>

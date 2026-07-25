@@ -79,18 +79,25 @@ export default function AnalystFloor() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-24 pt-10 md:pb-10 md:px-8">
-      <div className="mb-3 flex items-center gap-3">
-        <p className="kicker">The assistant</p>
-        <LearnLink concept="ai" />
+    <main className="relative isolate mx-auto w-full max-w-5xl flex-1 overflow-x-clip px-5 pb-24 pt-10 md:pb-10 md:px-8">
+      {/* the analyst floor's ambient — violet is the agent domain */}
+      <div className="aura aura-agent" aria-hidden />
+      <span aria-hidden className="ghost pointer-events-none absolute -top-4 right-0 select-none text-[26vw] leading-none md:text-[13rem]">
+        DESK
+      </span>
+      <div className="relative z-10 rise-in">
+        <div className="mb-3 flex items-center gap-3">
+          <p className="kicker">The assistant</p>
+          <LearnLink concept="ai" />
+        </div>
+        <h1 className="display text-4xl text-ink-1 md:text-5xl">Talk to your assistant.</h1>
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-2">
+          Tell it what you want and it hires an analyst to run it — plain English
+          in, transparent rules out. It backtests honestly and deploys on your
+          word, and it remembers everything. Analysts halt at their drawdown
+          limit, and the kill switch is always yours.
+        </p>
       </div>
-      <h1 className="display text-4xl text-ink-1 md:text-5xl">Talk to your assistant.</h1>
-      <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-2">
-        Tell it what you want and it hires an analyst to run it — plain English
-        in, transparent rules out. It backtests honestly and deploys on your
-        word, and it remembers everything. Analysts halt at their drawdown
-        limit, and the kill switch is always yours.
-      </p>
 
       {error && (
         <p role="alert" className="mt-4 rounded-lg border border-loss/40 bg-loss/10 px-4 py-2.5 text-sm text-loss">
@@ -105,7 +112,7 @@ export default function AnalystFloor() {
         {/* The roster — audit view + hard controls. */}
         <div className="flex min-w-0 flex-col gap-4 lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto">
           {agents.length === 0 && (
-            <section className="panel flex flex-col items-center gap-3 px-6 py-14 text-center">
+            <section className="raised flex flex-col items-center gap-3 px-6 py-14 text-center">
               <p className="text-sm text-ink-2">The floor is empty.</p>
               <p className="max-w-sm text-xs text-ink-4">
                 Ask your assistant to hire one — a single symbol, a simple
@@ -121,8 +128,9 @@ export default function AnalystFloor() {
         </div>
       </div>
 
-      <section className="panel mt-8 overflow-hidden">
-        <div className="border-b border-hairline px-5 py-3">
+      <section className="raised mt-8 overflow-hidden">
+        <div className="flex items-center gap-2 border-b border-hairline px-5 py-3">
+          <Icon.Journal className="h-4 w-4 text-agent" />
           <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Activity — every decision, narrated</h2>
         </div>
         {activity.length === 0 ? (
@@ -170,10 +178,10 @@ function AnalystCard({ agent, busy, onAction, onDelete }: {
   const bt = agent.backtest;
   const [confirmDelete, setConfirmDelete] = useState(false);
   return (
-    <section className={`card p-5 ${agent.status === "killed" ? "opacity-70" : ""}`}>
+    <section className={`raised lift rise-in p-5 ${agent.status === "killed" ? "opacity-70" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-agent/12" aria-hidden>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-agent/12 ring-1 ring-inset ring-agent/25" aria-hidden>
             <Icon.Analyst className="h-4.5 w-4.5 text-agent" />
           </span>
           <div>
@@ -189,7 +197,7 @@ function AnalystCard({ agent, busy, onAction, onDelete }: {
           </div>
         </div>
         <span className={`tnum text-[10px] uppercase tracking-[0.2em] ${STATUS_STYLE[agent.status]}`}>
-          {agent.status === "running" && <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-agent align-middle" />}
+          {agent.status === "running" && <span className="pulse-ring mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-gain align-middle" />}
           {agent.status}
         </span>
       </div>

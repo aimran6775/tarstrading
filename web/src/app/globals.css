@@ -268,3 +268,137 @@ html, body {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* ============================================================
+   THE AFTER-HOURS DESK — elevation, atmosphere, and signature
+   type. Everything below is the artistic layer: it turns flat
+   panels-on-black into a lit room with depth. Theme-aware.
+   ============================================================ */
+
+/* ---- Elevation ladder ----
+   Depth reads differently per theme: in the dark room, higher = more
+   luminous edge + deeper cast; in daylight, higher = softer real shadow.
+   Use tier classes on any container; they compose with .panel/.card. */
+:root {
+  --shadow-1: 0 1px 2px oklch(0 0 0 / 0.30), 0 2px 8px -2px oklch(0 0 0 / 0.30);
+  --shadow-2: 0 2px 4px oklch(0 0 0 / 0.34), 0 12px 32px -8px oklch(0 0 0 / 0.44);
+  --shadow-3: 0 4px 8px oklch(0 0 0 / 0.40), 0 28px 64px -12px oklch(0 0 0 / 0.55);
+  --edge-light: oklch(1 0 0 / 0.10);   /* top light-catch on cards */
+  --glow-gold: oklch(from var(--gold) l c h / 0.22);
+  --glow-agent: oklch(from var(--agent) l c h / 0.20);
+}
+:root[data-theme="light"] {
+  --shadow-1: 0 1px 2px oklch(0 0 0 / 0.05), 0 2px 8px -3px oklch(0 0 0 / 0.08);
+  --shadow-2: 0 2px 6px oklch(0 0 0 / 0.06), 0 14px 34px -10px oklch(0 0 0 / 0.14);
+  --shadow-3: 0 6px 14px oklch(0 0 0 / 0.08), 0 30px 70px -16px oklch(0 0 0 / 0.20);
+  --edge-light: oklch(1 0 0 / 0.9);
+  --glow-gold: oklch(from var(--gold) l c h / 0.16);
+  --glow-agent: oklch(from var(--agent) l c h / 0.14);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+    --shadow-1: 0 1px 2px oklch(0 0 0 / 0.05), 0 2px 8px -3px oklch(0 0 0 / 0.08);
+    --shadow-2: 0 2px 6px oklch(0 0 0 / 0.06), 0 14px 34px -10px oklch(0 0 0 / 0.14);
+    --shadow-3: 0 6px 14px oklch(0 0 0 / 0.08), 0 30px 70px -16px oklch(0 0 0 / 0.20);
+    --edge-light: oklch(1 0 0 / 0.9);
+  }
+}
+
+/* A raised surface: the material of the whole app. A hairline, a top
+   light-catch so it reads as machined, and a cast shadow for depth. */
+.raised {
+  position: relative;
+  background: var(--bg1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-l);
+  box-shadow: var(--shadow-2);
+}
+.raised::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding-top: 1px;
+  background: linear-gradient(180deg, var(--edge-light), transparent 40%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+}
+.raised-2 { box-shadow: var(--shadow-3); }
+.lift { transition: transform var(--dur-snappy) var(--ease-spring), box-shadow var(--dur-snappy) var(--ease-spring); }
+.lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-3); }
+
+/* A gold-threaded edge — the signature accent hairline, used once or
+   twice per view on the surface that matters most. */
+.edge-gold {
+  position: relative;
+}
+.edge-gold::after {
+  content: "";
+  position: absolute; inset-inline: 10%; top: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  opacity: 0.7; pointer-events: none;
+}
+
+/* ---- Atmosphere ---- ambient light in the room, never on content.
+   Drop <div class="aura aura-gold"/> as an absolute, aria-hidden layer
+   behind a hero; it's a soft radial that lifts the whole surface. */
+.aura { position: absolute; inset: -20% -10% auto; height: 60%; pointer-events: none; filter: blur(60px); opacity: 0.55; z-index: 0; }
+.aura-gold  { background: radial-gradient(50% 60% at 30% 0%, var(--glow-gold), transparent 70%); }
+.aura-agent { background: radial-gradient(50% 60% at 75% 10%, var(--glow-agent), transparent 70%); }
+:root[data-theme="light"] .aura { opacity: 0.8; filter: blur(70px); }
+
+/* Fine grain — kills banding on the big dark grounds, adds tactility.
+   Applied to a fixed full-page layer once (see AppGrain). SVG noise as a
+   data-URI so there's no asset request. */
+.grain {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  opacity: 0.035; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+:root[data-theme="light"] .grain { opacity: 0.02; }
+
+/* ---- Signature type ---- an oversized, ghosted display word/number set
+   behind a section header — the editorial move that makes a page feel
+   authored, not generated. Position it absolute inside a relative header. */
+.ghost {
+  font-family: var(--font-display);
+  font-weight: 800; font-stretch: 125%;
+  text-transform: uppercase; letter-spacing: -0.02em;
+  line-height: 0.8;
+  color: transparent;
+  -webkit-text-stroke: 1px oklch(from var(--ink-1) l c h / 0.06);
+  user-select: none; pointer-events: none;
+}
+:root[data-theme="light"] .ghost { -webkit-text-stroke-color: oklch(from var(--ink-1) l c h / 0.08); }
+
+/* A numeric that glows faintly gold — for the hero equity, a headline stat. */
+.lumina { text-shadow: 0 0 40px oklch(from var(--gold) l c h / 0.25); }
+
+/* ---- Reveal choreography ---- a non-JS entrance for server-rendered
+   content; framer-motion handles the interactive cases. Children stagger
+   via inline --i. Respects reduced-motion (global rule zeroes duration). */
+@keyframes rise-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.rise-in { animation: rise-in 0.6s var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 60ms); }
+
+/* Gold sweep — a light passes across a primary control on hover. Compose
+   with .cta-gold. */
+@keyframes sweep { from { transform: translateX(-120%); } to { transform: translateX(120%); } }
+.sweep { position: relative; overflow: hidden; }
+.sweep::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(105deg, transparent 35%, oklch(1 0 0 / 0.28) 50%, transparent 65%);
+  transform: translateX(-120%);
+}
+.sweep:hover::after { animation: sweep 0.9s var(--ease-spring); }
+
+/* Live pulse dot — a breathing ring for "live"/"streaming" states. */
+@keyframes ring { 0% { box-shadow: 0 0 0 0 oklch(from var(--gain) l c h / 0.5); } 70%, 100% { box-shadow: 0 0 0 6px oklch(from var(--gain) l c h / 0); } }
+.pulse-ring { animation: ring 2s var(--ease-spring) infinite; }
+
+/* Ambient dawn: a real presence in the dark room, a whisper in daylight
+   (a wide gold wash over near-white reads as haze, so keep it faint). */
+.app-dawn { opacity: 0.55; }
+:root[data-theme="light"] .app-dawn { opacity: 0.22; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) .app-dawn { opacity: 0.22; }
+}

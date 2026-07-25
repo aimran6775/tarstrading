@@ -47,7 +47,7 @@ export function Positions({ positions, quotes, onSelect, onClosed }: {
         const pnl = q ? (q.price - p.avgEntryPrice) * p.qty : 0;
         return (
           <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3 md:px-5">
-            <button onClick={() => onSelect(p.symbol)} className="pressable min-w-[110px] text-left">
+            <button onClick={() => onSelect(p.symbol)} className="pressable min-h-11 min-w-[110px] text-left">
               <p className="text-sm font-semibold text-ink-1">{p.symbol}</p>
               <p className="tnum text-[11px] text-ink-3">{p.qty} @ {usd(p.avgEntryPrice)}</p>
             </button>
@@ -112,7 +112,7 @@ export function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: ()
             </span>
             {o.status === "accepted" && (
               <button onClick={() => cancel(o.id)}
-                className="pressable rounded-full border border-hairline px-2.5 py-1 text-[11px] text-ink-3 hover:text-loss"
+                className="pressable min-h-11 rounded-full border border-hairline px-3.5 text-[11px] text-ink-3 hover:text-loss"
                 aria-label={`Cancel ${o.side} order for ${o.symbol}`}>
                 Cancel
               </button>
@@ -178,9 +178,10 @@ export function Alerts({ symbol, quote }: { symbol: string; quote: Quote | undef
         <div className="flex rounded-full border border-hairline bg-bg2 p-0.5">
           {(["above", "below"] as const).map((d) => (
             <button key={d} onClick={() => setDirection(d)}
-              className={`flex-1 rounded-full py-1.5 text-xs font-medium capitalize ${
-                direction === d ? "bg-bg3 text-ink-1" : "text-ink-3"
-              }`}>
+              className={`pressable min-h-11 flex-1 rounded-full text-xs font-medium capitalize transition-colors ${
+                direction === d ? "bg-bg3 text-ink-1" : "text-ink-3 hover:text-ink-1"
+              }`}
+              aria-pressed={direction === d}>
               {d}
             </button>
           ))}
@@ -188,10 +189,10 @@ export function Alerts({ symbol, quote }: { symbol: string; quote: Quote | undef
         <div className="flex gap-2">
           <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))}
             inputMode="decimal" placeholder="Price"
-            className="tnum w-full rounded-full border border-hairline bg-bg2 px-4 py-2 text-xs text-ink-1 outline-none focus:border-gold"
+            className="tnum min-h-11 w-full rounded-full border border-hairline bg-bg2 px-4 text-xs text-ink-1 outline-none focus:border-gold"
             aria-label="Alert price" />
           <button onClick={add}
-            className="pressable rounded-full border border-hairline px-4 text-xs text-ink-2 hover:text-ink-1">
+            className="pressable min-h-11 rounded-full border border-hairline px-4 text-xs text-ink-2 hover:text-ink-1">
             Set
           </button>
         </div>
@@ -211,7 +212,9 @@ export function Alerts({ symbol, quote }: { symbol: string; quote: Quote | undef
               </span>
               <div className="flex items-center gap-2">
                 <span className="tnum text-[10px] uppercase tracking-[0.15em] text-gold">armed</span>
-                <button onClick={() => remove(a.id)} className="pressable text-ink-4 hover:text-loss" aria-label="Remove alert">×</button>
+                <button onClick={() => remove(a.id)}
+                  className="pressable -my-2 flex h-11 w-11 items-center justify-center rounded-full text-ink-4 hover:text-loss"
+                  aria-label="Remove alert">×</button>
               </div>
             </li>
           ))}
@@ -223,7 +226,9 @@ export function Alerts({ symbol, quote }: { symbol: string; quote: Quote | undef
               </span>
               <div className="flex items-center gap-2">
                 <span className="tnum text-[10px] uppercase tracking-[0.15em] text-gain">fired</span>
-                <button onClick={() => remove(a.id)} className="pressable text-ink-4 hover:text-loss" aria-label="Remove alert">×</button>
+                <button onClick={() => remove(a.id)}
+                  className="pressable -my-2 flex h-11 w-11 items-center justify-center rounded-full text-ink-4 hover:text-loss"
+                  aria-label="Remove alert">×</button>
               </div>
             </li>
           ))}
@@ -273,13 +278,13 @@ export function Performance() {
           </p>
         )}
         <div className="mt-4 grid grid-cols-2 gap-3 text-center">
-          <div className="rounded-lg bg-bg2 py-2.5">
+          <div className="card py-2.5">
             <p className="text-[10px] uppercase tracking-[0.2em] text-ink-4">Realized</p>
             <p className={`tnum text-sm font-semibold ${realized > 0 ? "text-gain" : realized < 0 ? "text-loss" : "text-ink-2"}`}>
               {realized >= 0 ? "+" : ""}{usd(realized)}
             </p>
           </div>
-          <div className="rounded-lg bg-bg2 py-2.5">
+          <div className="card py-2.5">
             <p className="text-[10px] uppercase tracking-[0.2em] text-ink-4">Win rate</p>
             <p className="tnum text-sm font-semibold text-ink-1">
               {closed ? `${Math.round((wins / closed) * 100)}%` : "—"}
@@ -318,11 +323,26 @@ function EquitySpark({ points }: { points: { time: number; equity: number }[] })
   const range = max - min || 1;
   const W = 300, H = 64;
   const up = vals[vals.length - 1] >= vals[0];
-  const path = points.map((p, i) =>
-    `${((i / (points.length - 1)) * W).toFixed(1)},${(H - ((p.equity - min) / range) * H).toFixed(1)}`).join(" ");
+  const coords = points.map((p, i) => [
+    (i / (points.length - 1)) * W,
+    H - 2 - ((p.equity - min) / range) * (H - 4),
+  ] as const);
+  const line = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const [ex, ey] = coords[coords.length - 1];
+  const tone = up ? "var(--gain)" : "var(--loss)";
+  const gid = up ? "equity-grad-up" : "equity-grad-down";
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="h-16 w-full" preserveAspectRatio="none" aria-label="Equity curve">
-      <polyline points={path} fill="none" stroke={up ? "var(--gain)" : "var(--loss)"} strokeWidth="1.5" />
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={tone} stopOpacity="0.24" />
+          <stop offset="100%" stopColor={tone} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={`0,${H} ${line} ${W},${H}`} fill={`url(#${gid})`} stroke="none" />
+      <polyline points={line} fill="none" stroke={tone} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={ex} cy={ey} r="3.4" fill={tone} opacity="0.2" />
+      <circle cx={ex} cy={ey} r="1.8" fill={tone} />
     </svg>
   );
 }

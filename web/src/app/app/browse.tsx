@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
 import AppNav from "@/components/app-nav";
 import GettingStarted from "@/components/getting-started";
 import SymbolInput from "@/components/symbol-input";
-import MarketCard, { Spark } from "@/components/market-card";
+import MarketCard from "@/components/market-card";
 import { SYMBOLS } from "@/lib/symbols";
 import { usd, pct, categoryOf, type Quote, type Account } from "@/components/trading/shared";
 
@@ -25,6 +26,7 @@ const CATEGORIES: Category[] = ["Trending", "Stocks", "Crypto", "ETFs", "Watchli
 const NAME = new Map(SYMBOLS.map((e) => [e.symbol, e.name]));
 
 export default function Browse({ userName, welcome }: { userName: string; welcome: boolean }) {
+  const rm = useReducedMotion();
   const [category, setCategory] = useState<Category>("Trending");
   const [account, setAccount] = useState<Account | null>(null);
   const [watchlist, setWatchlist] = useState<string[]>([]);
@@ -154,22 +156,31 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
         </p>
       )}
 
-      {/* Category strip — markets are the content */}
+      {/* Category strip — a segmented scroller; the thumb slides between rooms */}
       <div className="sticky top-14 z-40 border-b border-hairline bg-bg0/85 px-4 backdrop-blur-md md:px-6">
         <nav
-          className="-mx-4 flex gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none] md:-mx-6 md:px-6 [&::-webkit-scrollbar]:hidden"
+          className="-mx-4 flex items-center overflow-x-auto px-4 py-2 [scrollbar-width:none] md:-mx-6 md:px-6 [&::-webkit-scrollbar]:hidden"
           aria-label="Market categories">
-          {CATEGORIES.map((c) => (
-            <button key={c} onClick={() => setCategory(c)}
-              className={`pressable shrink-0 rounded-full px-4 py-1.5 text-sm font-medium ${
-                category === c ? "bg-bg3 text-ink-1" : "text-ink-3 hover:text-ink-1"
-              }`}
-              aria-pressed={category === c}>
-              {c}{c === "Watchlist" && watchlist.length ? ` ${watchlist.length}` : ""}
-            </button>
-          ))}
+          <div className="flex shrink-0 gap-0.5 rounded-full border border-hairline bg-bg1 p-1">
+            {CATEGORIES.map((c) => (
+              <button key={c} onClick={() => setCategory(c)}
+                className={`pressable relative min-h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-colors ${
+                  category === c ? "text-gold" : "text-ink-3 hover:text-ink-1"
+                }`}
+                aria-pressed={category === c}>
+                {category === c && (
+                  <motion.span layoutId="browse-category-thumb" aria-hidden
+                    transition={rm ? { duration: 0 } : { type: "spring", bounce: 0.18, duration: 0.45 }}
+                    className="absolute inset-0 rounded-full border border-gold/40 bg-gold/12 shadow-[0_0_18px_-6px_var(--gold)]" />
+                )}
+                <span className="relative">
+                  {c}{c === "Watchlist" && watchlist.length ? ` ${watchlist.length}` : ""}
+                </span>
+              </button>
+            ))}
+          </div>
           {marketOpen === false && (
-            <span className="ml-auto hidden shrink-0 items-center text-[11px] text-ink-4 sm:flex">
+            <span className="ml-auto hidden shrink-0 items-center pl-4 text-[11px] text-ink-4 sm:flex">
               US market closed
             </span>
           )}
@@ -200,12 +211,12 @@ export default function Browse({ userName, welcome }: { userName: string; welcom
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {gridSymbols.map((s) => (
-              <div key={s} className="relative">
+            {gridSymbols.map((s, i) => (
+              <div key={s} className="rise-in relative" style={{ "--i": Math.min(i, 8) } as CSSProperties}>
                 <MarketCard symbol={s} name={NAME.get(s)} quote={quotes.get(s)} spark={sparks[s]} />
                 {category === "Watchlist" && (
                   <button onClick={() => removeFromWatchlist(s)}
-                    className="pressable absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center rounded-full bg-bg3/80 text-ink-4 hover:text-loss"
+                    className="pressable absolute right-1.5 top-1.5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-bg3/80 text-ink-4 hover:text-loss"
                     aria-label={`Remove ${s} from watchlist`}>
                     ×
                   </button>
@@ -228,30 +239,82 @@ function FeaturedCard({ symbol, name, quote, spark }: {
 }) {
   const chg = quote?.changePercent ?? 0;
   return (
-    <Link href={`/app/m/${encodeURIComponent(symbol)}`}
-      className="pressable mb-6 grid gap-4 rounded-2xl border border-hairline bg-bg1 p-5 transition-colors hover:bg-bg2/60 md:grid-cols-[1fr_380px] md:items-center md:p-6">
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-[0.25em] text-ink-4">
-          Featured · {categoryOf(symbol)} · biggest move
-        </p>
-        <h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink-1 md:text-3xl">
-          {name ?? symbol}
-        </h2>
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          {quote ? (
-            <>
-              <span className="tnum text-3xl font-semibold text-ink-1 md:text-4xl">{usd(quote.price)}</span>
-              <span className={`tnum text-lg font-semibold ${chg > 0 ? "text-gain" : chg < 0 ? "text-loss" : "text-ink-3"}`}>
-                {pct(chg)}
-              </span>
-            </>
-          ) : <span className="skeleton h-9 w-40" />}
+    <div className="rise-in relative mb-6">
+      {/* ambient light in the room — a single gold aura behind the hero */}
+      <div aria-hidden className="aura aura-gold" />
+      {/* the display ticker, ghosted huge behind the exhibit */}
+      <span aria-hidden className="ghost absolute -top-2 right-4 z-0 hidden select-none text-[7rem] leading-none sm:block md:text-[9rem]">
+        {symbol.replace("/", "")}
+      </span>
+      <Link href={`/app/m/${encodeURIComponent(symbol)}`}
+        className="raised raised-2 edge-gold lift group relative z-10 block overflow-hidden">
+        <div className="grid gap-4 p-5 md:grid-cols-[1fr_400px] md:items-center md:p-6 lg:p-7">
+          <div className="min-w-0">
+            <p className="kicker">Featured · {categoryOf(symbol)} · biggest move</p>
+            <h2 className="display mt-2 break-words text-[2.25rem] text-ink-1 sm:text-5xl md:text-6xl">
+              {name ?? symbol}
+            </h2>
+            <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              {quote ? (
+                <>
+                  <span className="lumina tnum text-5xl font-semibold tracking-tight text-ink-1 md:text-7xl">
+                    {usd(quote.price)}
+                  </span>
+                  <span className={`tnum text-lg font-semibold md:text-2xl ${chg > 0 ? "text-gain" : chg < 0 ? "text-loss" : "text-ink-3"}`}>
+                    {pct(chg)}
+                  </span>
+                </>
+              ) : <span className="skeleton h-12 w-52" />}
+            </div>
+            <span className="mt-6 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-5 text-xs font-semibold text-gold transition-colors group-hover:bg-gold/20">
+              Trade {symbol}
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </span>
+          </div>
+          <HeroSpark points={spark} up={chg >= 0} />
         </div>
-        <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-gold/10 px-4 py-1.5 text-xs font-semibold text-gold">
-          Trade {symbol} →
-        </span>
-      </div>
-      <Spark points={spark} className="h-24 w-full md:h-28" />
-    </Link>
+      </Link>
+    </div>
+  );
+}
+
+/** The hero's sparkline as an exhibit — gradient-tinted area under the line,
+    endpoint held in a soft halo. Decorative; the price above is the data. */
+function HeroSpark({ points, up }: { points: number[]; up: boolean }) {
+  if (points.length < 2) return <div className="h-28 w-full rounded-xl bg-bg2 md:h-32" aria-hidden />;
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = max - min || 1;
+  const W = 400, H = 128;
+  const coords = points.map((p, i) => [
+    (i / (points.length - 1)) * W,
+    H - 8 - ((p - min) / range) * (H - 16),
+  ] as const);
+  const line = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const [ex, ey] = coords[coords.length - 1];
+  const tone = up ? "var(--gain)" : "var(--loss)";
+  const gid = up ? "hero-spark-gain" : "hero-spark-loss";
+  const glow = up ? "hero-glow-gain" : "hero-glow-loss";
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-28 w-full md:h-32" preserveAspectRatio="none" aria-hidden>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={tone} stopOpacity="0.30" />
+          <stop offset="72%" stopColor={tone} stopOpacity="0.04" />
+          <stop offset="100%" stopColor={tone} stopOpacity="0" />
+        </linearGradient>
+        <filter id={glow} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2.2" result="b" />
+          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      <polygon points={`0,${H} ${line} ${W},${H}`} fill={`url(#${gid})`} stroke="none" />
+      <polyline points={line} fill="none" stroke={tone} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" filter={`url(#${glow})`} />
+      {/* the live endpoint, held in a phosphor halo */}
+      <circle cx={ex} cy={ey} r="9" fill={tone} opacity="0.12" />
+      <circle cx={ex} cy={ey} r="5" fill={tone} opacity="0.22" />
+      <circle cx={ex} cy={ey} r="2.6" fill={tone} />
+    </svg>
   );
 }

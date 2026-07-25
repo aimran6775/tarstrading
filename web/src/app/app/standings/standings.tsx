@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 
 /*
@@ -50,13 +50,29 @@ export default function Standings() {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 pb-24 sm:px-6">
-      <header className="mb-8">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-ink-1 sm:text-3xl">Standings</h1>
-        <p className="mt-1 text-sm text-ink-3">Trophies you&apos;ve earned, and where you rank against every trader on the desk.</p>
+      <header className="rise-in relative isolate mb-8 overflow-hidden">
+        <span aria-hidden className="ghost pointer-events-none absolute -left-1 -top-5 select-none text-[22vw] leading-none sm:text-[9rem]">
+          STANDINGS
+        </span>
+        <div className="relative z-10 flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <p className="kicker mb-2">The desk</p>
+            <h1 className="display text-4xl text-ink-1 md:text-5xl">Standings</h1>
+            <p className="mt-3 max-w-xl text-sm text-ink-3">Trophies you&apos;ve earned, and where you rank against every trader on the desk.</p>
+          </div>
+          {/* one bold moment: your standing, lit in gold */}
+          {data?.leaderboard.you && (
+            <div className="raised edge-gold shrink-0 px-6 py-4 text-right">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-ink-4">Your rank</p>
+              <p className="tnum lumina mt-0.5 text-5xl font-bold leading-none text-gold">#{data.leaderboard.you.rank}</p>
+              <p className="tnum mt-1.5 text-xs text-ink-3">of {data.leaderboard.totalTraders} traders</p>
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-5">
-        <section className="lg:col-span-3">
+        <section className="rise-in lg:col-span-3" style={{ "--i": 1 } as CSSProperties}>
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Achievements</h2>
             {data && <span className="tnum text-xs text-ink-4">{data.achievements.earned} / {data.achievements.total}</span>}
@@ -72,12 +88,12 @@ export default function Standings() {
           )}
         </section>
 
-        <section className="lg:col-span-2">
+        <section className="rise-in lg:col-span-2" style={{ "--i": 2 } as CSSProperties}>
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Leaderboard</h2>
             {data && <span className="tnum text-xs text-ink-4">{data.leaderboard.totalTraders} traders</span>}
           </div>
-          <div className="panel overflow-hidden">
+          <div className="raised-2 overflow-hidden">
             {!data ? (
               <div className="space-y-2 p-4">
                 {Array.from({ length: 8 }).map((_, i) => <div key={i} className="skeleton h-9 rounded-lg" />)}
@@ -109,8 +125,14 @@ export default function Standings() {
 
 function BadgeCard({ b }: { b: Badge }) {
   return (
-    <div className={`panel relative flex flex-col gap-2 rounded-2xl p-4 transition-opacity ${b.earned ? "" : "opacity-60"}`}>
-      <div className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br ${TIER_RING[b.tier]} ${b.earned ? "" : "grayscale"}`}>
+    <div
+      className={`raised lift relative flex flex-col gap-2 p-4 ${b.earned ? "ring-1 ring-gold/20" : "opacity-55"}`}
+    >
+      <div
+        className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br ${TIER_RING[b.tier]} ${
+          b.earned ? "shadow-[0_0_18px_-4px_var(--glow-gold)]" : "grayscale"
+        }`}
+      >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {b.earned
             ? <path d="M20 6L9 17l-5-5" />
@@ -127,18 +149,34 @@ function BadgeCard({ b }: { b: Badge }) {
             <div className="h-full rounded-full bg-ink-3" style={{ width: `${Math.round(b.progress * 100)}%` }} />
           </div>
         )}
-        <p className={`tnum text-[10px] ${b.earned ? "text-gain" : "text-ink-4"}`}>{b.detail}</p>
+        <p className={`tnum text-[10px] ${b.earned ? "text-gold" : "text-ink-4"}`}>{b.detail}</p>
       </div>
     </div>
   );
 }
 
 function RankRow({ r }: { r: Rank }) {
-  const medal = r.rank === 1 ? "text-gold" : r.rank === 2 ? "text-[#c9ccd6]" : r.rank === 3 ? "text-[#b0764a]" : "text-ink-4";
+  // Podium via gold + ink tones only — #1 lit gold, #2/#3 stepped ink.
+  const podium =
+    r.rank === 1
+      ? "bg-gold text-ongold shadow-[0_0_12px_-2px_var(--glow-gold)]"
+      : r.rank === 2
+        ? "bg-ink-2/20 text-ink-1"
+        : r.rank === 3
+          ? "bg-ink-3/25 text-ink-2"
+          : "text-ink-4";
+  const isPodium = r.rank <= 3;
   return (
-    <li className={`flex items-center gap-3 px-4 py-2.5 ${r.isYou ? "bg-gold/10" : ""}`}>
-      <span className={`tnum w-6 text-center text-sm font-semibold ${medal}`}>{r.rank}</span>
-      <span className="flex-1 truncate text-sm text-ink-1">
+    <li className={`relative flex items-center gap-3 px-4 py-2.5 ${r.isYou ? "bg-gold/10" : r.rank === 1 ? "bg-gold/[0.04]" : ""}`}>
+      {r.isYou && <span aria-hidden className="absolute inset-y-0 left-0 w-0.5 bg-gold" />}
+      <span
+        className={`tnum grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${
+          isPodium ? podium : "text-ink-4"
+        }`}
+      >
+        {r.rank}
+      </span>
+      <span className={`flex-1 truncate text-sm ${r.rank === 1 ? "font-semibold lumina text-ink-1" : "text-ink-1"}`}>
         {r.name}{r.isYou && <span className="ml-1.5 text-[10px] font-medium uppercase tracking-wide text-gold">You</span>}
       </span>
       <span className="tnum text-right text-xs text-ink-3">{usd(r.equity)}</span>

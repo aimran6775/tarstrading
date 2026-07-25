@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import HoldButton from "@/components/hold-button";
 import { useToast } from "@/components/toast";
 import LearnLink from "@/components/academy/learn-link";
@@ -20,6 +21,7 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
   onPlaced: () => void;
   presetSide?: "buy" | "sell" | null;
 }) {
+  const rm = useReducedMotion();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [type, setType] = useState<"market" | "limit" | "stop">("market");
   const [qty, setQty] = useState("1");
@@ -81,7 +83,9 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
   const isCrypto = symbol.includes("/");
 
   return (
-    <section className="panel p-4">
+    <section className="raised relative overflow-hidden p-4">
+      {/* the signature thread — the same gold hairline that runs under the masthead */}
+      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/45 to-transparent" />
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Trade</h2>
@@ -92,36 +96,48 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
       </div>
 
       <div className="flex flex-col gap-2.5">
-        {/* Side — the Kalshi two-button pattern, in P&L colors */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* Side — a true segmented control; the thumb slides between conviction states */}
+        <div className="grid grid-cols-2 gap-1 rounded-xl border border-hairline bg-bg2 p-1">
           {(["buy", "sell"] as const).map((s) => (
             <button key={s} onClick={() => setSide(s)}
-              className={`pressable rounded-xl border py-2.5 text-sm font-semibold capitalize ${
+              className={`pressable relative min-h-11 rounded-[9px] text-sm font-semibold capitalize transition-colors ${
                 side === s
-                  ? s === "buy"
-                    ? "border-gain/50 bg-gain/15 text-gain"
-                    : "border-loss/50 bg-loss/15 text-loss"
-                  : "border-hairline text-ink-3 hover:text-ink-1"
-              }`}>
-              {s}
+                  ? s === "buy" ? "text-gain" : "text-loss"
+                  : "text-ink-3 hover:text-ink-1"
+              }`}
+              aria-pressed={side === s}>
+              {side === s && (
+                <motion.span layoutId="ticket-side-thumb" aria-hidden
+                  transition={rm ? { duration: 0 } : { type: "spring", bounce: 0.18, duration: 0.4 }}
+                  className={`absolute inset-0 rounded-[9px] border ${
+                    s === "buy" ? "border-gain/50 bg-gain/15" : "border-loss/50 bg-loss/15"
+                  }`} />
+              )}
+              <span className="relative">{s}</span>
             </button>
           ))}
         </div>
 
-        {/* Type */}
+        {/* Type — same sliding-thumb craft, quieter voice */}
         <div className="flex rounded-full border border-hairline bg-bg2 p-1">
           {(["market", "limit", "stop"] as const).map((t) => (
             <button key={t} onClick={() => setType(t)}
-              className={`pressable flex-1 rounded-full py-1.5 text-xs font-medium capitalize ${
-                type === t ? "bg-bg3 text-ink-1" : "text-ink-3"
-              }`}>
-              {t}
+              className={`pressable relative min-h-11 flex-1 rounded-full text-xs font-medium capitalize transition-colors ${
+                type === t ? "text-ink-1" : "text-ink-3 hover:text-ink-1"
+              }`}
+              aria-pressed={type === t}>
+              {type === t && (
+                <motion.span layoutId="ticket-type-thumb" aria-hidden
+                  transition={rm ? { duration: 0 } : { type: "spring", bounce: 0.18, duration: 0.4 }}
+                  className="absolute inset-0 rounded-full bg-bg3" />
+              )}
+              <span className="relative">{t}</span>
             </button>
           ))}
         </div>
 
         {/* Qty */}
-        <label className="flex items-center gap-2 rounded-xl border border-hairline bg-bg2 px-4">
+        <label className="flex min-h-11 items-center gap-2 rounded-xl border border-hairline bg-bg2 px-4 transition-colors [transition-timing-function:var(--ease-spring)] focus-within:border-gold/50 focus-within:bg-bg2/60">
           <span className="text-xs text-ink-3">Qty</span>
           <input
             value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.]/g, ""))}
@@ -132,7 +148,7 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
         </label>
 
         {type === "limit" && (
-          <label className="flex items-center gap-2 rounded-xl border border-hairline bg-bg2 px-4">
+          <label className="flex min-h-11 items-center gap-2 rounded-xl border border-hairline bg-bg2 px-4 transition-colors [transition-timing-function:var(--ease-spring)] focus-within:border-gold/50 focus-within:bg-bg2/60">
             <span className="text-xs text-ink-3">Limit</span>
             <input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value.replace(/[^\d.]/g, ""))}
               inputMode="decimal" placeholder={quote ? quote.price.toFixed(2) : ""}
@@ -141,7 +157,7 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
           </label>
         )}
         {type === "stop" && (
-          <label className="flex items-center gap-2 rounded-xl border border-hairline bg-bg2 px-4">
+          <label className="flex min-h-11 items-center gap-2 rounded-xl border border-hairline bg-bg2 px-4 transition-colors [transition-timing-function:var(--ease-spring)] focus-within:border-gold/50 focus-within:bg-bg2/60">
             <span className="text-xs text-ink-3">Stop</span>
             <input value={stopPrice} onChange={(e) => setStopPrice(e.target.value.replace(/[^\d.]/g, ""))}
               inputMode="decimal" placeholder={quote ? quote.price.toFixed(2) : ""}
@@ -174,9 +190,10 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
         {phase.kind === "done" ? (
           <FillResult order={phase.order} onReset={() => setPhase({ kind: "idle" })} />
         ) : phase.kind === "error" ? (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-loss/40 bg-loss/10 px-4 py-2.5">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-loss/40 bg-loss/10 px-4 py-1">
             <span className="text-xs text-loss">{phase.message}</span>
-            <button onClick={() => setPhase({ kind: "idle" })} className="text-xs text-ink-2 underline">Adjust</button>
+            <button onClick={() => setPhase({ kind: "idle" })}
+              className="pressable min-h-11 shrink-0 px-2 text-xs text-ink-2 underline">Adjust</button>
           </div>
         ) : (
           <HoldButton
@@ -199,7 +216,7 @@ export default function Ticket({ symbol, quote, cash, marketOpen, onPlaced, pres
 function FillResult({ order, onReset }: { order: Order; onReset: () => void }) {
   const filled = order.status === "filled";
   return (
-    <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 ${
+    <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-1 ${
       filled ? "border-gain/40 bg-gain/10" : "border-gold/40 bg-gold/10"
     }`}>
       <span className={`tnum text-xs ${filled ? "text-gain" : "text-gold"}`}>
@@ -207,7 +224,7 @@ function FillResult({ order, onReset }: { order: Order; onReset: () => void }) {
           ? `Filled ${order.qty} @ ${usd(order.filledPrice ?? 0)}`
           : "Order resting — it'll fill when price agrees"}
       </span>
-      <button onClick={onReset} className="text-xs text-ink-2 underline">New</button>
+      <button onClick={onReset} className="pressable min-h-11 shrink-0 px-2 text-xs text-ink-2 underline">New</button>
     </div>
   );
 }
