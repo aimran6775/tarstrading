@@ -24,11 +24,11 @@ $ORIGIN tarstrading.com.
 $TTL 300
 
 ;; ---------- Frontend (Railway: tars-trading/web) ----------
-@       IN CNAME zmx6ce7z.up.railway.app.
-www     IN CNAME d0chmvwf.up.railway.app.
+@       IN CNAME 22by1znk.up.railway.app.
+www     IN CNAME nmguv9td.up.railway.app.
 
 ;; ---------- Backend (Railway: tars-trading/api) ----------
-admin   IN CNAME pk7xyoty.up.railway.app.
+admin   IN CNAME v8l8akq9.up.railway.app.
 
 ;; Railway domain-ownership verification
 _railway-verify        IN TXT "railway-verify=railway-verify=6e5adc1b777f96616a32c4006bab53ad68ad0329dd1f99f094ea640e345df3be"
