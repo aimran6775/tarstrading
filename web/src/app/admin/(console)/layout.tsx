@@ -61,7 +61,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin" className="pressable shrink-0" aria-label="Tars control center">
               <TarsWordmark size={18} text="TARS" />
             </Link>
-            <span className="hidden shrink-0 rounded-full border border-agent/40 bg-agent/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-agent min-[420px]:inline-block">
+            <span className="hidden shrink-0 rounded-full border border-agent/40 bg-agent/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-agent min-[360px]:inline-block">
               Control center
             </span>
             <div className="ml-auto flex shrink-0 items-center gap-1">
