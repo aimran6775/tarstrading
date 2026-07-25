@@ -149,6 +149,7 @@ export default function MarketsBoard({ rows: served }: { rows: BoardRow[] }) {
           <input value={q} onChange={(e) => setQ(e.target.value)}
             placeholder="Filter board…" aria-label="Filter the board"
             className={`${FIELD} w-40 placeholder:text-ink-4`} />
+          <DeepHistory />
           <BackfillPass />
         </div>
       </div>
@@ -399,6 +400,49 @@ function BackfillPass() {
       <button type="button" onClick={run} disabled={state === "running"}
         className={`${CHIP} border-hairline text-ink-2 hover:text-ink-1`}>
         {state === "running" ? "backfilling…" : "run backfill"}
+      </button>
+    </span>
+  );
+}
+
+/*
+  Deep history — the historian. Pulls years of bars from Alpaca in batched
+  requests (many symbols per call), so a whole board fills in minutes rather
+  than days on the rate-limited quote provider. "cold only" is the fast path
+  for newly added listings.
+*/
+function DeepHistory() {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [note, setNote] = useState("");
+
+  async function run(scope: "cold" | "board") {
+    setState("running");
+    setNote(scope === "cold" ? "filling new listings…" : "filling 5 years for the whole board…");
+    const res = await send("/api/admin/historian", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(scope === "cold" ? { scope: "cold", years: 5 } : { years: 5 }),
+    });
+    if (!res.ok) { setState("error"); setNote(res.error ?? "Deep fill failed."); return; }
+    const r = (res.data.report ?? {}) as Record<string, number | string[] | undefined>;
+    const errs = Array.isArray(r.errors) ? r.errors.length : 0;
+    setState("done");
+    setNote(`${r.symbols ?? 0} symbols · ${r.requests ?? 0} requests · ${(r.barsWritten ?? 0).toLocaleString()} bars` +
+      `${errs ? ` · ${errs} errors` : ""}`);
+    router.refresh();
+  }
+
+  return (
+    <span className="flex items-center gap-2">
+      {note && <span className={`font-mono text-[10px] ${state === "error" ? "text-loss" : "text-ink-4"}`}>{note}</span>}
+      <button type="button" onClick={() => run("cold")} disabled={state === "running"}
+        className={`${CHIP} border-hairline text-ink-2 hover:text-ink-1`}>
+        fill cold
+      </button>
+      <button type="button" onClick={() => run("board")} disabled={state === "running"}
+        className={`${CHIP} border-agent/40 bg-agent/10 text-agent hover:bg-agent/15`}>
+        {state === "running" ? "loading history…" : "load 5y history"}
       </button>
     </span>
   );
