@@ -27,7 +27,8 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
 }) {
   const rm = useReducedMotion();
   const [side, setSide] = useState<"buy" | "sell">("buy");
-  const [type, setType] = useState<"market" | "limit" | "stop">("market");
+  const [type, setType] = useState<"market" | "limit" | "stop" | "stop_limit" | "trailing_stop">("market");
+  const [trailPct, setTrailPct] = useState("");
   const [qty, setQty] = useState("1");
   const [limitPrice, setLimitPrice] = useState("");
   const [stopPrice, setStopPrice] = useState("");
@@ -37,7 +38,7 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
   const toast = useToast();
 
   const qtyNum = Number(qty) || 0;
-  const estPrice = type === "limit" ? Number(limitPrice) || quote?.price || 0 : quote?.price || 0;
+  const estPrice = (type === "limit" || type === "stop_limit") ? Number(limitPrice) || quote?.price || 0 : quote?.price || 0;
   const estCost = qtyNum * estPrice;
   // Buying power (margin) drives the buy limit; fall back to cash pre-load.
   const power = buyingPower ?? cash;
@@ -49,8 +50,9 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
   const coversShort = side === "buy" && held < -1e-9;
   const actionLabel = side === "buy" ? (coversShort ? "Cover" : "Buy") : (opensShort ? "Short" : "Sell");
   const valid = qtyNum > 0 && estPrice > 0 && !blocked
-    && (type !== "limit" || Number(limitPrice) > 0)
-    && (type !== "stop" || Number(stopPrice) > 0);
+    && ((type !== "limit" && type !== "stop_limit") || Number(limitPrice) > 0)
+    && ((type !== "stop" && type !== "stop_limit") || Number(stopPrice) > 0)
+    && (type !== "trailing_stop" || Number(trailPct) > 0);
 
   useEffect(() => { setPhase({ kind: "idle" }); }, [symbol]);
   useEffect(() => { if (presetSide) { setSide(presetSide); setPhase({ kind: "idle" }); } }, [presetSide]);
@@ -64,8 +66,9 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           symbol, side, type, qty: qtyNum,
-          limitPrice: type === "limit" ? Number(limitPrice) : undefined,
-          stopPrice: type === "stop" ? Number(stopPrice) : undefined,
+          limitPrice: (type === "limit" || type === "stop_limit") ? Number(limitPrice) : undefined,
+          stopPrice: (type === "stop" || type === "stop_limit") ? Number(stopPrice) : undefined,
+          trailPercent: type === "trailing_stop" ? Number(trailPct) / 100 : undefined,
         }),
       });
       const data = await res.json();
@@ -130,23 +133,19 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
           ))}
         </div>
 
-        {/* Type — same sliding-thumb craft, quieter voice */}
-        <div className="flex rounded-full border border-hairline bg-bg2 p-1">
-          {(["market", "limit", "stop"] as const).map((t) => (
-            <button key={t} onClick={() => setType(t)}
-              className={`pressable relative min-h-11 flex-1 rounded-full text-xs font-medium capitalize transition-colors ${
-                type === t ? "text-ink-1" : "text-ink-3 hover:text-ink-1"
-              }`}
-              aria-pressed={type === t}>
-              {type === t && (
-                <motion.span layoutId="ticket-type-thumb" aria-hidden
-                  transition={rm ? { duration: 0 } : { type: "spring", bounce: 0.18, duration: 0.4 }}
-                  className="absolute inset-0 rounded-full bg-bg3" />
-              )}
-              <span className="relative">{t}</span>
-            </button>
-          ))}
-        </div>
+        {/* Order type — a select scales to the full order book (and options later) */}
+        <label className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-hairline bg-bg2 px-4 transition-colors [transition-timing-function:var(--ease-spring)] focus-within:border-gold/50">
+          <span className="text-xs text-ink-3">Order type</span>
+          <select value={type} onChange={(e) => setType(e.target.value as typeof type)}
+            className="tnum bg-transparent py-2.5 text-right text-sm font-medium text-ink-1 outline-none"
+            aria-label="Order type">
+            <option value="market">Market</option>
+            <option value="limit">Limit</option>
+            <option value="stop">Stop</option>
+            <option value="stop_limit">Stop-limit</option>
+            <option value="trailing_stop">Trailing stop</option>
+          </select>
+        </label>
 
         {/* Qty */}
         <label className="flex min-h-11 items-center gap-2 rounded-xl border border-hairline bg-bg2 px-4 transition-colors [transition-timing-function:var(--ease-spring)] focus-within:border-gold/50 focus-within:bg-bg2/60">
@@ -159,7 +158,16 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
           />
         </label>
 
-        {type === "limit" && (
+        {(type === "stop" || type === "stop_limit") && (
+          <label className="flex min-h-11 items-center gap-2 rounded-xl border border-hairline bg-bg2 px-4 transition-colors [transition-timing-function:var(--ease-spring)] focus-within:border-gold/50 focus-within:bg-bg2/60">
+            <span className="text-xs text-ink-3">Stop</span>
+            <input value={stopPrice} onChange={(e) => setStopPrice(e.target.value.replace(/[^\d.]/g, ""))}
+              inputMode="decimal" placeholder={quote ? quote.price.toFixed(2) : ""}
+              className="tnum w-full bg-transparent py-2.5 text-right text-sm text-ink-1 outline-none"
+              aria-label="Stop price" />
+          </label>
+        )}
+        {(type === "limit" || type === "stop_limit") && (
           <label className="flex min-h-11 items-center gap-2 rounded-xl border border-hairline bg-bg2 px-4 transition-colors [transition-timing-function:var(--ease-spring)] focus-within:border-gold/50 focus-within:bg-bg2/60">
             <span className="text-xs text-ink-3">Limit</span>
             <input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value.replace(/[^\d.]/g, ""))}
@@ -168,13 +176,14 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
               aria-label="Limit price" />
           </label>
         )}
-        {type === "stop" && (
+        {type === "trailing_stop" && (
           <label className="flex min-h-11 items-center gap-2 rounded-xl border border-hairline bg-bg2 px-4 transition-colors [transition-timing-function:var(--ease-spring)] focus-within:border-gold/50 focus-within:bg-bg2/60">
-            <span className="text-xs text-ink-3">Stop</span>
-            <input value={stopPrice} onChange={(e) => setStopPrice(e.target.value.replace(/[^\d.]/g, ""))}
-              inputMode="decimal" placeholder={quote ? quote.price.toFixed(2) : ""}
+            <span className="text-xs text-ink-3">Trail %</span>
+            <input value={trailPct} onChange={(e) => setTrailPct(e.target.value.replace(/[^\d.]/g, ""))}
+              inputMode="decimal" placeholder="5"
               className="tnum w-full bg-transparent py-2.5 text-right text-sm text-ink-1 outline-none"
-              aria-label="Stop price" />
+              aria-label="Trail percent" />
+            <span className="text-xs text-ink-4">%</span>
           </label>
         )}
 

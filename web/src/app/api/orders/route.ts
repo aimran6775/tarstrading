@@ -25,13 +25,16 @@ export async function POST(request: Request) {
   if (!/^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/.test(symbol)) {
     return NextResponse.json({ ok: false, error: "That doesn't look like a symbol." }, { status: 400 });
   }
+  const TYPES = ["market", "limit", "stop", "stop_limit", "trailing_stop"] as const;
+  const type = TYPES.includes(body.type as (typeof TYPES)[number]) ? (body.type as (typeof TYPES)[number]) : "market";
   const order = await placeOrder(user.id, {
     symbol,
     side: body.side === "sell" ? "sell" : "buy",
-    type: ["market", "limit", "stop"].includes(body.type as string) ? (body.type as "market" | "limit" | "stop") : "market",
+    type,
     qty: Number(body.qty),
     limitPrice: body.limitPrice != null ? Number(body.limitPrice) : undefined,
     stopPrice: body.stopPrice != null ? Number(body.stopPrice) : undefined,
+    trailPercent: body.trailPercent != null ? Number(body.trailPercent) : undefined,
   });
   await reconcile(user.id);
   const status = order.status === "rejected" ? 422 : 201;

@@ -48,12 +48,27 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type PlaceOrderInput = {
   symbol: string;
   side: "buy" | "sell";
-  type: "market" | "limit" | "stop";
+  type: "market" | "limit" | "stop" | "stop_limit" | "trailing_stop";
   qty: number;
   limitPrice?: number;
   stopPrice?: number;
+  /** Trailing stop: trail as a fraction, e.g. 0.05 = 5%. */
+  trailPercent?: number;
   agentId?: string;
 };
+
+/*
+  Trailing-stop math (pure, unit-tested). The anchor tracks the best price seen
+  since placement — the HIGH for a sell (protecting a long), the LOW for a buy
+  (protecting a short). The stop trails the anchor by `pct`; it fires when price
+  retraces to the stop.
+*/
+export function trailingStop(side: "buy" | "sell", anchor: number, price: number, pct: number) {
+  const newAnchor = side === "sell" ? Math.max(anchor, price) : Math.min(anchor, price);
+  const stop = side === "sell" ? newAnchor * (1 - pct) : newAnchor * (1 + pct);
+  const triggered = side === "sell" ? price <= stop : price >= stop;
+  return { newAnchor, stop, triggered };
+}
 
 export type PlacedOrder = typeof schema.orders.$inferSelect;
 
@@ -67,6 +82,7 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     const row = {
       id, userId, symbol, side: input.side, type: input.type, qty: input.qty,
       limitPrice: input.limitPrice ?? null, stopPrice: input.stopPrice ?? null,
+      trailPercent: null, trailAnchor: null, triggered: 0,
       status: "rejected" as const, filledPrice: null, filledAt: null,
       agentId: input.agentId ?? null, rejectReason: reason, createdAt: now,
     };
@@ -81,6 +97,10 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     return reject("Limit orders need a limit price.");
   if (input.type === "stop" && !(input.stopPrice && input.stopPrice > 0))
     return reject("Stop orders need a stop price.");
+  if (input.type === "stop_limit" && !(input.stopPrice && input.stopPrice > 0 && input.limitPrice && input.limitPrice > 0))
+    return reject("Stop-limit orders need both a stop and a limit price.");
+  if (input.type === "trailing_stop" && !(input.trailPercent && input.trailPercent > 0 && input.trailPercent < 1))
+    return reject("Trailing stops need a trail between 0% and 100%.");
 
   // Platform kill switch — admins can halt all order flow.
   if ((await getPlatformConfig()).tradingHalted) return reject("Trading is temporarily halted by the platform.");
@@ -92,6 +112,10 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
   const row = {
     id, userId, symbol, side: input.side, type: input.type, qty: input.qty,
     limitPrice: input.limitPrice ?? null, stopPrice: input.stopPrice ?? null,
+    // Trailing stop starts its anchor at the current price and tracks from there.
+    trailPercent: input.type === "trailing_stop" ? (input.trailPercent ?? null) : null,
+    trailAnchor: input.type === "trailing_stop" ? quote.price : null,
+    triggered: 0,
     status: "accepted" as const, filledPrice: null as number | null,
     filledAt: null as number | null,
     agentId: input.agentId ?? null, rejectReason: null as string | null, createdAt: now,
@@ -176,6 +200,29 @@ async function tryFill(tx: Tx, order: PlacedOrder, price: number): Promise<{ sta
       if (order.side === "buy" && price >= order.stopPrice!) fillPrice = price * slip;
       if (order.side === "sell" && price <= order.stopPrice!) fillPrice = price * slip;
       break;
+    case "stop_limit": {
+      // Once the stop is crossed the order BECOMES a live limit (persisted), so
+      // it stays a limit even if price then moves away.
+      let live = order.triggered === 1;
+      if (!live) {
+        const crossed = order.side === "buy" ? price >= order.stopPrice! : price <= order.stopPrice!;
+        if (crossed) { live = true; await tx.update(schema.orders).set({ triggered: 1 }).where(eq(schema.orders.id, order.id)); }
+      }
+      if (live) {
+        if (order.side === "buy" && price <= order.limitPrice!) fillPrice = Math.min(price * slip, order.limitPrice!);
+        if (order.side === "sell" && price >= order.limitPrice!) fillPrice = Math.max(price * slip, order.limitPrice!);
+      }
+      break;
+    }
+    case "trailing_stop": {
+      const t = trailingStop(order.side, order.trailAnchor ?? price, price, order.trailPercent ?? 0);
+      // Persist a new high/low water even when it doesn't fire.
+      if (t.newAnchor !== order.trailAnchor) {
+        await tx.update(schema.orders).set({ trailAnchor: t.newAnchor }).where(eq(schema.orders.id, order.id));
+      }
+      if (t.triggered) fillPrice = price * slip;
+      break;
+    }
   }
   if (fillPrice == null) return null;
 

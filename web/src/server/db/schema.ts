@@ -66,7 +66,7 @@ export const positions = pgTable("positions", {
 
 export type OrderStatus = "accepted" | "filled" | "canceled" | "rejected";
 export type OrderSide = "buy" | "sell";
-export type OrderType = "market" | "limit" | "stop";
+export type OrderType = "market" | "limit" | "stop" | "stop_limit" | "trailing_stop";
 
 export const orders = pgTable("orders", {
   id: text("id").primaryKey(),
@@ -77,6 +77,12 @@ export const orders = pgTable("orders", {
   qty: doublePrecision("qty").notNull(),
   limitPrice: doublePrecision("limit_price"),
   stopPrice: doublePrecision("stop_price"),
+  /** Trailing stop: the trail as a fraction (0.05 = 5%) and the tracked extreme
+      (highest price since placement for a sell, lowest for a buy). */
+  trailPercent: doublePrecision("trail_percent"),
+  trailAnchor: doublePrecision("trail_anchor"),
+  /** Stop-limit: 1 once the stop has been crossed and it's become a live limit. */
+  triggered: integer("triggered").notNull().default(0),
   status: text("status").$type<OrderStatus>().notNull(),
   filledPrice: doublePrecision("filled_price"),
   filledAt: epochMs("filled_at"),
