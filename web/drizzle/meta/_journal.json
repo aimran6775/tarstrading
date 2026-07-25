@@ -92,6 +92,13 @@
       "when": 1785009222567,
       "tag": "0012_military_christian_walker",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785015910560,
+      "tag": "0013_romantic_bishop",
+      "breakpoints": true
     }
   ]
 }

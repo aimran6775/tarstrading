@@ -133,7 +133,77 @@ function adminEmails(): Set<string> {
     .split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
 }
 
+/*
+  ---- The control console ----
+  admin.tarstrading.com is its own product: a branded sign-in, its own session
+  cookie (tars_console, distinct from the product's), and a surface confined to
+  /admin by the edge Worker. Credentials come from env (CONSOLE_USER /
+  CONSOLE_PASS) — no console account exists in the product's user flow.
+*/
+const CONSOLE_COOKIE = "tars_console";
+const CONSOLE_TTL_MS = 12 * 60 * 60 * 1000; // a working day; consoles shouldn't linger
+
+/** Constant-time string compare (avoids leaking the password by timing). */
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a), bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
+
+export function consoleCredentialsOk(username: string, password: string): boolean {
+  const u = process.env.CONSOLE_USER, p = process.env.CONSOLE_PASS;
+  if (!u || !p) return false;
+  // Always compare both so a wrong username costs the same as a wrong password.
+  const okU = safeEqual(username, u), okP = safeEqual(password, p);
+  return okU && okP;
+}
+
+/** Mint a console session (rows live in `sessions`, owned by the console user). */
+export async function startConsoleSession(): Promise<boolean> {
+  const consoleId = process.env.CONSOLE_USER_ID;
+  if (!consoleId) return false;
+  const token = randomBytes(32).toString("hex");
+  await db.insert(schema.sessions).values({
+    id: token, userId: consoleId, expiresAt: Date.now() + CONSOLE_TTL_MS,
+  });
+  const jar = await cookies();
+  jar.set(CONSOLE_COOKIE, token, {
+    httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
+    maxAge: CONSOLE_TTL_MS / 1000, path: "/",
+  });
+  return true;
+}
+
+export async function endConsoleSession() {
+  const jar = await cookies();
+  const token = jar.get(CONSOLE_COOKIE)?.value;
+  if (token) await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
+  jar.set(CONSOLE_COOKIE, "", { maxAge: 0, path: "/" });
+}
+
+/** The console operator, if a valid console session cookie is present. */
+export async function consoleUser(): Promise<SessionUser | null> {
+  const consoleId = process.env.CONSOLE_USER_ID;
+  if (!consoleId) return null;
+  const jar = await cookies();
+  const token = jar.get(CONSOLE_COOKIE)?.value;
+  if (!token) return null;
+  const [row] = await db.select({
+    id: schema.users.id, email: schema.users.email, name: schema.users.name,
+    role: schema.users.role, fundName: schema.users.fundName,
+  })
+    .from(schema.sessions)
+    .innerJoin(schema.users, eq(schema.sessions.userId, schema.users.id))
+    .where(and(eq(schema.sessions.id, token), gt(schema.sessions.expiresAt, Date.now())))
+    .limit(1);
+  return row && row.id === consoleId ? row : null;
+}
+
 export async function currentAdmin(): Promise<SessionUser | null> {
+  // A console session authenticates the control center outright.
+  const op = await consoleUser();
+  if (op) return op;
+
   const user = await currentUser();
   if (!user) return null;
   if (user.role === "admin") return user;

@@ -388,3 +388,24 @@ export const priceAlerts = pgTable("price_alerts", {
   triggeredAt: epochMs("triggered_at"),
   createdAt: epochMs("created_at").notNull(),
 }, (t) => [index("alerts_user").on(t.userId)]);
+
+/*
+  The house board — the market universe the product SHOWS, curated from the
+  control center. The full ~13k ticker directory stays searchable; this table
+  decides what appears on Markets (categories, order, the featured hero).
+  Empty table = the app falls back to its built-in defaults.
+*/
+export const platformSymbols = pgTable("platform_symbols", {
+  symbol: text("symbol").primaryKey(),
+  /** Board section: "stocks" | "crypto" | "etf" — drives the category pills. */
+  category: text("category").notNull().default("stocks"),
+  /** Sort order within the board (lower first). */
+  rank: integer("rank").notNull().default(100),
+  /** 1 = eligible for the featured hero slot on Markets. */
+  featured: integer("featured").notNull().default(0),
+  /** 0 = hidden from the board without deleting the curation. */
+  enabled: integer("enabled").notNull().default(1),
+  /** Free-text operator note ("added for the AI basket"). */
+  note: text("note"),
+  addedAt: epochMs("added_at").notNull(),
+}, (t) => [index("psym_enabled").on(t.enabled), index("psym_category").on(t.category)]);

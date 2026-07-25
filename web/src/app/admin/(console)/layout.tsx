@@ -13,7 +13,9 @@ export const metadata = { title: { default: "Admin", template: "%s · Tars Admin
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const admin = await currentAdmin();
-  if (!admin) redirect("/app");
+  // The console has its own front door — unauthenticated operators sign in
+  // there, they are never bounced into the product.
+  if (!admin) redirect("/admin/login");
 
   return (
     <div className="flex min-h-screen flex-col">
