@@ -8,10 +8,11 @@ import Ticket from "@/components/trading/ticket";
 import { Positions, Orders, Alerts, Performance } from "@/components/trading/tray";
 import { useToast } from "@/components/toast";
 import { SYMBOLS } from "@/lib/symbols";
-import { usd, pct, categoryOf, type Quote, type Account, type Position, type Order, type Timeframe }
+import { usd, pct, categoryOf, marketHrefFor, type Quote, type Account, type Position, type Order, type Timeframe }
   from "@/components/trading/shared";
 import LearnLink from "@/components/academy/learn-link";
 import KeyStatistics, { type SymbolStat, type StatsState } from "@/components/markets/key-statistics";
+import OptionChain from "@/components/markets/option-chain";
 import type { ChartBar } from "@/components/price-chart";
 
 const PriceChart = dynamic(() => import("@/components/price-chart"), {
@@ -24,11 +25,12 @@ const PriceChart = dynamic(() => import("@/components/price-chart"), {
   price + delta under the category eyebrow), the chart runs full-bleed with
   its timeframe tabs tucked into the chart footer, the ticket lives in the
   right rail with a context card, and the portfolio tray runs full-width
-  underneath. Hotkeys: 1–6 timeframes, P/O/A/E tray tabs.
+  underneath. Hotkeys: 1–6 timeframes, P/O/A/E/C tray tabs
+  (C = the option chain, which only exists for equities — crypto has none).
 */
 
 const NAME = new Map(SYMBOLS.map((e) => [e.symbol, e.name]));
-type TrayTab = "positions" | "orders" | "alerts" | "perf";
+type TrayTab = "positions" | "orders" | "alerts" | "perf" | "options";
 
 export default function MarketView({ symbol, initialTray, initialSide }: {
   symbol: string;
@@ -56,7 +58,8 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
   const [stat, setStat] = useState<SymbolStat | null>(null);
   const [statState, setStatState] = useState<StatsState>("loading");
   const [tray, setTray] = useState<TrayTab>(
-    initialTray === "perf" || initialTray === "orders" || initialTray === "alerts" ? initialTray as TrayTab : "positions");
+    initialTray === "perf" || initialTray === "orders" || initialTray === "alerts" || initialTray === "options"
+      ? initialTray as TrayTab : "positions");
   const [presetSide, setPresetSide] = useState<"buy" | "sell" | null>(
     initialSide === "sell" ? "sell" : initialSide === "buy" ? "buy" : null);
   // Lazy-init to the correct height so mobile doesn't render 420 then snap to
@@ -75,20 +78,26 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
     return () => window.removeEventListener("resize", fit);
   }, []);
 
-  // Hotkeys: 1-6 timeframe, P/O/A/E tray (never while typing / with modifiers).
+  // Hotkeys: 1-6 timeframe, P/O/A/E/C tray (never while typing / with modifiers).
   useEffect(() => {
     const TF: Record<string, Timeframe> = { "1": "1D", "2": "1W", "3": "1M", "4": "3M", "5": "1Y", "6": "5Y" };
-    const TRAY: Record<string, TrayTab> = { p: "positions", o: "orders", a: "alerts", e: "perf" };
+    const TRAY: Record<string, TrayTab> = {
+      p: "positions", o: "orders", a: "alerts", e: "perf", c: "options",
+    };
     const onKey = (ev: KeyboardEvent) => {
       if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
       const el = document.activeElement;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) return;
       if (TF[ev.key]) setTimeframe(TF[ev.key]);
-      else if (TRAY[ev.key.toLowerCase()]) setTray(TRAY[ev.key.toLowerCase()]);
+      else {
+        const next = TRAY[ev.key.toLowerCase()];
+        // Crypto has no listed options, so C has nothing to open there.
+        if (next && !(next === "options" && symbol.includes("/"))) setTray(next);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [symbol]);
 
   // ---------- data loops ----------
   const loadAccount = useCallback(async () => {
@@ -209,6 +218,10 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
   }
 
   const quote = quotes.get(symbol);
+  const isCrypto = symbol.includes("/");
+  // Crypto has no listed options: the tab disappears, and a stale ?tray=options
+  // (or a hop from an equity page) falls back rather than showing an error.
+  const activeTray: TrayTab = tray === "options" && isCrypto ? "positions" : tray;
   const chg = quote?.changePercent ?? 0;
   const position = positions.find((p) => p.symbol === symbol);
   const openOrders = orders.filter((o) => o.status === "accepted");
@@ -416,28 +429,43 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
               ["orders", `Orders${openOrders.length ? ` · ${openOrders.length}` : ""}`],
               ["alerts", "Alerts"],
               ["perf", "Performance"],
+              // Options only exist for equities — the tab isn't rendered for crypto.
+              ...(isCrypto ? [] : [["options", "Options"] as const]),
             ] as const).map(([key, label]) => (
               <button key={key} onClick={() => setTray(key)}
                 className={`pressable relative min-h-11 rounded-t-lg px-4 py-2.5 text-xs font-medium transition-colors ${
-                  tray === key ? "text-gold" : "text-ink-3 hover:text-ink-1"
+                  activeTray === key ? "text-gold" : "text-ink-3 hover:text-ink-1"
                 }`}
-                aria-selected={tray === key}>
+                aria-selected={activeTray === key}>
                 {label}
                 {/* the gold active underline — the same tape that runs under the app nav */}
                 <span aria-hidden className={`absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-gold transition-opacity ${
-                  tray === key ? "opacity-100 shadow-[0_0_10px_-1px_var(--gold)]" : "opacity-0"
+                  activeTray === key ? "opacity-100 shadow-[0_0_10px_-1px_var(--gold)]" : "opacity-0"
                 }`} />
               </button>
             ))}
           </nav>
-          {tray === "positions" && (
+          {activeTray === "positions" && (
             <Positions positions={positions} quotes={quotes}
-              onSelect={(s) => router.push(`/app/m/${encodeURIComponent(s)}`)}
+              // An option position routes to its UNDERLYING's terminal (with the
+              // chain open) — an OCC symbol has no page of its own.
+              onSelect={(s) => router.push(marketHrefFor(s))}
               onClosed={refreshAfterTrade} />
           )}
-          {tray === "orders" && <Orders orders={orders} onCanceled={refreshAfterTrade} />}
-          {tray === "alerts" && <Alerts symbol={symbol} quote={quote} />}
-          {tray === "perf" && <Performance />}
+          {activeTray === "orders" && <Orders orders={orders} onCanceled={refreshAfterTrade} />}
+          {activeTray === "alerts" && <Alerts symbol={symbol} quote={quote} />}
+          {activeTray === "perf" && <Performance />}
+          {activeTray === "options" && (
+            <OptionChain
+              key={symbol}
+              symbol={symbol}
+              positions={positions}
+              marketOpen={marketOpen}
+              buyingPower={buyingPower}
+              cash={account?.cash ?? 0}
+              onPlaced={refreshAfterTrade}
+            />
+          )}
         </section>
       </main>
 

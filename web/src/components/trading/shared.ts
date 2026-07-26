@@ -29,3 +29,18 @@ export function categoryOf(symbol: string): MarketCategory {
   if (ETFS.has(symbol)) return "ETFs";
   return "Stocks";
 }
+
+/*
+  Where a position's symbol should link. An OCC option contract has no page of
+  its own — the underlying's terminal is where its chain and its ticket live —
+  so an option routes there with the Options tray open. Everything else links
+  to itself. Client-safe (no server-only imports), so every surface that lists
+  positions can use it.
+*/
+const OCC = /^([A-Z]{1,6})\d{6}[CP]\d{8}$/;
+export function marketHrefFor(symbol: string): string {
+  const m = OCC.exec(symbol.toUpperCase());
+  return m
+    ? `/app/m/${encodeURIComponent(m[1])}?tray=options`
+    : `/app/m/${encodeURIComponent(symbol)}`;
+}

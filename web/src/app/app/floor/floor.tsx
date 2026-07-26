@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import dynamic from "next/dynamic";
-import { usd, pct } from "@/components/trading/shared";
+import { usd, pct, marketHrefFor } from "@/components/trading/shared";
 import { Spark } from "@/components/market-card";
 import { Icon } from "@/components/icons";
 import FloorTour from "./tour";
@@ -230,7 +230,7 @@ export default function Floor({ data }: { data: Data }) {
               <ul className="flex flex-col gap-2">
                 {data.positions.slice(0, 5).map((p) => (
                   <li key={p.symbol} className="flex items-center justify-between">
-                    <Link href={`/app/m/${encodeURIComponent(p.symbol)}`} className="text-sm font-medium text-ink-1 hover:text-gold">{p.symbol}</Link>
+                    <Link href={marketHrefFor(p.symbol)} className="text-sm font-medium text-ink-1 hover:text-gold">{p.symbol}</Link>
                     <div className="flex items-center gap-4">
                       <span className="tnum text-sm text-ink-2">{usd(p.value, 0)}</span>
                       <span className={`tnum w-20 text-right text-sm ${TONE[tone(p.openPnl)]}`}>{usd(p.openPnl)}</span>
