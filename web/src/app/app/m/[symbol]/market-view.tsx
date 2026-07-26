@@ -11,6 +11,7 @@ import { SYMBOLS } from "@/lib/symbols";
 import { usd, pct, categoryOf, type Quote, type Account, type Position, type Order, type Timeframe }
   from "@/components/trading/shared";
 import LearnLink from "@/components/academy/learn-link";
+import KeyStatistics, { type SymbolStat, type StatsState } from "@/components/markets/key-statistics";
 import type { ChartBar } from "@/components/price-chart";
 
 const PriceChart = dynamic(() => import("@/components/price-chart"), {
@@ -52,6 +53,8 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
   const [barsError, setBarsError] = useState<string | null>(null);
   const [syncedAt, setSyncedAt] = useState<number | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
+  const [stat, setStat] = useState<SymbolStat | null>(null);
+  const [statState, setStatState] = useState<StatsState>("loading");
   const [tray, setTray] = useState<TrayTab>(
     initialTray === "perf" || initialTray === "orders" || initialTray === "alerts" ? initialTray as TrayTab : "positions");
   const [presetSide, setPresetSide] = useState<"buy" | "sell" | null>(
@@ -163,6 +166,32 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
     })();
     return () => { alive = false; };
   }, [symbol, timeframe, reloadNonce]);
+
+  // Key statistics: the session's facts plus vault context (52-week extremes,
+  // average volume, trailing returns). A slow loop on purpose — those numbers
+  // don't move tick to tick, and the needles ride the live quote in between.
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/market/stats?symbols=${encodeURIComponent(symbol)}`);
+      if (!res.ok) throw new Error("stats");
+      const data = await res.json();
+      const row = (data.stats as SymbolStat[] | undefined)?.[0];
+      if (data.ok && row && row.symbol === symbol) { setStat(row); setStatState("ready"); }
+      else setStatState("error");
+    } catch {
+      // A transient failure keeps the last good numbers on screen rather than
+      // blanking a panel the user may be reading.
+      setStatState((prev) => (prev === "ready" ? "ready" : "error"));
+    }
+  }, [symbol]);
+
+  useEffect(() => {
+    setStat(null);
+    setStatState("loading");
+    loadStats();
+    const t = setInterval(loadStats, 60_000);
+    return () => clearInterval(t);
+  }, [loadStats]);
 
   const refreshAfterTrade = useCallback(() => {
     loadAccount().then(() => { loadQuotes(); loadOrders(); });
@@ -365,6 +394,18 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
               )}
             </section>
           </aside>
+
+          {/* ---------- key statistics: under the chart, never over the ticket ----------
+              Explicitly placed so it sits beneath the chart on wide screens while
+              keeping the ticket first in the DOM (and first on a phone). */}
+          <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+            <KeyStatistics
+              stat={stat}
+              state={statState}
+              livePrice={quote?.price ?? null}
+              onRetry={() => { setStatState("loading"); loadStats(); }}
+            />
+          </div>
         </div>
 
         {/* ---------- the portfolio tray ---------- */}

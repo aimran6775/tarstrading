@@ -134,6 +134,8 @@ export default function MarketsBoard({ rows: served }: { rows: BoardRow[] }) {
         router.refresh();
       }} />
 
+      <GrowUniverse />
+
       {/* Board toolbar — filter, search, and the healing pass */}
       <div className="mt-8 flex flex-wrap items-center gap-2">
         <h2 className="mr-1 font-mono text-[11px] uppercase tracking-[0.25em] text-ink-4">Board</h2>
@@ -370,6 +372,250 @@ function AddSymbol({ rows, onAdded }: { rows: BoardRow[]; onAdded: (row: BoardRo
           })}
         </ul>
       )}
+    </section>
+  );
+}
+
+/* ── Grow the universe ─────────────────────────────────────────────────── */
+
+const KINDS: { value: string; label: string }[] = [
+  { value: "CS", label: "common stock" },
+  { value: "ETF", label: "etf" },
+  { value: "ADRC", label: "adr" },
+  { value: "CRYPTO", label: "crypto pair" },
+];
+const COUNTS = [50, 100, 250, 500];
+
+type Preview = {
+  available: number;
+  sample: { symbol: string; name: string }[];
+  exchanges: { code: string; available: number }[];
+};
+
+/*
+  Bulk listing. The board grows by hundreds here, not by ones: pick a slice of
+  the 13k-row directory, read how many of those are NOT yet listed, and file
+  that many at once. Add-only by construction — the endpoint cannot disable,
+  edit or remove a listing, so the worst a wrong filter costs is a few rows to
+  remove by hand.
+
+  The count is previewed before anything is written, and the freshly added
+  symbols land cold, so the fill button sits right there next to the result.
+*/
+function GrowUniverse() {
+  const router = useRouter();
+
+  const [kind, setKind] = useState("CS");
+  const [exchange, setExchange] = useState("");
+  const [count, setCount] = useState(100);
+  const [cat, setCat] = useState<"auto" | Category>("auto");
+  const [q, setQ] = useState("");
+
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState<{ n: number; symbols: string[] } | null>(null);
+
+  const [fill, setFill] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [fillNote, setFillNote] = useState("");
+
+  const seq = useRef(0);
+  const [stamp, setStamp] = useState(0); // bumped after a commit to re-count
+
+  // Preview: debounced, last-keystroke-wins, and never silently empty — a
+  // failure says so instead of reading as "0 available".
+  useEffect(() => {
+    const mine = ++seq.current;
+    const t = setTimeout(async () => {
+      setLoading(true);
+      const params = new URLSearchParams({ kind });
+      if (exchange) params.set("exchange", exchange);
+      if (q.trim()) params.set("search", q.trim());
+      const res = await send(`/api/admin/markets/bulk?${params}`);
+      if (mine !== seq.current) return;
+      setLoading(false);
+      if (!res.ok) { setPreview(null); setError(res.error ?? "Preview failed."); return; }
+      setError("");
+      setPreview({
+        available: Number(res.data.available ?? 0),
+        sample: Array.isArray(res.data.sample) ? (res.data.sample as Preview["sample"]) : [],
+        exchanges: Array.isArray(res.data.exchanges) ? (res.data.exchanges as Preview["exchanges"]) : [],
+      });
+    }, 200);
+    return () => clearTimeout(t);
+  }, [kind, exchange, q, stamp]);
+
+  const available = preview?.available ?? 0;
+  const willAdd = Math.min(count, available);
+
+  async function commit() {
+    setAdding(true);
+    setError("");
+    setAdded(null);
+    setFill("idle");
+    setFillNote("");
+    const res = await send("/api/admin/markets/bulk", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind, exchange: exchange || undefined, search: q.trim() || undefined,
+        limit: count, category: cat === "auto" ? undefined : cat,
+      }),
+    });
+    setAdding(false);
+    if (!res.ok) { setError(res.error ?? "Bulk add failed."); return; }
+    const symbols = Array.isArray(res.data.symbols) ? (res.data.symbols as string[]) : [];
+    setAdded({ n: Number(res.data.added ?? 0), symbols });
+    setStamp((s) => s + 1);
+    router.refresh();
+  }
+
+  /** The new listings are cold by definition — this is the one-click warm-up. */
+  async function fillHistory() {
+    setFill("running");
+    setFillNote("filling 5 years for the new listings…");
+    const res = await send("/api/admin/historian", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scope: "cold", years: 5 }),
+    });
+    if (!res.ok) { setFill("error"); setFillNote(res.error ?? "Deep fill failed."); return; }
+    const r = (res.data.report ?? {}) as Record<string, number | string[] | undefined>;
+    const errs = Array.isArray(r.errors) ? r.errors.length : 0;
+    setFill("done");
+    setFillNote(`${r.symbols ?? 0} symbols · ${Number(r.barsWritten ?? 0).toLocaleString()} bars` +
+      `${errs ? ` · ${errs} errors` : ""}`);
+    router.refresh();
+  }
+
+  return (
+    <section className="raised mt-4 p-4">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.25em] text-ink-4">Grow the universe</h2>
+        <p className="text-[11px] text-ink-4">
+          Bulk-list a slice of the directory. Adds only — nothing already curated is touched.
+        </p>
+      </div>
+
+      {/* Filter row — every control clears 44px on a phone and wraps freely */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1.5">
+          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink-4">kind</span>
+          <select value={kind} onChange={(e) => { setKind(e.target.value); setExchange(""); }}
+            aria-label="Directory kind to list"
+            className={`${FIELD} uppercase tracking-[0.1em]`}>
+            {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+          </select>
+        </label>
+
+        <label className="flex items-center gap-1.5">
+          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink-4">exchange</span>
+          <select value={exchange} onChange={(e) => setExchange(e.target.value)}
+            aria-label="Exchange filter"
+            className={`${FIELD} uppercase tracking-[0.1em]`}>
+            <option value="">any</option>
+            {(preview?.exchanges ?? []).map((x) => (
+              <option key={x.code} value={x.code}>{x.code} · {x.available}</option>
+            ))}
+            {exchange && !(preview?.exchanges ?? []).some((x) => x.code === exchange) && (
+              <option value={exchange}>{exchange}</option>
+            )}
+          </select>
+        </label>
+
+        <label className="flex items-center gap-1.5">
+          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink-4">count</span>
+          <select value={count} onChange={(e) => setCount(Number(e.target.value))}
+            aria-label="How many to add"
+            className={`${FIELD} tnum`}>
+            {COUNTS.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+
+        <label className="flex items-center gap-1.5">
+          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink-4">file under</span>
+          <select value={cat} onChange={(e) => setCat(e.target.value as "auto" | Category)}
+            aria-label="Category to file the new listings under"
+            className={`${FIELD} uppercase tracking-[0.1em]`}>
+            <option value="auto">auto</option>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+
+        <input value={q} onChange={(e) => setQ(e.target.value)}
+          placeholder="Narrow by ticker or name…" aria-label="Narrow the sweep"
+          autoComplete="off"
+          className={`${FIELD} w-44 placeholder:text-ink-4`} />
+      </div>
+
+      {/* The count, then the commit — never the other way round */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-hairline pt-3">
+        <p className="font-mono text-[11px] text-ink-4">
+          {loading && !preview ? (
+            <span className="skeleton inline-block h-3 w-28 align-middle" />
+          ) : error ? (
+            <span className="text-loss">{error}</span>
+          ) : (
+            <>
+              <span className={`tnum text-sm font-semibold ${available ? "text-ink-1" : "text-ink-4"}`}>
+                {available.toLocaleString()}
+              </span>{" "}
+              available, not yet listed
+              {available > 0 && (
+                <span className="text-ink-4"> · this adds {willAdd.toLocaleString()}</span>
+              )}
+            </>
+          )}
+        </p>
+
+        <button type="button" onClick={commit}
+          disabled={adding || loading || willAdd < 1}
+          className={`${CHIP} ml-auto ${willAdd > 0
+            ? "border-agent/50 bg-agent/15 text-agent hover:bg-agent/25"
+            : "border-hairline text-ink-4"}`}>
+          {adding ? "listing…" : `list ${willAdd.toLocaleString()}`}
+        </button>
+      </div>
+
+      {/* First few of what the sweep would take — the filter made concrete */}
+      {!error && preview && preview.sample.length > 0 && !added && (
+        <p className="mt-2 truncate font-mono text-[10px] text-ink-4">
+          first: {preview.sample.map((s) => s.symbol).join(" · ")}
+          {available > preview.sample.length ? " …" : ""}
+        </p>
+      )}
+
+      {/* The result, and the warm-up that always follows it */}
+      {added && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-hairline pt-3">
+          <p className="min-w-0 font-mono text-[11px] text-ink-3">
+            <span className="tnum text-gain">+{added.n.toLocaleString()}</span> listed
+            {added.symbols.length > 0 && (
+              <span className="text-ink-4"> · {added.symbols.slice(0, 6).join(" · ")}
+                {added.symbols.length > 6 ? ` +${added.symbols.length - 6}` : ""}</span>
+            )}
+          </p>
+          <span className="ml-auto flex flex-wrap items-center gap-2">
+            {fillNote && (
+              <span className={`font-mono text-[10px] ${fill === "error" ? "text-loss" : "text-ink-4"}`}>
+                {fillNote}
+              </span>
+            )}
+            {added.n > 0 && (
+              <button type="button" onClick={fillHistory} disabled={fill === "running"}
+                className={`${CHIP} border-gold/50 bg-gold/10 text-gold hover:bg-gold/20`}>
+                {fill === "running" ? "filling…" : "fill history"}
+              </button>
+            )}
+          </span>
+        </div>
+      )}
+
+      <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.15em] text-ink-4">
+        shortest tickers first · max 500 per sweep · new listings rank after the board tail
+      </p>
     </section>
   );
 }
