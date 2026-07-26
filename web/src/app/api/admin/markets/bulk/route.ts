@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { and, eq, ilike, notExists, or, sql } from "drizzle-orm";
+import { type SQL, and, eq, ilike, notExists, or, sql } from "drizzle-orm";
 import { currentAdmin } from "@/server/auth";
 import { db, schema } from "@/server/db";
 
@@ -10,7 +10,7 @@ import { db, schema } from "@/server/db";
   The single-symbol route is curation by hand; this one is curation by the
   shovel-load: pick a slice of the tickers directory (kind, exchange, an
   optional name/ticker search), see how many of those are NOT yet listed, and
-  file that many onto the board under one category.
+  file that many onto the board under one section.
 
   Deliberately one-directional. This endpoint only ever INSERTS — never
   updates, disables, or deletes an existing listing (onConflictDoNothing), and
@@ -20,11 +20,37 @@ import { db, schema } from "@/server/db";
 
 export const dynamic = "force-dynamic";
 
-const CATEGORIES = new Set(["stocks", "crypto", "etf"]);
+/* Board sections, matching the markets route: "global" carries ADRs and
+   country/region funds, "income" carries preferreds and closed-end funds. */
+const CATEGORIES = new Set(["stocks", "crypto", "etf", "global", "fx", "income"]);
 
-/** Directory kinds an operator can sweep. Warrants, rights, units and the
-    other exotica stay out — they are not things we want on a house board. */
-const KINDS = new Set(["CS", "ETF", "ADRC", "CRYPTO"]);
+/*
+  Directory kinds an operator can sweep.
+
+  The first group is the world an investor recognises: operating companies,
+  funds, foreign listings via ADRs, preferreds, closed-end funds. The second
+  group — warrants, rights, units — is thin, expiry-dated paper that has no
+  business landing on a house board by accident, so it is reachable only when
+  an operator asks for it BY NAME (never the default, never swept in by a
+  geography search alone).
+*/
+const CORE_KINDS = ["CS", "ETF", "ADRC", "PFD", "FUND", "CRYPTO"];
+const OPT_IN_KINDS = ["WARRANT", "RIGHT", "UNIT"];
+const KINDS = new Set([...CORE_KINDS, ...OPT_IN_KINDS]);
+
+/** Where a sweep of each kind belongs when the operator names no section. */
+const HOME_SECTION: Record<string, string> = {
+  CS: "stocks", ETF: "etf", CRYPTO: "crypto",
+  ADRC: "global", PFD: "income", FUND: "income",
+};
+
+/*
+  Geography needles. The directory carries no country column, so region is read
+  off the NAME — which is exactly how these funds are named ("iShares MSCI
+  Japan ETF", "Emerging Markets Bond"). Each needle is the literal `search`
+  term the console prefills, so a chip's count and its sweep can never disagree.
+*/
+const GEOS = ["japan", "europe", "china", "emerging", "india", "brazil", "global", "world"] as const;
 
 /** The hard ceiling on one sweep. One click can never insert thousands. */
 const MAX_LIMIT = 500;
@@ -72,6 +98,17 @@ function where(f: Filter) {
 */
 const ORDER = [sql`length(${schema.tickers.symbol})`, schema.tickers.symbol] as const;
 
+/*
+  One geography needle counted in place — a facet, not a query per chip. The
+  predicate is the SAME symbol-or-name match the sweep itself uses, so a chip's
+  count is exactly what clicking it would take.
+*/
+const geoCount = (needle: string) =>
+  sql<number>`count(*) filter (
+    where ${schema.tickers.symbol} ilike ${`%${needle}%`}
+       or ${schema.tickers.name} ilike ${`%${needle}%`}
+  )::int`;
+
 /** GET — preview a sweep: how many match, and what the first ones look like. */
 export async function GET(req: Request) {
   if (!(await currentAdmin())) return NextResponse.json({ ok: false }, { status: 403 });
@@ -79,7 +116,12 @@ export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
   const filter = readFilter((k) => params.get(k));
 
-  const [[count], sample, exchanges] = await Promise.all([
+  // Every geography needle counted in ONE pass over the slice, rather than a
+  // query per chip. The counts are what the operator commits against.
+  const geoSelect: Record<string, SQL<number>> = {};
+  for (const g of GEOS) geoSelect[g] = geoCount(g);
+
+  const [[count], sample, exchanges, kinds, [geo]] = await Promise.all([
     db.select({ n: sql<number>`count(*)::int` }).from(schema.tickers).where(where(filter)),
     db.select({ symbol: schema.tickers.symbol, name: schema.tickers.name })
       .from(schema.tickers).where(where(filter)).orderBy(...ORDER).limit(8),
@@ -88,7 +130,16 @@ export async function GET(req: Request) {
     db.select({ exchange: schema.tickers.exchange, n: sql<number>`count(*)::int` })
       .from(schema.tickers).where(where({ ...filter, exchange: undefined }))
       .groupBy(schema.tickers.exchange).orderBy(sql`count(*) desc`),
+    // The same trick for instrument type: how many unlisted rows of each kind
+    // sit under the CURRENT search, so "japan" re-counts every type at once.
+    db.select({ kind: schema.tickers.kind, n: sql<number>`count(*)::int` })
+      .from(schema.tickers).where(where({ ...filter, kind: undefined }))
+      .groupBy(schema.tickers.kind),
+    // …and for geography: counts under the current kind/exchange, search aside.
+    db.select(geoSelect).from(schema.tickers).where(where({ ...filter, search: undefined })),
   ]);
+
+  const byKind = new Map(kinds.map((k) => [k.kind, k.n]));
 
   return NextResponse.json({
     ok: true,
@@ -98,6 +149,14 @@ export async function GET(req: Request) {
     exchanges: exchanges
       .filter((e) => e.exchange)
       .map((e) => ({ code: e.exchange as string, available: e.n })),
+    // Sweepable kinds only, each with what is left to take. `optIn` marks the
+    // paper the console keeps behind a deliberate reveal.
+    kinds: [...CORE_KINDS, ...OPT_IN_KINDS].map((k) => ({
+      code: k,
+      available: byKind.get(k) ?? 0,
+      optIn: OPT_IN_KINDS.includes(k),
+    })),
+    geos: GEOS.map((g) => ({ term: g, available: Number(geo?.[g] ?? 0) })),
   });
 }
 
@@ -156,9 +215,13 @@ export async function POST(req: Request) {
   const base = (tail?.max ?? 99) + 1;
   const now = Date.now();
 
+  // The console always names a section; this is the fallback for API callers
+  // that don't — an ADR sweep lands in global, a preferred sweep in income.
+  const home = HOME_SECTION[filter.kind ?? ""] ?? "stocks";
+
   const values = picked.map((symbol, i) => ({
     symbol,
-    category: category ?? (symbol.includes("/") ? "crypto" : filter.kind === "ETF" ? "etf" : "stocks"),
+    category: category ?? (symbol.includes("/") ? "crypto" : home),
     rank: base + i,
     featured: 0,
     enabled: 1,

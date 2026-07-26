@@ -16,11 +16,42 @@ import { useRouter } from "next/navigation";
 export type BoardRow = {
   symbol: string; category: string; rank: number; featured: number;
   enabled: number; note: string | null; addedAt: number; bars: number;
+  /** Directory facts, joined server-side: what this listing actually IS. */
+  kind: string | null; name: string | null;
 };
 
-type Category = "stocks" | "etf" | "crypto";
-const CATEGORIES: Category[] = ["stocks", "etf", "crypto"];
-const ORDER: Record<string, number> = { stocks: 0, etf: 1, crypto: 2 };
+/*
+  Board sections. The house board is a world board: US operating companies and
+  funds, then the rest of the planet (ADRs and country/region funds), then the
+  things people hold for yield, then currency, then crypto. The order here is
+  the order the product reads them in.
+*/
+type Section = "stocks" | "etf" | "global" | "income" | "fx" | "crypto";
+const SECTIONS: Section[] = ["stocks", "etf", "global", "income", "fx", "crypto"];
+const ORDER: Record<string, number> = {
+  stocks: 0, etf: 1, global: 2, income: 3, fx: 4, crypto: 5,
+};
+
+/*
+  Instrument types, in plain English. The directory speaks in codes (ADRC,
+  PFD, CS); an operator should never have to. `short` is the board badge,
+  `label` is the picker line.
+*/
+const KIND: Record<string, { label: string; short: string }> = {
+  CS: { label: "common stock", short: "stock" },
+  ETF: { label: "exchange-traded fund", short: "etf" },
+  ADRC: { label: "foreign company (ADR)", short: "adr" },
+  PFD: { label: "preferred share", short: "preferred" },
+  FUND: { label: "closed-end fund", short: "cef" },
+  CRYPTO: { label: "crypto pair", short: "crypto" },
+  WARRANT: { label: "warrant", short: "warrant" },
+  RIGHT: { label: "subscription right", short: "right" },
+  UNIT: { label: "unit", short: "unit" },
+  ETS: { label: "single-stock ETF", short: "etf" },
+  SP: { label: "structured product", short: "structured" },
+};
+const kindLabel = (k: string) => KIND[k]?.label ?? k.toLowerCase();
+const kindShort = (k: string | null) => (k ? KIND[k]?.short ?? k.toLowerCase() : "—");
 
 // Dense on desktop, thumb-sized on phones — the console is used on both.
 const TAP = "min-h-[44px] sm:min-h-0";
@@ -57,7 +88,7 @@ export default function MarketsBoard({ rows: served }: { rows: BoardRow[] }) {
   useEffect(() => { setRows(served); }, [served]);
 
   const [q, setQ] = useState("");
-  const [cat, setCat] = useState<"all" | Category>("all");
+  const [cat, setCat] = useState<"all" | Section>("all");
   const [busy, setBusy] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -111,21 +142,37 @@ export default function MarketsBoard({ rows: served }: { rows: BoardRow[] }) {
     router.refresh();
   }
 
-  const shown = useMemo(() => {
+  // The text filter runs FIRST and the section counts are taken from what
+  // survives it — so a pill, a group header and the rows on screen can never
+  // disagree about how many listings there are.
+  const matches = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return rows
-      .filter((r) => cat === "all" || r.category === cat)
-      .filter((r) => !s || r.symbol.toLowerCase().includes(s) || (r.note ?? "").toLowerCase().includes(s))
-      .sort((a, b) =>
-        (ORDER[a.category] ?? 9) - (ORDER[b.category] ?? 9) ||
-        a.rank - b.rank || a.symbol.localeCompare(b.symbol));
-  }, [rows, q, cat]);
+    if (!s) return rows;
+    return rows.filter((r) =>
+      r.symbol.toLowerCase().includes(s) ||
+      (r.name ?? "").toLowerCase().includes(s) ||
+      (r.note ?? "").toLowerCase().includes(s));
+  }, [rows, q]);
+
+  const shown = useMemo(() => matches
+    .filter((r) => cat === "all" || r.category === cat)
+    .sort((a, b) =>
+      (ORDER[a.category] ?? 9) - (ORDER[b.category] ?? 9) ||
+      a.rank - b.rank || a.symbol.localeCompare(b.symbol)),
+  [matches, cat]);
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: rows.length };
-    for (const r of rows) c[r.category] = (c[r.category] ?? 0) + 1;
+    const c: Record<string, number> = { all: matches.length };
+    for (const r of matches) c[r.category] = (c[r.category] ?? 0) + 1;
     return c;
-  }, [rows]);
+  }, [matches]);
+
+  // Pills for the sections that actually carry listings (plus whatever is
+  // selected, so a filter never vanishes from under the operator).
+  const pills = useMemo(
+    () => SECTIONS.filter((s) => (counts[s] ?? 0) > 0 || cat === s),
+    [counts, cat],
+  );
 
   return (
     <>
@@ -139,7 +186,7 @@ export default function MarketsBoard({ rows: served }: { rows: BoardRow[] }) {
       {/* Board toolbar — filter, search, and the healing pass */}
       <div className="mt-8 flex flex-wrap items-center gap-2">
         <h2 className="mr-1 font-mono text-[11px] uppercase tracking-[0.25em] text-ink-4">Board</h2>
-        {(["all", ...CATEGORIES] as const).map((c) => (
+        {(["all", ...pills] as const).map((c) => (
           <button key={c} type="button" onClick={() => setCat(c)} aria-pressed={cat === c}
             className={`${CHIP} ${cat === c
               ? "border-agent/50 bg-agent/15 text-agent"
@@ -151,17 +198,19 @@ export default function MarketsBoard({ rows: served }: { rows: BoardRow[] }) {
           <input value={q} onChange={(e) => setQ(e.target.value)}
             placeholder="Filter board…" aria-label="Filter the board"
             className={`${FIELD} w-40 placeholder:text-ink-4`} />
+          <Rerank />
           <DeepHistory />
           <BackfillPass />
         </div>
       </div>
 
-      <section className="panel mt-2 overflow-x-auto">
-        <table className="w-full min-w-[860px] text-left text-xs">
+      <section className="panel mt-2 overflow-x-auto overscroll-x-contain">
+        <table className="w-full min-w-[960px] text-left text-xs">
           <thead>
             <tr className="border-b border-hairline font-mono text-[10px] uppercase tracking-[0.15em] text-ink-4">
               <th className="px-4 py-2.5">Symbol</th>
-              <th className="px-4 py-2.5">Category</th>
+              <th className="px-4 py-2.5">Type</th>
+              <th className="px-4 py-2.5">Section</th>
               <th className="px-4 py-2.5">Rank</th>
               <th className="px-4 py-2.5">Featured</th>
               <th className="px-4 py-2.5">State</th>
@@ -171,7 +220,7 @@ export default function MarketsBoard({ rows: served }: { rows: BoardRow[] }) {
           </thead>
           <tbody>
             {shown.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-4">
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-ink-4">
                 {rows.length === 0
                   ? "The board is empty — the product falls back to its built-in defaults."
                   : "No listings match this filter."}
@@ -186,28 +235,42 @@ export default function MarketsBoard({ rows: served }: { rows: BoardRow[] }) {
                 <Fragment key={r.symbol}>
                   {newGroup && (
                     <tr className="border-b border-hairline bg-bg2/60">
-                      <td colSpan={7} className="px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink-4">
+                      <td colSpan={8} className="px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink-4">
                         {r.category}
+                        <span className="tnum ml-2 tracking-normal opacity-60">
+                          {counts[r.category] ?? 0}
+                        </span>
                       </td>
                     </tr>
                   )}
                   <tr className={`border-b border-hairline last:border-0 transition-colors hover:bg-bg3/50 ${
                     isBusy(r.symbol) ? "opacity-60" : ""}`}>
-                    {/* Symbol + note + any inline failure */}
+                    {/* Symbol, what it's called, and any inline failure */}
                     <td className="px-4 py-2">
                       <p className={`font-mono text-xs font-medium ${off ? "text-ink-4" : "text-ink-1"}`}>{r.symbol}</p>
-                      {r.note && <p className="mt-0.5 max-w-[220px] truncate text-[11px] text-ink-4">{r.note}</p>}
+                      {(r.note || r.name) && (
+                        <p className="mt-0.5 max-w-[240px] truncate text-[11px] text-ink-4">{r.note ?? r.name}</p>
+                      )}
                       {err && <p className="mt-0.5 text-[10px] text-loss">{err}</p>}
                     </td>
 
-                    {/* Category */}
+                    {/* Instrument type, straight from the directory */}
+                    <td className="px-4 py-2">
+                      <span title={r.kind ?? "not in the directory"}
+                        className={`font-mono text-[10px] uppercase tracking-[0.14em] ${
+                          r.kind ? "text-ink-3" : "text-ink-4"}`}>
+                        {kindShort(r.kind)}
+                      </span>
+                    </td>
+
+                    {/* Section */}
                     <td className="px-4 py-2">
                       <select value={r.category} disabled={isBusy(r.symbol)}
-                        aria-label={`Category for ${r.symbol}`}
+                        aria-label={`Section for ${r.symbol}`}
                         onChange={(e) => edit(r.symbol, { category: e.target.value })}
                         className={`${FIELD} uppercase tracking-[0.1em]`}>
-                        {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                        {!CATEGORIES.includes(r.category as Category) && <option value={r.category}>{r.category}</option>}
+                        {SECTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                        {!SECTIONS.includes(r.category as Section) && <option value={r.category}>{r.category}</option>}
                       </select>
                     </td>
 
@@ -290,7 +353,7 @@ type Hit = { symbol: string; name: string };
 function AddSymbol({ rows, onAdded }: { rows: BoardRow[]; onAdded: (row: BoardRow) => void }) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
-  const [cat, setCat] = useState<"auto" | Category>("auto");
+  const [cat, setCat] = useState<"auto" | Section>("auto");
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
   const seq = useRef(0);
@@ -312,7 +375,7 @@ function AddSymbol({ rows, onAdded }: { rows: BoardRow[]; onAdded: (row: BoardRo
   const listed = useMemo(() => new Set(rows.map((r) => r.symbol)), [rows]);
 
   async function add(symbol: string) {
-    const category: Category = cat === "auto" ? (symbol.includes("/") ? "crypto" : "stocks") : cat;
+    const category: Section = cat === "auto" ? (symbol.includes("/") ? "crypto" : "stocks") : cat;
     const rank = rows.length ? Math.max(...rows.map((r) => r.rank)) + 1 : 100;
     setPending(symbol);
     setError("");
@@ -326,6 +389,10 @@ function AddSymbol({ rows, onAdded }: { rows: BoardRow[]; onAdded: (row: BoardRo
     onAdded({
       symbol, category, rank, featured: 0, enabled: 1,
       note: null, addedAt: Date.now(), bars: 0,
+      // The type isn't in the search payload; the refresh right behind this
+      // add fills it in from the directory.
+      kind: null,
+      name: hits.find((h) => h.symbol === symbol)?.name ?? null,
     });
     setQ(""); setHits([]);
   }
@@ -334,11 +401,11 @@ function AddSymbol({ rows, onAdded }: { rows: BoardRow[]; onAdded: (row: BoardRo
     <section className="raised mt-6 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="mr-1 font-mono text-[11px] uppercase tracking-[0.25em] text-ink-4">Add listing</h2>
-        <select value={cat} onChange={(e) => setCat(e.target.value as "auto" | Category)}
-          aria-label="Category for the added symbol"
+        <select value={cat} onChange={(e) => setCat(e.target.value as "auto" | Section)}
+          aria-label="Section for the added symbol"
           className={`${FIELD} uppercase tracking-[0.1em]`}>
           <option value="auto">auto</option>
-          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          {SECTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
@@ -378,18 +445,36 @@ function AddSymbol({ rows, onAdded }: { rows: BoardRow[]; onAdded: (row: BoardRo
 
 /* ── Grow the universe ─────────────────────────────────────────────────── */
 
-const KINDS: { value: string; label: string }[] = [
-  { value: "CS", label: "common stock" },
-  { value: "ETF", label: "etf" },
-  { value: "ADRC", label: "adr" },
-  { value: "CRYPTO", label: "crypto pair" },
-];
+/*
+  The instrument types a sweep can take. CORE is the world an investor
+  recognises. OPT_IN is thin, expiry-dated paper — warrants, rights, units —
+  which stays hidden until an operator deliberately reveals it, so no
+  geography sweep can quietly rake it onto the house board.
+*/
+const CORE_KINDS = ["CS", "ETF", "ADRC", "PFD", "FUND", "CRYPTO"];
+const OPT_IN_KINDS = ["WARRANT", "RIGHT", "UNIT"];
+
+/** Where each instrument type belongs when nobody says otherwise. */
+const HOME: Record<string, Section> = {
+  CS: "stocks", ETF: "etf", CRYPTO: "crypto",
+  ADRC: "global", PFD: "income", FUND: "income",
+  WARRANT: "stocks", RIGHT: "stocks", UNIT: "stocks",
+};
+
+/** A geography sweep of ordinary stocks or funds is a WORLD sweep. */
+function homeSection(kind: string, geo: boolean): Section {
+  if (geo && (kind === "CS" || kind === "ETF")) return "global";
+  return HOME[kind] ?? "stocks";
+}
+
 const COUNTS = [50, 100, 250, 500];
 
 type Preview = {
   available: number;
   sample: { symbol: string; name: string }[];
   exchanges: { code: string; available: number }[];
+  kinds: { code: string; available: number; optIn: boolean }[];
+  geos: { term: string; available: number }[];
 };
 
 /*
@@ -401,15 +486,26 @@ type Preview = {
 
   The count is previewed before anything is written, and the freshly added
   symbols land cold, so the fill button sits right there next to the result.
+
+  Geography is read off the NAME, because that is the only place the directory
+  keeps it: "iShares MSCI Japan ETF" is a Japan fund and says so. The chips
+  prefill the same free-text search an operator could type by hand, each
+  carrying the count it would sweep, so nothing is committed blind.
 */
 function GrowUniverse() {
   const router = useRouter();
 
   const [kind, setKind] = useState("CS");
+  const [exotic, setExotic] = useState(false);
   const [exchange, setExchange] = useState("");
   const [count, setCount] = useState(100);
-  const [cat, setCat] = useState<"auto" | Category>("auto");
   const [q, setQ] = useState("");
+
+  // The destination is always a real section, never "auto" — a sweep of 500
+  // must never be able to land somewhere the operator didn't read first. It is
+  // DERIVED from the instrument type and geography until an operator overrides
+  // it by hand, at which point their choice sticks for the rest of the session.
+  const [catOverride, setCatOverride] = useState<Section | null>(null);
 
   const [preview, setPreview] = useState<Preview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -442,10 +538,24 @@ function GrowUniverse() {
         available: Number(res.data.available ?? 0),
         sample: Array.isArray(res.data.sample) ? (res.data.sample as Preview["sample"]) : [],
         exchanges: Array.isArray(res.data.exchanges) ? (res.data.exchanges as Preview["exchanges"]) : [],
+        kinds: Array.isArray(res.data.kinds) ? (res.data.kinds as Preview["kinds"]) : [],
+        geos: Array.isArray(res.data.geos) ? (res.data.geos as Preview["geos"]) : [],
       });
     }, 200);
     return () => clearTimeout(t);
   }, [kind, exchange, q, stamp]);
+
+  const term = q.trim().toLowerCase();
+  const geos = preview?.geos ?? [];
+  const geoActive = geos.some((g) => g.term === term);
+
+  const cat = catOverride ?? homeSection(kind, geoActive);
+
+  // The kind picker: the live directory counts under the current search, with
+  // the exotica folded away unless asked for.
+  const counted = new Map((preview?.kinds ?? []).map((k) => [k.code, k.available]));
+  const kindOptions = [...CORE_KINDS, ...(exotic ? OPT_IN_KINDS : [])]
+    .map((code) => ({ code, available: counted.get(code) ?? 0 }));
 
   const available = preview?.available ?? 0;
   const willAdd = Math.min(count, available);
@@ -461,7 +571,7 @@ function GrowUniverse() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         kind, exchange: exchange || undefined, search: q.trim() || undefined,
-        limit: count, category: cat === "auto" ? undefined : cat,
+        limit: count, category: cat,
       }),
     });
     setAdding(false);
@@ -499,16 +609,34 @@ function GrowUniverse() {
         </p>
       </div>
 
-      {/* Filter row — every control clears 44px on a phone and wraps freely */}
+      {/* Instrument type — plain English, with what is left to take of each */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1.5">
-          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink-4">kind</span>
+          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink-4">instrument</span>
           <select value={kind} onChange={(e) => { setKind(e.target.value); setExchange(""); }}
-            aria-label="Directory kind to list"
-            className={`${FIELD} uppercase tracking-[0.1em]`}>
-            {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+            aria-label="Instrument type to list"
+            className={`${FIELD} max-w-[15rem] tracking-[0.02em]`}>
+            {kindOptions.map((k) => (
+              <option key={k.code} value={k.code}>
+                {kindLabel(k.code)} · {k.available.toLocaleString()}
+              </option>
+            ))}
           </select>
         </label>
+
+        <button type="button" aria-pressed={exotic}
+          onClick={() => {
+            const next = !exotic;
+            setExotic(next);
+            // Folding the exotica away can't leave a warrant sweep armed.
+            if (!next && OPT_IN_KINDS.includes(kind)) setKind("CS");
+          }}
+          title="Warrants, subscription rights and units — thin, expiry-dated paper"
+          className={`${CHIP} ${exotic
+            ? "border-gold/50 bg-gold/10 text-gold"
+            : "border-hairline text-ink-4 hover:text-ink-2"}`}>
+          {exotic ? "exotics shown" : "+ exotics"}
+        </button>
 
         <label className="flex items-center gap-1.5">
           <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink-4">exchange</span>
@@ -536,11 +664,12 @@ function GrowUniverse() {
 
         <label className="flex items-center gap-1.5">
           <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink-4">file under</span>
-          <select value={cat} onChange={(e) => setCat(e.target.value as "auto" | Category)}
-            aria-label="Category to file the new listings under"
-            className={`${FIELD} uppercase tracking-[0.1em]`}>
-            <option value="auto">auto</option>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          <select value={cat}
+            onChange={(e) => setCatOverride(e.target.value as Section)}
+            aria-label="Board section to file the new listings under"
+            className={`${FIELD} uppercase tracking-[0.1em] ${
+              catOverride ? "border-agent/50 text-agent" : ""}`}>
+            {SECTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
 
@@ -548,6 +677,29 @@ function GrowUniverse() {
           placeholder="Narrow by ticker or name…" aria-label="Narrow the sweep"
           autoComplete="off"
           className={`${FIELD} w-44 placeholder:text-ink-4`} />
+      </div>
+
+      {/* Geography — country and region funds, found by the only thing the
+          directory knows about them: their name. */}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span className="mr-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-ink-4">geography</span>
+        {geos.map((g) => {
+          const on = term === g.term;
+          return (
+            <button key={g.term} type="button" aria-pressed={on}
+              disabled={!on && g.available === 0}
+              onClick={() => setQ(on ? "" : g.term)}
+              className={`${CHIP} ${on
+                ? "border-agent/50 bg-agent/15 text-agent"
+                : "border-hairline text-ink-4 hover:text-ink-2"}`}>
+              {g.term}
+              <span className="tnum ml-1.5 opacity-60">{g.available.toLocaleString()}</span>
+            </button>
+          );
+        })}
+        {geos.length === 0 && (
+          <span className="skeleton inline-block h-4 w-48 align-middle" />
+        )}
       </div>
 
       {/* The count, then the commit — never the other way round */}
@@ -562,9 +714,13 @@ function GrowUniverse() {
               <span className={`tnum text-sm font-semibold ${available ? "text-ink-1" : "text-ink-4"}`}>
                 {available.toLocaleString()}
               </span>{" "}
-              available, not yet listed
+              unlisted · {kindLabel(kind)}
+              {term ? <> matching &ldquo;{term}&rdquo;</> : null}
               {available > 0 && (
-                <span className="text-ink-4"> · this adds {willAdd.toLocaleString()}</span>
+                <span className="text-ink-4">
+                  {" "}· this files {willAdd.toLocaleString()} under{" "}
+                  <span className="uppercase tracking-[0.14em] text-agent">{cat}</span>
+                </span>
               )}
             </>
           )}
@@ -575,7 +731,7 @@ function GrowUniverse() {
           className={`${CHIP} ml-auto ${willAdd > 0
             ? "border-agent/50 bg-agent/15 text-agent hover:bg-agent/25"
             : "border-hairline text-ink-4"}`}>
-          {adding ? "listing…" : `list ${willAdd.toLocaleString()}`}
+          {adding ? "listing…" : `list ${willAdd.toLocaleString()} → ${cat}`}
         </button>
       </div>
 
@@ -614,9 +770,66 @@ function GrowUniverse() {
       )}
 
       <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.15em] text-ink-4">
-        shortest tickers first · max 500 per sweep · new listings rank after the board tail
+        shortest tickers first · max 500 per sweep · new listings rank after the board tail ·
+        rerank by liquidity once the history is in
       </p>
     </section>
+  );
+}
+
+/* ── Rerank ────────────────────────────────────────────────────────────── */
+
+/*
+  Order the board by what people actually trade.
+
+  A bulk sweep can only order by what the directory knows, so a fresh slice
+  lands alphabetically — the board leads with A and B. Once history is stored
+  we know something far better: 90-day average dollar volume. This pass
+  rewrites every rank from that, within each section.
+
+  It overwrites EVERY rank, including hand-set ones, so it asks first — the
+  same two-step the remove button uses.
+*/
+function Rerank() {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "confirm" | "running" | "done" | "error">("idle");
+  const [note, setNote] = useState("");
+
+  async function run() {
+    setState("running");
+    setNote("");
+    const res = await send("/api/admin/markets/rerank", { method: "POST" });
+    if (!res.ok) { setState("error"); setNote(res.error ?? "Rerank failed."); return; }
+    const n = Number(res.data.reranked ?? 0);
+    const top = Array.isArray(res.data.top) ? (res.data.top as string[]) : [];
+    setState("done");
+    setNote(`${n.toLocaleString()} reranked${top.length ? ` · now leads ${top.slice(0, 5).join(" · ")}` : ""}`);
+    router.refresh();
+  }
+
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {note && (
+        <span className={`font-mono text-[10px] ${state === "error" ? "text-loss" : "text-ink-4"}`}>{note}</span>
+      )}
+      {state === "confirm" ? (
+        <>
+          <span className="font-mono text-[10px] text-gold">rewrites every rank</span>
+          <button type="button" onClick={run}
+            className={`${CHIP} border-agent/50 bg-agent/15 text-agent hover:bg-agent/25`}>
+            rerank
+          </button>
+          <button type="button" onClick={() => setState("idle")}
+            className={`${CHIP} border-hairline text-ink-4 hover:text-ink-2`}>keep</button>
+        </>
+      ) : (
+        <button type="button" disabled={state === "running"}
+          onClick={() => { setNote(""); setState("confirm"); }}
+          className={`${CHIP} border-hairline text-ink-2 hover:text-ink-1`}>
+          {state === "running" ? "reranking…" : "rerank by liquidity"}
+        </button>
+      )}
+    </span>
   );
 }
 

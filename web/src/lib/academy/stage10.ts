@@ -121,7 +121,7 @@ export const fundStage: Track = {
         { kind: "game", variant: "size-it", title: "Prove the process is muscle memory" },
         { kind: "keyIdea", title: "Survive, compound, repeat",
           text: "The whole academy reduces to three moves: don't blow up (risk small), keep a positive edge (expectancy), and let time compound it (patience). It's not glamorous and it's not a secret. It's just what actually works — and now you know how to do it. Go run your book like you mean it." },
-        { kind: "desk", instruction: "You've finished the academy. Now the real work: make a trade with a written thesis, size it from a stop, journal the result, and review it honestly. Repeat. That loop is the whole job.", symbol: "AAPL" },
+        { kind: "desk", instruction: "That's the operating system, end to end. Now the real work: make a trade with a written thesis, size it from a stop, journal the result, and review it honestly. Repeat. That loop is the whole job — everything after this stage just widens what you can point it at.", symbol: "AAPL" },
         { kind: "flashcards", title: "The system",
           cards: [
             { front: "Process", back: "A repeatable routine that removes emotion from decisions." },

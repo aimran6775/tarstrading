@@ -14,8 +14,59 @@ export const usd = (v: number, digits = 2) =>
   v.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: digits });
 export const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 
+/* ---- currency pairs -------------------------------------------------------
+   Spot FX carries an explicit `FX:` prefix in the exchange (FX:EURUSD) because
+   BTC/USD already means "crypto" everywhere here, and an ambiguous ticker in a
+   trading engine is a bug waiting to happen. The prefix is plumbing: a user
+   must never see it. These are the client's own copies of the server's rules
+   (src/server/fx.ts is server-only) — display and formatting, nothing else. */
+
+export const FX_PREFIX = "FX:";
+export const isFxSymbol = (s: string) => s.toUpperCase().startsWith(FX_PREFIX);
+
+/** FX:EURUSD → EUR/USD. Anything else comes back untouched. */
+export function fxDisplay(symbol: string): string {
+  const p = symbol.toUpperCase().slice(FX_PREFIX.length);
+  return p.length === 6 ? `${p.slice(0, 3)}/${p.slice(3)}` : p;
+}
+
+/** What a user reads. The route still travels on the real symbol. */
+export const displaySymbol = (symbol: string) =>
+  isFxSymbol(symbol) ? fxDisplay(symbol) : symbol;
+
+/* Quote currencies that trade in the hundreds rather than around 1 — a yen
+   cross prints 157.2354 where a major prints 1.16352. The scale belongs to the
+   pair, not to the number in hand, so a price and its change always agree. */
+const WIDE_QUOTE = /(JPY|HUF|KRW)$/;
+
+/**
+ * Decimals a price deserves. Equities and crypto settle in cents; spot FX moves
+ * in pips (0.0001), so two decimals would round a currency pair's whole trading
+ * day away.
+ */
+export function priceDigits(symbol: string): number {
+  if (!isFxSymbol(symbol)) return 2;
+  return WIDE_QUOTE.test(symbol.toUpperCase()) ? 4 : 5;
+}
+
+/** A price in its own units: dollars for securities, bare pips for a pair. */
+export function formatPrice(symbol: string, value: number): string {
+  const d = priceDigits(symbol);
+  if (!isFxSymbol(symbol)) return usd(value, d);
+  // A currency pair is a ratio, not an amount of dollars — no currency mark.
+  return value.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+/** A signed move in the instrument's own units. */
+export function formatSignedPrice(symbol: string, value: number): string {
+  return `${value >= 0 ? "+" : "−"}${formatPrice(symbol, Math.abs(value))}`;
+}
+
 /** The pills the browse page groups markets under. */
-export type MarketCategory = "Crypto" | "ETFs" | "Stocks";
+/* The board's sections. Global = foreign companies (ADRs) and country/region
+   funds — real US-listed securities that carry world-market exposure without a
+   foreign data feed. FX = spot currency pairs (FX: prefixed). */
+export type MarketCategory = "Crypto" | "ETFs" | "Stocks" | "Global" | "FX" | "Income";
 
 /** One row of the curated house board, as served to the client by the server. */
 export type BoardEntry = { symbol: string; category: MarketCategory; featured: boolean };
@@ -25,6 +76,7 @@ const ETFS = new Set(["SPY", "QQQ", "DIA", "IWM", "VTI", "VOO", "GLD"]);
 /** Shape-based fallback classification — used for off-board symbols (watchlist
     additions) and when the curated board is unavailable. */
 export function categoryOf(symbol: string): MarketCategory {
+  if (isFxSymbol(symbol)) return "FX";
   if (symbol.includes("/")) return "Crypto";
   if (ETFS.has(symbol)) return "ETFs";
   return "Stocks";

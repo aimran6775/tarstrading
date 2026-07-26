@@ -18,18 +18,31 @@ export default async function MarketsPage() {
   const board = await db.select().from(schema.platformSymbols)
     .orderBy(schema.platformSymbols.rank, schema.platformSymbols.symbol);
 
-  // Coverage: how many stored bars back each listing (warm vs cold).
+  // Coverage: how many stored bars back each listing (warm vs cold), and what
+  // instrument each listing actually IS — the directory's kind, so an operator
+  // can see a preferred or an ADR sitting in the wrong section at a glance.
   const symbols = board.map((b) => b.symbol);
   const coverage = new Map<string, number>();
+  const kinds = new Map<string, string>();
+  const names = new Map<string, string>();
   if (symbols.length) {
-    const counts = await db.select({
-      symbol: schema.bars.symbol, n: sql<number>`count(*)::int`,
-    }).from(schema.bars).where(inArray(schema.bars.symbol, symbols))
-      .groupBy(schema.bars.symbol);
+    const [counts, directory] = await Promise.all([
+      db.select({ symbol: schema.bars.symbol, n: sql<number>`count(*)::int` })
+        .from(schema.bars).where(inArray(schema.bars.symbol, symbols))
+        .groupBy(schema.bars.symbol),
+      db.select({ symbol: schema.tickers.symbol, kind: schema.tickers.kind, name: schema.tickers.name })
+        .from(schema.tickers).where(inArray(schema.tickers.symbol, symbols)),
+    ]);
     for (const c of counts) coverage.set(c.symbol, c.n);
+    for (const d of directory) { kinds.set(d.symbol, d.kind); names.set(d.symbol, d.name); }
   }
 
-  const rows: BoardRow[] = board.map((b) => ({ ...b, bars: coverage.get(b.symbol) ?? 0 }));
+  const rows: BoardRow[] = board.map((b) => ({
+    ...b,
+    bars: coverage.get(b.symbol) ?? 0,
+    kind: kinds.get(b.symbol) ?? null,
+    name: names.get(b.symbol) ?? null,
+  }));
   const enabled = rows.filter((r) => r.enabled === 1);
   const featured = rows.filter((r) => r.featured === 1);
   const cold = rows.filter((r) => r.bars === 0);

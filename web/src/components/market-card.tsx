@@ -2,13 +2,19 @@
 
 import { useId } from "react";
 import Link from "next/link";
-import { usd, pct, categoryOf, type Quote, type MarketCategory } from "./trading/shared";
+import { pct, displaySymbol, formatPrice, type Quote, type MarketCategory } from "./trading/shared";
+import { instrumentOf } from "./markets/instrument";
 
 /*
   A market card — the unit of the browse page. Sparkline from the bar vault,
-  big tabular price, delta in P&L color, category eyebrow. The whole card is
-  the link; inline Buy/Sell act without leaving the grid's flow. The card is
-  a .raised material that .lifts on hover and reveals its "Trade" affordance.
+  big tabular price, delta in P&L color, and an eyebrow that names what the
+  thing IS (ADR, country fund, preferred, FX pair) rather than only where it
+  sits. The whole card is the link; the card is a .raised material that .lifts
+  on hover and reveals its "Trade" affordance.
+
+  A currency pair reads as EUR/USD and prices to the pip without a dollar
+  sign — the exchange's real ticker (FX:EURUSD) never reaches the reader,
+  though it's what the link travels on.
 */
 
 export function Spark({ points, className = "h-10 w-full", fill = false }: {
@@ -59,13 +65,17 @@ export default function MarketCard({ symbol, name, kind, quote, spark }: {
   spark?: number[];
 }) {
   const chg = quote?.changePercent ?? 0;
+  const instrument = instrumentOf(symbol, kind, name);
   return (
     <Link href={`/app/m/${encodeURIComponent(symbol)}`}
       className="raised lift group flex flex-col gap-3 p-4 active:scale-[0.98] active:brightness-95">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-ink-4">{kind ?? categoryOf(symbol)}</p>
-          <p className="mt-0.5 truncate text-sm font-semibold tracking-tight text-ink-1">{symbol}</p>
+          <p title={instrument.title}
+            className="truncate font-mono text-[10px] uppercase tracking-[0.24em] text-ink-4">
+            {instrument.label}
+          </p>
+          <p className="mt-0.5 truncate text-sm font-semibold tracking-tight text-ink-1">{displaySymbol(symbol)}</p>
           {name && <p className="truncate text-[11px] text-ink-4">{name}</p>}
         </div>
         {quote ? (
@@ -81,7 +91,7 @@ export default function MarketCard({ symbol, name, kind, quote, spark }: {
 
       <div className="flex items-baseline justify-between">
         {quote
-          ? <span className="tnum text-lg font-semibold tracking-tight text-ink-1">{usd(quote.price)}</span>
+          ? <span className="tnum text-lg font-semibold tracking-tight text-ink-1">{formatPrice(symbol, quote.price)}</span>
           : <span className="skeleton h-6 w-20" />}
         <span className="flex items-center gap-1 text-[11px] font-medium text-gold opacity-0 transition-all duration-200 [transition-timing-function:var(--ease-spring)] group-hover:translate-x-0 group-hover:opacity-100 -translate-x-1 [@media(hover:none)]:translate-x-0 [@media(hover:none)]:opacity-70">
           Trade

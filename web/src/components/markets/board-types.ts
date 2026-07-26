@@ -1,4 +1,4 @@
-import { usd, type MarketCategory } from "@/components/trading/shared";
+import { formatPrice, formatSignedPrice, type MarketCategory } from "@/components/trading/shared";
 
 /*
   The Markets board — shapes and formatters shared by the pulse strip, the
@@ -55,16 +55,24 @@ export type BoardPayload = {
 
 export const DASH = "—";
 
+/*
+  Prices carry their symbol so the instrument decides its own units: a security
+  prints in dollars to the cent, a currency pair prints to the pip with no
+  dollar sign at all (EUR/USD is a ratio, not an amount). Passing no symbol
+  keeps the old dollar behaviour, which is what every equity row wants.
+*/
+
 /** A price, or an em dash. Never a zero standing in for "unknown". */
-export const money = (v: number | null | undefined) => (v == null ? DASH : usd(v));
+export const money = (v: number | null | undefined, symbol = "") =>
+  v == null ? DASH : formatPrice(symbol, v);
 
 /** A signed percentage from a fraction. */
 export const pctOf = (v: number | null | undefined) =>
   v == null ? DASH : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
 
-/** A signed absolute change, in dollars. */
-export const signedMoney = (v: number | null | undefined) =>
-  v == null ? DASH : `${v >= 0 ? "+" : "−"}${usd(Math.abs(v))}`;
+/** A signed absolute change, in the instrument's own units. */
+export const signedMoney = (v: number | null | undefined, symbol = "") =>
+  v == null ? DASH : formatSignedPrice(symbol, v);
 
 /** Share counts read better compacted; a terminal never prints 12 digits. */
 export function compact(v: number | null | undefined): string {

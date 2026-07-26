@@ -49,6 +49,9 @@ function toCategory(section: string, symbol: string): MarketCategory {
     case "crypto": return "Crypto";
     case "etf": case "etfs": return "ETFs";
     case "stocks": case "stock": return "Stocks";
+    case "global": return "Global";
+    case "fx": case "forex": return "FX";
+    case "income": return "Income";
     default: return categoryOf(symbol); // unknown section → infer, never drop
   }
 }

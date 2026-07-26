@@ -9,11 +9,13 @@ import { DASH, money } from "./board-types";
   `position` is 0..1. Null means the range isn't real (missing high/low, or a
   flat range) and the cell falls back to an em dash rather than a fake needle.
 */
-export function RangeMeter({ position, low, high, label, className = "w-24" }: {
+export function RangeMeter({ position, low, high, label, symbol = "", className = "w-24" }: {
   position: number | null;
   low: number | null;
   high: number | null;
   label: string;
+  /** Whose range this is — so the endpoints print in the instrument's units. */
+  symbol?: string;
   className?: string;
 }) {
   if (position == null) {
@@ -24,8 +26,8 @@ export function RangeMeter({ position, low, high, label, className = "w-24" }: {
     <span
       className={`relative block h-1.5 rounded-full bg-bg3 ring-1 ring-inset ring-[var(--hairline)] ${className}`}
       role="img"
-      title={`${label}: ${money(low)} – ${money(high)} · ${Math.round(p)}% of range`}
-      aria-label={`${label} ${money(low)} to ${money(high)}, ${Math.round(p)} percent of range`}
+      title={`${label}: ${money(low, symbol)} – ${money(high, symbol)} · ${Math.round(p)}% of range`}
+      aria-label={`${label} ${money(low, symbol)} to ${money(high, symbol)}, ${Math.round(p)} percent of range`}
     >
       <span aria-hidden
         className="absolute inset-y-0 left-0 rounded-full bg-[color-mix(in_oklab,var(--ink-2),transparent_62%)]"

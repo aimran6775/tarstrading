@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { Icon } from "@/components/icons";
+import { instrumentOf } from "./instrument";
+import { displaySymbol, isFxSymbol } from "@/components/trading/shared";
 import { compact, marketPath, money, pctOf, toneOf, type BoardRow, type Movers } from "./board-types";
 
 /*
@@ -38,23 +40,31 @@ function Rail({ title, icon, rows, loading, emptyNote }: {
         <p className="px-3 py-6 text-center text-[11px] text-ink-4">{emptyNote}</p>
       ) : (
         <ul className="divide-y divide-[var(--hairline)]">
-          {rows.map((r) => (
-            <li key={r.symbol}>
-              <Link href={marketPath(r.symbol)}
-                className="flex min-h-11 items-center justify-between gap-3 px-3 py-1.5 transition-colors hover:bg-bg2">
-                <span className="min-w-0">
-                  <span className="block truncate text-xs font-semibold tracking-tight text-ink-1">{r.symbol}</span>
-                  <span className="tnum block text-[10px] text-ink-4">{compact(r.volume)} vol</span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="tnum block text-xs text-ink-2">{money(r.price)}</span>
-                  <span className={`tnum block text-[11px] font-semibold ${toneOf(r.changePercent)}`}>
-                    {pctOf(r.changePercent)}
+          {rows.map((r) => {
+            const kind = instrumentOf(r.symbol, r.category);
+            return (
+              <li key={r.symbol}>
+                <Link href={marketPath(r.symbol)} title={kind.title}
+                  className="flex min-h-11 items-center justify-between gap-3 px-3 py-1.5 transition-colors hover:bg-bg2">
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-semibold tracking-tight text-ink-1">
+                      {displaySymbol(r.symbol)}
+                    </span>
+                    {/* Spot FX reports no share volume — the feed's count is ticks. */}
+                    <span className="tnum block text-[10px] text-ink-4">
+                      {compact(r.volume)} {isFxSymbol(r.symbol) ? "ticks" : "vol"}
+                    </span>
                   </span>
-                </span>
-              </Link>
-            </li>
-          ))}
+                  <span className="shrink-0 text-right">
+                    <span className="tnum block text-xs text-ink-2">{money(r.price, r.symbol)}</span>
+                    <span className={`tnum block text-[11px] font-semibold ${toneOf(r.changePercent)}`}>
+                      {pctOf(r.changePercent)}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

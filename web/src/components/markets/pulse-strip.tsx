@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { displaySymbol } from "@/components/trading/shared";
 import { DASH, marketPath, money, pctOf, toneOf, type Breadth, type BoardRow } from "./board-types";
 
 /*
@@ -28,7 +29,7 @@ function ProxyTile({ symbol, name, row, loading }: {
       className="group flex min-h-11 flex-col justify-center gap-0.5 rounded-[var(--r-s)] px-3 py-2 transition-colors hover:bg-bg2">
       <div className="flex items-baseline gap-1.5">
         <span className="text-[11px] font-semibold tracking-tight text-ink-1 transition-colors group-hover:text-gold">
-          {symbol}
+          {displaySymbol(symbol)}
         </span>
         <span className="truncate text-[10px] text-ink-4">{name}</span>
       </div>
@@ -36,7 +37,7 @@ function ProxyTile({ symbol, name, row, loading }: {
         <span className="skeleton mt-1 h-4 w-20" />
       ) : (
         <div className="flex items-baseline gap-2">
-          <span className="tnum text-sm font-semibold text-ink-1">{money(row?.price)}</span>
+          <span className="tnum text-sm font-semibold text-ink-1">{money(row?.price, symbol)}</span>
           <span className={`tnum text-[11px] font-semibold ${toneOf(chg)}`}>{pctOf(chg)}</span>
         </div>
       )}

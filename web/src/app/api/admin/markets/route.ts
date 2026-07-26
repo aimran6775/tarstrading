@@ -15,7 +15,10 @@ import { db, schema } from "@/server/db";
 
 export const dynamic = "force-dynamic";
 
-const CATEGORIES = new Set(["stocks", "crypto", "etf"]);
+/* Board sections. "global" carries ADRs and country/region funds; "income"
+   carries preferreds, closed-end funds and bond vehicles; "fx" is spot
+   currency. The product maps these to its category pills. */
+const CATEGORIES = new Set(["stocks", "crypto", "etf", "global", "fx", "income"]);
 
 /** GET — the board, enriched with data coverage so operators see what's warm. */
 export async function GET() {

@@ -10,6 +10,7 @@ import { optionsStage } from "./stage7";
 import { futuresStage } from "./stage8";
 import { aiStage } from "./stage9";
 import { fundStage } from "./stage10";
+import { worldStage } from "./stage11";
 
 /*
   The stages of the academy, in order — every one fully interactive: charts you
@@ -27,6 +28,7 @@ export const tracks: Track[] = [
   futuresStage,     // Stage 9
   aiStage,          // Stage 10
   fundStage,        // Stage 11
+  worldStage,       // Stage 12 — the wider universe of instruments
 ];
 
 /** Map a concept → the lesson that teaches it, for contextual "Learn" links
@@ -45,6 +47,11 @@ export const CONCEPT_LESSON: Record<string, { id: string; label: string }> = {
   tilt: { id: "mind2-tilt", label: "Tilt & revenge trading" },
   indicators: { id: "p5-momentum", label: "Indicators & RSI" },
   heat: { id: "r4-portfolio-heat", label: "Portfolio heat" },
+  adr: { id: "w1-adrs", label: "ADRs & foreign shares" },
+  global: { id: "w2-country-funds", label: "Country & region funds" },
+  preferred: { id: "w3-preferred", label: "Preferred shares" },
+  cef: { id: "w4-closed-end-funds", label: "Closed-end funds" },
+  fx: { id: "w5-fx-pairs", label: "How currency pairs work" },
 };
 
 export const allLessons: Lesson[] = tracks.flatMap((t) => t.lessons);

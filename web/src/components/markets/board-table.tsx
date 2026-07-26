@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RangeMeter } from "./range-meter";
+import { instrumentOf } from "./instrument";
+import { displaySymbol } from "@/components/trading/shared";
 import {
   DASH, compact, marketPath, money, pctOf, positionIn, signedMoney, toneOf, type BoardRow,
 } from "./board-types";
@@ -11,6 +13,12 @@ import {
 /*
   The board table — the centerpiece. Every curated market, one dense row each:
   last, change, volume, both ranges as instruments, and trailing returns.
+
+  A world board holds instruments that look alike and behave nothing alike, so
+  each symbol carries its nature underneath it — ADR, country fund, preferred,
+  FX pair — and prints in its own units: dollars for a security, pips and no
+  currency mark for a currency pair. FX rides on its real ticker (FX:EURUSD)
+  in every link; only the reader sees EUR/USD.
 
   Sorting is client-side over the polled snapshot; nulls always sink to the
   bottom whichever direction is active, because "unknown" is not "smallest".
@@ -47,7 +55,8 @@ const COLUMNS: Column[] = [
 
 function sortValue(r: BoardRow, key: SortKey): number | string | null {
   switch (key) {
-    case "symbol": return r.symbol;
+    // Sort by what's on screen: EUR/USD files under E, not under its FX: prefix.
+    case "symbol": return displaySymbol(r.symbol);
     case "dayRange": return positionIn(r.dayLow, r.dayHigh, r.price);
     case "rangePosition": return r.rangePosition;
     default: return r[key];
@@ -66,10 +75,12 @@ function SortMark({ active, dir }: { active: boolean; dir: Dir }) {
   );
 }
 
-export default function BoardTable({ rows, loading, emptyNote, onRemove }: {
+export default function BoardTable({ rows, loading, emptyNote, names, onRemove }: {
   rows: BoardRow[];
   loading: boolean;
   emptyNote: string;
+  /** Registered names, where the page knows them — they sharpen the type label. */
+  names?: Map<string, string>;
   /** Present only in the watchlist view — renders a trailing remove control. */
   onRemove?: (symbol: string) => void;
 }) {
@@ -154,6 +165,8 @@ export default function BoardTable({ rows, loading, emptyNote, onRemove }: {
 
             {sorted.map((r) => {
               const dayPos = positionIn(r.dayLow, r.dayHigh, r.price);
+              const shown = displaySymbol(r.symbol);
+              const kind = instrumentOf(r.symbol, r.category, names?.get(r.symbol));
               return (
                 <tr key={r.symbol}
                   onClick={() => router.push(marketPath(r.symbol))}
@@ -162,27 +175,30 @@ export default function BoardTable({ rows, loading, emptyNote, onRemove }: {
                     <Link href={marketPath(r.symbol)} onClick={(e) => e.stopPropagation()}
                       className="flex h-11 flex-col justify-center md:h-10">
                       <span className="truncate text-[13px] font-semibold tracking-tight text-ink-1 group-hover:text-gold">
-                        {r.symbol}
+                        {shown}
                       </span>
-                      <span className="truncate font-mono text-[9px] uppercase tracking-[0.16em] text-ink-4">
-                        {r.category ?? ""}
+                      <span title={kind.title}
+                        className="truncate font-mono text-[9px] uppercase tracking-[0.16em] text-ink-4">
+                        {kind.label}
                       </span>
                     </Link>
                   </td>
-                  <td className="tnum px-2.5 text-right text-[13px] text-ink-1">{money(r.price)}</td>
-                  <td className={`tnum px-2.5 text-right text-[12px] ${toneOf(r.change)}`}>{signedMoney(r.change)}</td>
+                  <td className="tnum px-2.5 text-right text-[13px] text-ink-1">{money(r.price, r.symbol)}</td>
+                  <td className={`tnum px-2.5 text-right text-[12px] ${toneOf(r.change)}`}>{signedMoney(r.change, r.symbol)}</td>
                   <td className={`tnum px-2.5 text-right text-[12px] font-semibold ${toneOf(r.changePercent)}`}>
                     {pctOf(r.changePercent)}
                   </td>
                   <td className="tnum px-2.5 text-right text-[12px] text-ink-2">{compact(r.volume)}</td>
                   <td className="px-2.5">
                     <span className="flex justify-end">
-                      <RangeMeter position={dayPos} low={r.dayLow} high={r.dayHigh} label="Day range" className="w-[104px]" />
+                      <RangeMeter position={dayPos} low={r.dayLow} high={r.dayHigh} symbol={r.symbol}
+                        label="Day range" className="w-[104px]" />
                     </span>
                   </td>
                   <td className="px-2.5">
                     <span className="flex justify-end">
-                      <RangeMeter position={r.rangePosition} low={r.low52} high={r.high52} label="52-week range" className="w-[104px]" />
+                      <RangeMeter position={r.rangePosition} low={r.low52} high={r.high52} symbol={r.symbol}
+                        label="52-week range" className="w-[104px]" />
                     </span>
                   </td>
                   <td className={`tnum px-2.5 text-right text-[12px] ${toneOf(r.return1M)}`}>
@@ -195,7 +211,7 @@ export default function BoardTable({ rows, loading, emptyNote, onRemove }: {
                     <td className="px-1 text-right">
                       <button type="button"
                         onClick={(e) => { e.stopPropagation(); onRemove(r.symbol); }}
-                        aria-label={`Remove ${r.symbol} from watchlist`}
+                        aria-label={`Remove ${shown} from watchlist`}
                         className="pressable inline-flex h-11 w-11 items-center justify-center rounded-full text-ink-4 hover:text-loss md:h-9 md:w-9">
                         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor"
                           strokeWidth="2" strokeLinecap="round" aria-hidden>

@@ -13,8 +13,12 @@ import PulseStrip from "@/components/markets/pulse-strip";
 import MoversRails from "@/components/markets/movers-rails";
 import BoardTable from "@/components/markets/board-table";
 import { moversFromRows, type BoardPayload, type BoardRow, type Movers } from "@/components/markets/board-types";
+import { fxPairName, instrumentOf } from "@/components/markets/instrument";
 import { SYMBOLS } from "@/lib/symbols";
-import { usd, pct, categoryOf, type Quote, type Account, type BoardEntry, type MarketCategory } from "@/components/trading/shared";
+import {
+  usd, pct, categoryOf, displaySymbol, formatPrice,
+  type Quote, type Account, type BoardEntry, type MarketCategory,
+} from "@/components/trading/shared";
 
 /*
   Markets — the desk's front page.
@@ -25,19 +29,46 @@ import { usd, pct, categoryOf, type Quote, type Account, type BoardEntry, type M
   A Table | Grid switch keeps the card view (and its sparklines) one click
   away; the choice is remembered.
 
-  One poll drives all of it: GET /api/market/board every 20s carries prices,
-  ranges, volume, returns, movers and breadth for the whole universe. A second,
-  much smaller poll covers watchlist symbols that aren't on the house board.
+  One poll drives most of it: GET /api/market/board every 20s carries prices,
+  ranges, volume, returns, movers and breadth for the head of the universe.
+  Opening a section (Stocks, ETFs, Crypto, Global, FX, Income) polls that same
+  endpoint scoped to the section, because the world sections run hundreds deep
+  and would otherwise show only what fits in the headline page. A third, much
+  smaller poll covers watchlist symbols that aren't on the house board.
 
   The board arrives as a prop from the server (src/server/board.ts) — the
   control center's curated universe. Off-board symbols still fall back to
   shape-based classification.
 */
 
-type Category = "Trending" | "Stocks" | "Crypto" | "ETFs" | "Watchlist";
-const CATEGORIES: Category[] = ["Trending", "Stocks", "Crypto", "ETFs", "Watchlist"];
+/* The rooms of the board. Trending is everything; Watchlist is yours; the rest
+   are the platform's sections, including the world ones — Global (foreign
+   companies listed here, and country funds), FX (spot currency pairs) and
+   Income (preferreds, closed-end funds, bond vehicles). */
+type Category = "Trending" | MarketCategory | "Watchlist";
+const CATEGORIES: Category[] = [
+  "Trending", "Stocks", "ETFs", "Crypto", "Global", "FX", "Income", "Watchlist",
+];
+
+/** A section is a slice of the board the server can page for us. */
+type Section = MarketCategory;
+const isSection = (c: Category): c is Section => c !== "Trending" && c !== "Watchlist";
+
+/** What an empty room should say — never the same sentence twice. */
+const EMPTY_NOTE: Record<Category, string> = {
+  Trending: "No markets on the board yet.",
+  Stocks: "No stocks on the board yet.",
+  ETFs: "No funds on the board yet.",
+  Crypto: "No crypto pairs on the board yet.",
+  Global: "No world markets on the board yet — ADRs and country funds land here.",
+  FX: "No currency pairs on the board yet.",
+  Income: "No income instruments on the board yet — preferreds and bond funds land here.",
+  Watchlist: "Nothing on your watchlist yet. Add a ticker above and it follows you everywhere.",
+};
 
 const NAME = new Map(SYMBOLS.map((e) => [e.symbol, e.name]));
+/** The name a row deserves: the dictionary's, or a pair spelled out. */
+const nameOf = (symbol: string) => NAME.get(symbol) ?? fxPairName(symbol);
 const POLL_MS = 20_000;
 
 /* ---- the remembered view --------------------------------------------------
@@ -80,6 +111,7 @@ export default function Browse({ userName, welcome, board }: {
   const [account, setAccount] = useState<Account | null>(null);
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [rows, setRows] = useState<BoardRow[]>([]);
+  const [sections, setSections] = useState<Partial<Record<Section, BoardRow[]>>>({});
   const [movers, setMovers] = useState<Movers | null>(null);
   const [asOf, setAsOf] = useState<number | null>(null);
   const [extraQuotes, setExtraQuotes] = useState<Map<string, Quote>>(new Map());
@@ -132,6 +164,27 @@ export default function Browse({ userName, welcome, board }: {
     } catch { setStale(true); }
   }, []);
 
+  /*
+    One section, paged by the server.
+
+    The headline poll takes the board's first 250 by rank, which is the right
+    shape for Trending, the pulse and the movers — but the world sections are
+    hundreds of symbols deep and would show only the sliver of themselves that
+    reached that cut. So opening a section asks the API for that section, and
+    the room fills with its own markets.
+  */
+  const loadSection = useCallback(async (section: Section) => {
+    try {
+      const res = await fetch(
+        `/api/market/board?category=${encodeURIComponent(section.toLowerCase())}&limit=250`);
+      if (!res.ok) { setStale(true); return; }
+      const data = await res.json() as BoardPayload;
+      if (!data.ok || !Array.isArray(data.rows)) { setStale(true); return; }
+      setSections((prev) => ({ ...prev, [section]: data.rows }));
+      setStale(false);
+    } catch { setStale(true); }
+  }, []);
+
   /** Watchlist symbols the house board doesn't carry — a much smaller ask. */
   const loadOffBoardQuotes = useCallback(async () => {
     const missing = watchRef.current.filter((s) => !houseSet.has(s)).slice(0, 24);
@@ -176,6 +229,18 @@ export default function Browse({ userName, welcome, board }: {
     };
   }, [loadAccount, loadBoard, loadOffBoardQuotes, loadSparks]);
 
+  // The open section keeps its own beat, on the same 20s cadence.
+  const openSection = isSection(category) ? category : null;
+  useEffect(() => {
+    if (!openSection) return;
+    loadSection(openSection);
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      loadSection(openSection);
+    }, POLL_MS);
+    return () => clearInterval(id);
+  }, [openSection, loadSection]);
+
   // ------------------------------------------------------------- watchlist ops
 
   async function addToWatchlist(raw: string) {
@@ -209,11 +274,13 @@ export default function Browse({ userName, welcome, board }: {
 
   const rowMap = useMemo(() => new Map(rows.map((r) => [r.symbol, r] as const)), [rows]);
 
-  /** Quotes for the cards and the hero: board rows first, off-board fills in. */
+  /** Quotes for the cards and the hero: board rows first, then whatever section
+      is open, then off-board watchlist fills in. */
   const quotes = useMemo(() => {
     const m = new Map<string, Quote>(extraQuotes);
     const stamp = asOf ?? 0; // the loader always stamps; 0 only before the first poll
-    for (const r of rows) {
+    const section = openSection ? sections[openSection] ?? [] : [];
+    for (const r of [...rows, ...section]) {
       if (r.price == null || r.changePercent == null) continue;
       m.set(r.symbol, {
         symbol: r.symbol, price: r.price,
@@ -222,7 +289,7 @@ export default function Browse({ userName, welcome, board }: {
       });
     }
     return m;
-  }, [rows, extraQuotes, asOf]);
+  }, [rows, sections, openSection, extraQuotes, asOf]);
 
   /** A board row for any symbol — synthesised from a quote when off-board, so
       the watchlist view has a row shape even for symbols we know least about. */
@@ -242,12 +309,13 @@ export default function Browse({ userName, welcome, board }: {
     };
   }, [rowMap, extraQuotes, categoryFor]);
 
-  /** The rows the active pill is asking for. */
+  /** The rows the active pill is asking for. A section serves its own page
+      when it has arrived; until then the headline board's slice stands in. */
   const displayRows = useMemo(() => {
     if (category === "Watchlist") return watchlist.map(rowFor);
     if (category === "Trending") return rows;
-    return rows.filter((r) => categoryFor(r.symbol) === category);
-  }, [category, rows, watchlist, rowFor, categoryFor]);
+    return sections[category] ?? rows.filter((r) => categoryFor(r.symbol) === category);
+  }, [category, rows, sections, watchlist, rowFor, categoryFor]);
 
   /** The rails follow the pill: the whole market's movers on Trending (the
       server already computed them), the slice's own movers otherwise. */
@@ -278,6 +346,13 @@ export default function Browse({ userName, welcome, board }: {
     .filter((s) => s !== featured);
 
   const loading = rows.length === 0;
+  /** The list is still loading when its own page hasn't landed and the board's
+      slice has nothing to stand in with. */
+  const listLoading = category === "Watchlist"
+    ? false
+    : openSection
+      ? sections[openSection] == null && displayRows.length === 0
+      : loading;
   const stamp = asOf
     ? new Date(asOf).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
     : null;
@@ -308,15 +383,18 @@ export default function Browse({ userName, welcome, board }: {
         </p>
       )}
 
-      {/* Category strip — a segmented scroller; the thumb slides between rooms */}
+      {/* Category strip — a segmented scroller; the thumb slides between rooms.
+          Eight rooms now, so the strip travels sideways on a phone: the pills
+          stay full height (a 44px target) and the track keeps its own scroll,
+          which never becomes the page's. */}
       <div className="sticky top-14 z-40 border-b border-hairline bg-bg0/85 px-4 backdrop-blur-md md:px-6">
         <nav
-          className="-mx-4 flex items-center overflow-x-auto px-4 py-2 [scrollbar-width:none] md:-mx-6 md:px-6 [&::-webkit-scrollbar]:hidden"
+          className="-mx-4 flex items-center overflow-x-auto overscroll-x-contain px-4 py-2 [scrollbar-width:none] md:-mx-6 md:px-6 [&::-webkit-scrollbar]:hidden"
           aria-label="Market categories">
           <div className="flex shrink-0 gap-0.5 rounded-full border border-hairline bg-bg1 p-1">
             {CATEGORIES.map((c) => (
               <button key={c} onClick={() => setCategory(c)}
-                className={`pressable relative min-h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-colors ${
+                className={`pressable relative min-h-11 shrink-0 rounded-full px-3.5 text-sm font-medium transition-colors md:min-h-9 md:px-4 ${
                   category === c ? "text-gold" : "text-ink-3 hover:text-ink-1"
                 }`}
                 aria-pressed={category === c}>
@@ -325,7 +403,7 @@ export default function Browse({ userName, welcome, board }: {
                     transition={rm ? { duration: 0 } : { type: "spring", bounce: 0.18, duration: 0.45 }}
                     className="absolute inset-0 rounded-full border border-gold/40 bg-gold/12 shadow-[0_0_18px_-6px_var(--gold)]" />
                 )}
-                <span className="relative">
+                <span className="relative whitespace-nowrap">
                   {c}{c === "Watchlist" && watchlist.length ? ` ${watchlist.length}` : ""}
                 </span>
               </button>
@@ -348,13 +426,13 @@ export default function Browse({ userName, welcome, board }: {
 
         {/* 2 — the featured exhibit */}
         {featured && (
-          <FeaturedCard symbol={featured} name={NAME.get(featured)} kind={categoryFor(featured)}
+          <FeaturedCard symbol={featured} name={nameOf(featured)} kind={categoryFor(featured)}
             quote={quotes.get(featured)} spark={sparks[featured] ?? []} />
         )}
 
         {/* 3 — what moved */}
-        {(loading || displayRows.length >= 5) && (
-          <MoversRails movers={railMovers} loading={loading && !railMovers} />
+        {(listLoading || displayRows.length >= 5) && (
+          <MoversRails movers={railMovers} loading={listLoading && !railMovers} />
         )}
 
         {/* Watchlist management row */}
@@ -371,7 +449,7 @@ export default function Browse({ userName, welcome, board }: {
         {/* 4 — the board */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="tnum text-[11px] text-ink-4">
-            {loading && category !== "Watchlist"
+            {listLoading
               ? "Loading the board…"
               : `${displayRows.length} market${displayRows.length === 1 ? "" : "s"}`}
             {stamp && <span className={stale ? "text-warning" : ""}> · updated {stamp}</span>}
@@ -384,25 +462,24 @@ export default function Browse({ userName, welcome, board }: {
         ) : view === "table" ? (
           <BoardTable
             rows={displayRows}
-            loading={loading}
-            emptyNote={category === "Watchlist"
-              ? "Nothing on your watchlist yet. Add a ticker above and it follows you everywhere."
-              : "No markets in this view."}
+            loading={listLoading}
+            names={NAME}
+            emptyNote={EMPTY_NOTE[category]}
             onRemove={category === "Watchlist" ? removeFromWatchlist : undefined} />
-        ) : gridSymbols.length === 0 && category === "Watchlist" ? (
+        ) : gridSymbols.length === 0 && !listLoading ? (
           <p className="rounded-2xl border border-hairline bg-bg1 px-6 py-14 text-center text-sm text-ink-4">
-            Nothing on your watchlist yet. Add a ticker above and it follows you everywhere.
+            {EMPTY_NOTE[category]}
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {gridSymbols.map((s, i) => (
               <div key={s} className="rise-in relative" style={{ "--i": Math.min(i, 8) } as CSSProperties}>
-                <MarketCard symbol={s} name={NAME.get(s)} kind={categoryFor(s)}
+                <MarketCard symbol={s} name={nameOf(s)} kind={categoryFor(s)}
                   quote={quotes.get(s)} spark={sparks[s]} />
                 {category === "Watchlist" && (
                   <button onClick={() => removeFromWatchlist(s)}
                     className="pressable absolute right-1.5 top-1.5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-bg3/80 text-ink-4 hover:text-loss"
-                    aria-label={`Remove ${s} from watchlist`}>
+                    aria-label={`Remove ${displaySymbol(s)} from watchlist`}>
                     ×
                   </button>
                 )}
@@ -462,27 +539,31 @@ function FeaturedCard({ symbol, name, kind, quote, spark }: {
   symbol: string; name?: string; kind?: MarketCategory; quote?: Quote; spark: number[];
 }) {
   const chg = quote?.changePercent ?? 0;
+  const shown = displaySymbol(symbol);
+  const instrument = instrumentOf(symbol, kind, name);
   return (
     <div className="rise-in relative mb-4">
       {/* ambient light in the room — a single gold aura behind the hero */}
       <div aria-hidden className="aura aura-gold" />
       {/* the display ticker, ghosted huge behind the exhibit */}
       <span aria-hidden className="ghost absolute -top-2 right-4 z-0 hidden select-none text-[7rem] leading-none sm:block md:text-[9rem]">
-        {symbol.replace("/", "")}
+        {shown.replace("/", "")}
       </span>
       <Link href={`/app/m/${encodeURIComponent(symbol)}`}
         className="raised raised-2 edge-gold lift group relative z-10 block overflow-hidden">
         <div className="grid gap-4 p-5 md:grid-cols-[1fr_400px] md:items-center md:p-6 lg:p-7">
           <div className="min-w-0">
-            <p className="kicker">Featured · {kind ?? categoryOf(symbol)} · biggest move</p>
+            <p className="kicker" title={instrument.title}>
+              Featured · {instrument.label} · biggest move
+            </p>
             <h2 className="display mt-2 break-words text-[2.25rem] text-ink-1 sm:text-5xl md:text-6xl">
-              {name ?? symbol}
+              {name ?? shown}
             </h2>
             <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
               {quote ? (
                 <>
                   <span className="lumina tnum text-5xl font-semibold tracking-tight text-ink-1 md:text-7xl">
-                    {usd(quote.price)}
+                    {formatPrice(symbol, quote.price)}
                   </span>
                   <span className={`tnum text-lg font-semibold md:text-2xl ${chg > 0 ? "text-gain" : chg < 0 ? "text-loss" : "text-ink-3"}`}>
                     {pct(chg)}
@@ -491,7 +572,7 @@ function FeaturedCard({ symbol, name, kind, quote, spark }: {
               ) : <span className="skeleton h-12 w-52" />}
             </div>
             <span className="mt-6 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-5 text-xs font-semibold text-gold transition-colors group-hover:bg-gold/20">
-              Trade {symbol}
+              Trade {shown}
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M5 12h14M13 6l6 6-6 6" />
               </svg>
