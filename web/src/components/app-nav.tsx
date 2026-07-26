@@ -88,9 +88,19 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
         <div className="flex items-center justify-between px-3 py-2.5 sm:px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-4">
             <Link href="/app/floor" className="pressable shrink-0 whitespace-nowrap">
-              {/* Full lockup everywhere; below ~400px space truly forbids it */}
-              <TarsWordmark size={22} text="TARS TRADING" className="hidden min-[400px]:inline-flex" />
-              <TarsWordmark size={22} text="TARS" className="min-[400px]:hidden" />
+              {/*
+                Full lockup above 400px, short one below. The show/hide lives on
+                these WRAPPERS: TarsWordmark hardcodes `inline-flex` on its own
+                root, and in Tailwind v4 a caller's `hidden` loses to it on
+                stylesheet order — so both lockups used to render at once and
+                the equity strip landed on top of the garbled result.
+              */}
+              <span className="hidden min-[400px]:block">
+                <TarsWordmark size={22} text="TARS TRADING" />
+              </span>
+              <span className="min-[400px]:hidden">
+                <TarsWordmark size={22} text="TARS" />
+              </span>
             </Link>
 
             {/* Market pulse — a real desk always shows session state */}

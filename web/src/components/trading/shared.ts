@@ -12,7 +12,14 @@ export type Timeframe = "1D" | "1W" | "1M" | "3M" | "1Y" | "5Y";
 
 export const usd = (v: number, digits = 2) =>
   v.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: digits });
-export const pct = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%`;
+/* A signed zero in a P&L colour is the one thing a trading UI must never print:
+   -0.0000321 formatted to 2dp became "-0.00%" under a red ▼. Anything that
+   rounds to zero is reported as a flat 0.00%. */
+export const pct = (v: number) => {
+  const p = v * 100;
+  if (Math.abs(p) < 0.005) return "0.00%";
+  return `${p > 0 ? "+" : ""}${p.toFixed(2)}%`;
+};
 
 /* ---- currency pairs -------------------------------------------------------
    Spot FX carries an explicit `FX:` prefix in the exchange (FX:EURUSD) because

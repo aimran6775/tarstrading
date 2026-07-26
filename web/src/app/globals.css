@@ -18,11 +18,16 @@
 
   /* Ink */
   --ink-1: oklch(0.95 0.008 264);
-  --ink-2: oklch(0.71 0.018 264);
-  --ink-3: oklch(0.53 0.02 264);
-  --ink-4: oklch(0.40 0.02 264);
-  --hairline: oklch(1 0 0 / 0.08);
-  --hairline-strong: oklch(1 0 0 / 0.16);
+  --ink-2: oklch(0.75 0.018 264);
+  /* ink-3/ink-4 carry almost every machine label in the terminal — column
+     heads, Key Statistics field names, chart footers, hints. Measured at
+     3.37:1 and 2.08:1 against bg1, both under the 4.5:1 floor, with 57 failing
+     text nodes on the symbol page alone. Lifted until they actually read; the
+     hierarchy survives because the gaps are preserved. */
+  --ink-3: oklch(0.68 0.02 264);
+  --ink-4: oklch(0.58 0.02 264);
+  --hairline: oklch(1 0 0 / 0.12);
+  --hairline-strong: oklch(1 0 0 / 0.24);
 
   /* Tape gold — the one accent. Brand, CTA, and the simulated marker. */
   --gold: oklch(0.83 0.114 84);
@@ -58,19 +63,24 @@
 
   --ink-1: oklch(0.24 0.022 274);
   --ink-2: oklch(0.46 0.02 268);
-  --ink-3: oklch(0.55 0.016 264);
-  --ink-4: oklch(0.62 0.012 264);
-  --hairline: oklch(0 0 0 / 0.1);
-  --hairline-strong: oklch(0 0 0 / 0.18);
+  --ink-3: oklch(0.52 0.016 264);
+  --ink-4: oklch(0.56 0.012 264);
+  /* Interactive boundaries need 3:1 (WCAG 1.4.11); these measured ~1.25:1, so
+     order-entry fields had no perceptible edge. */
+  --hairline: oklch(0 0 0 / 0.14);
+  --hairline-strong: oklch(0 0 0 / 0.28);
 
-  --gold: oklch(0.66 0.125 80);
-  --gold-deep: oklch(0.62 0.13 74);
-  --on-gold: oklch(0.99 0 0);
+  /* Gold marked the ACTIVE tab while measuring 2.95:1 — fainter than the
+     inactive ones, inverting the state signal. Darkened for text use; the
+     CTA now also takes the dark label rather than white at 3.09:1. */
+  --gold: oklch(0.54 0.125 80);
+  --gold-deep: oklch(0.50 0.13 74);
+  --on-gold: oklch(0.17 0.03 80);
 
-  --gain: oklch(0.58 0.14 158);
-  --loss: oklch(0.55 0.18 24);
-  --agent: oklch(0.56 0.18 300);
-  --warning: oklch(0.66 0.15 62);
+  --gain: oklch(0.50 0.14 158);
+  --loss: oklch(0.50 0.18 24);
+  --agent: oklch(0.50 0.18 300);
+  --warning: oklch(0.52 0.15 62);
 }
 
 @media (prefers-color-scheme: light) {
@@ -82,17 +92,17 @@
     --glass: oklch(1 0 0 / 0.85);
     --ink-1: oklch(0.24 0.022 274);
     --ink-2: oklch(0.46 0.02 268);
-    --ink-3: oklch(0.55 0.016 264);
-    --ink-4: oklch(0.62 0.012 264);
-    --hairline: oklch(0 0 0 / 0.1);
-    --hairline-strong: oklch(0 0 0 / 0.18);
-    --gold: oklch(0.66 0.125 80);
-    --gold-deep: oklch(0.62 0.13 74);
-    --on-gold: oklch(0.99 0 0);
-    --gain: oklch(0.58 0.14 158);
-    --loss: oklch(0.55 0.18 24);
-    --agent: oklch(0.56 0.18 300);
-    --warning: oklch(0.66 0.15 62);
+    --ink-3: oklch(0.52 0.016 264);
+    --ink-4: oklch(0.56 0.012 264);
+    --hairline: oklch(0 0 0 / 0.14);
+    --hairline-strong: oklch(0 0 0 / 0.28);
+    --gold: oklch(0.54 0.125 80);
+    --gold-deep: oklch(0.50 0.13 74);
+    --on-gold: oklch(0.17 0.03 80);
+    --gain: oklch(0.50 0.14 158);
+    --loss: oklch(0.50 0.18 24);
+    --agent: oklch(0.50 0.18 300);
+    --warning: oklch(0.52 0.15 62);
   }
 }
 

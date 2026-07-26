@@ -24,12 +24,20 @@ export function Spark({ points, className = "h-10 w-full", fill = false }: {
   const gid = useId();
   if (points.length < 2) return <div className={`${className} rounded bg-bg2`} aria-hidden />;
   const min = Math.min(...points), max = Math.max(...points);
-  const range = max - min || 1;
+  /*
+    Floor the domain relative to the series' own level. Pure auto-scaling drew
+    a $3.21 move on a $99,997 account as a full-height cliff in loss red — the
+    Floor hero showed what looked like a total collapse of the user's fund for
+    a 0.003% day. A flat book must draw flat: the domain never spans less than
+    0.5% of the mean, so small moves stay visually small.
+  */
+  const mean = points.reduce((a, b) => a + b, 0) / points.length;
+  const range = Math.max(max - min, Math.abs(mean) * 0.005, 1e-9);
   const W = 120, H = 36;
   const up = points[points.length - 1] >= points[0];
   const coords = points.map((p, i) => [
     (i / (points.length - 1)) * W,
-    H - 3 - ((p - min) / range) * (H - 6),
+    H - 3 - ((p - (mean - range / 2)) / range) * (H - 6),
   ] as const);
   const path = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   const [ex, ey] = coords[coords.length - 1];
