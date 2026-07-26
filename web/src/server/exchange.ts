@@ -581,3 +581,23 @@ export async function settleAllExpiredOptions(): Promise<number> {
   }
   return total;
 }
+
+/*
+  Re-check every account holding a resting order.
+
+  reconcile() was only ever reached from a user's own request, so an order
+  placed while the market was shut did not fill at the bell — it filled
+  whenever its owner next loaded a page, at THAT moment's price. For a product
+  teaching execution, the lesson was wrong. The heartbeat now runs it, so the
+  market fills your order, not your page visit.
+*/
+export async function reconcileRestingOrders(): Promise<number> {
+  const waiting = await db.selectDistinct({ userId: schema.orders.userId })
+    .from(schema.orders).where(eq(schema.orders.status, "accepted"));
+  let touched = 0;
+  for (const w of waiting) {
+    try { await reconcile(w.userId); touched++; }
+    catch { /* one account's failure must not stop the sweep */ }
+  }
+  return touched;
+}

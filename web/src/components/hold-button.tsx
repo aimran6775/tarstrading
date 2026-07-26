@@ -44,10 +44,10 @@ export default function HoldButton({
     if (rearm.current) clearTimeout(rearm.current);
   }, []);
 
-  function begin(e: React.PointerEvent<HTMLButtonElement>) {
+  /** Start the hold. Shared by pointer and keyboard so both must really hold. */
+  function startHold() {
     if (disabled || done.current) return;
     pressing.current = true;
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* unsupported */ }
     start.current = performance.now();
     const tick = (t: number) => {
       if (!pressing.current) return;
@@ -60,6 +60,12 @@ export default function HoldButton({
     // Backstop for throttled rAF (background/embedded webviews): only commits
     // if the pointer is STILL down. A cancelled gesture can never fire this.
     timeout.current = setTimeout(() => { if (pressing.current) finish(); }, DURATION + 40);
+  }
+
+  function begin(e: React.PointerEvent<HTMLButtonElement>) {
+    // Capture the pointer so a drag off the button still reports its release.
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* unsupported */ }
+    startHold();
   }
 
   function cancel() {
@@ -92,13 +98,33 @@ export default function HoldButton({
       onPointerUp={cancel}
       onPointerLeave={cancel}
       onPointerCancel={cancel}
-      // Keyboard activation arrives as a click with detail === 0; commit
-      // directly — deliberateness there comes from focus + explicit key.
-      onClick={(e) => { if (e.detail === 0) finish(); }}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); finish(); } }}
+      /*
+        Keyboard users must HOLD too. This previously committed on a single
+        keydown for Enter OR Space — so a keyboard user who focused "Buy 1 AAPL"
+        and tapped Space to scroll the page placed a live order, while the
+        button's own label promised "press and hold to confirm". The safeguard
+        existed only for mice.
+
+        Now the key press starts the same timer a pointer does, and releasing
+        early cancels it exactly like lifting a finger. The click handler no
+        longer commits — keydown/keyup own the keyboard path entirely, so
+        nothing can fire twice.
+      */
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        if (e.repeat) return; // auto-repeat must not restart the hold
+        startHold();
+      }}
+      onKeyUp={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        cancel();
+      }}
+      onBlur={cancel}
       style={{ touchAction: "none" }}
       className={`pressable relative w-full overflow-hidden rounded-full px-6 py-3.5 text-base font-semibold disabled:opacity-50 ${toneStyles}`}
-      aria-label={`${label}. Press and hold to confirm.`}
+      aria-label={`${label}. Press and hold to confirm — release early to cancel.`}
     >
       <span
         aria-hidden

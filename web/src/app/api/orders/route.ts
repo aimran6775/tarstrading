@@ -25,7 +25,8 @@ export async function POST(request: Request) {
   // Equity/crypto tickers, or an OCC option contract (AAPL260727C00335000).
   const EQUITY_OR_CRYPTO = /^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/;
   const OCC_OPTION = /^[A-Z]{1,6}\d{6}[CP]\d{8}$/;
-  if (!EQUITY_OR_CRYPTO.test(symbol) && !OCC_OPTION.test(symbol)) {
+  const FX_PAIR = /^FX:[A-Z]{6}$/;
+  if (!EQUITY_OR_CRYPTO.test(symbol) && !OCC_OPTION.test(symbol) && !FX_PAIR.test(symbol)) {
     return NextResponse.json({ ok: false, error: "That doesn't look like a symbol." }, { status: 400 });
   }
   const TYPES = ["market", "limit", "stop", "stop_limit", "trailing_stop"] as const;

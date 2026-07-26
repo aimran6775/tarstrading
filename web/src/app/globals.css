@@ -232,6 +232,11 @@ html, body {
   .skeleton { animation: none; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    /* Without capping iterations, an INFINITE animation compressed to 0.01ms
+       becomes a full-frame-rate strobe — animate-pulse on a whole <main>,
+       pulse-ring, animate-ping. That is actively dangerous for the vestibular
+       and photosensitive users who set this preference in the first place. */
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }
@@ -377,8 +382,26 @@ html, body {
 /* ---- Reveal choreography ---- a non-JS entrance for server-rendered
    content; framer-motion handles the interactive cases. Children stagger
    via inline --i. Respects reduced-motion (global rule zeroes duration). */
+/*
+  Entrance choreography that FAILS VISIBLE.
+
+  This used to be `animation: … both` over a keyframe starting at opacity 0 —
+  so if the animation never ran (a backgrounded tab, a paint the browser
+  skipped, an element mounted while hidden), the fill kept the content at
+  opacity 0 FOREVER. Whole pages rendered blank with a fully populated DOM:
+  the join form, the academy stage list, the mobile trade grid with a live
+  order ticket inside it.
+
+  Now the element is opaque by default and the animation only ANIMATES IN from
+  a transparent start (`backwards`, not `both`). If it never runs, the content
+  is simply there — the worst case is a missing flourish, not an invisible app.
+*/
 @keyframes rise-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-.rise-in { animation: rise-in 0.6s var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 60ms); }
+.rise-in {
+  opacity: 1;
+  animation: rise-in 0.6s var(--ease-spring) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
 
 /* Gold sweep — a light passes across a primary control on hover. Compose
    with .cta-gold. */

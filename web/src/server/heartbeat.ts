@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { tickAllRunningAgents } from "./agents";
 import { purgeExpiredSessions } from "./auth";
 import { backfillTick } from "./backfill";
-import { settleAllExpiredOptions } from "./exchange";
+import { settleAllExpiredOptions, reconcileRestingOrders } from "./exchange";
 import { tickAllPrivateMarkets } from "./private-markets";
 import { maybeSyncTickers } from "./tickers";
 import { db, schema } from "./db";
@@ -26,12 +26,13 @@ export async function runHeartbeat(kind = "tick") {
   // allSettled: one failing task (a flaky backfill fetch, a purge hiccup) must
   // not discard the agent metrics that already succeeded, nor falsely mark the
   // whole run failed.
-  const [aRes, bRes, pRes, oRes, peRes] = await Promise.allSettled([
+  const [aRes, bRes, pRes, oRes, peRes, rRes] = await Promise.allSettled([
     tickAllRunningAgents(),
     backfillTick(),
     purgeExpiredSessions(),
     settleAllExpiredOptions(),
     tickAllPrivateMarkets(),
+    reconcileRestingOrders(),
   ]);
   if (aRes.status === "fulfilled") agents = aRes.value;
   if (bRes.status === "fulfilled") backfill = bRes.value;
@@ -44,6 +45,11 @@ export async function runHeartbeat(kind = "tick") {
   // tickAllPrivateMarkets); capital calls and distributions count as actions.
   if (peRes.status === "fulfilled") {
     agents = { ...agents, actions: agents.actions + peRes.value.calls + peRes.value.distributions };
+  }
+  // Resting orders are re-checked centrally so they fill when the MARKET moves,
+  // not when their owner happens to open a page.
+  if (rRes.status === "fulfilled" && rRes.value > 0) {
+    agents = { ...agents, actions: agents.actions + rRes.value };
   }
   const ok = aRes.status === "fulfilled" && bRes.status === "fulfilled" && pRes.status === "fulfilled" ? 1 : 0;
 
