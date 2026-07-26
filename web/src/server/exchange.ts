@@ -4,6 +4,7 @@ import { db, schema } from "./db";
 import { and, eq, desc } from "drizzle-orm";
 import { getQuote, getQuotes, isUSMarketOpen, etDay } from "./market";
 import { getPlatformConfig } from "./platform";
+import { isOptionSymbol, parseOptionSymbol, optionQuotes, CONTRACT_SIZE } from "./options";
 
 /*
   The simulated exchange. Every user trades an isolated $100k account.
@@ -39,8 +40,13 @@ const SLIPPAGE = 0.0005;
   includes unrealized P&L, marked live), exactly as a real margin desk does.
 */
 const isCryptoSym = (s: string) => s.includes("/");
-const initialRate = (s: string) => (isCryptoSym(s) ? 1 : 0.5);
-const maintRate = (s: string) => (isCryptoSym(s) ? 1 : 0.25);
+/* Options are cash-secured here (long only), so they carry a 100% initial
+   requirement like crypto — you pay the premium, full stop. */
+const initialRate = (s: string) => (isCryptoSym(s) || isOptionSymbol(s) ? 1 : 0.5);
+const maintRate = (s: string) => (isCryptoSym(s) || isOptionSymbol(s) ? 1 : 0.25);
+
+/** Contract multiplier: an option covers 100 shares, everything else is 1:1. */
+export const multiplierFor = (s: string) => (isOptionSymbol(s) ? CONTRACT_SIZE : 1);
 
 /** Any drizzle executor — the base db or a transaction handle. */
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -90,9 +96,20 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     return row;
   };
 
+  const isOption = isOptionSymbol(symbol);
   if (!Number.isFinite(input.qty) || input.qty <= 0) return reject("Quantity must be positive.");
-  // Equities trade in whole shares; only crypto is fractional.
-  if (!isCrypto && !Number.isInteger(input.qty)) return reject("Stocks trade in whole shares.");
+  // Equities trade in whole shares and options in whole contracts; only crypto
+  // is fractional.
+  if (!isCrypto && !Number.isInteger(input.qty)) {
+    return reject(isOption ? "Options trade in whole contracts." : "Stocks trade in whole shares.");
+  }
+  if (isOption) {
+    const leg = parseOptionSymbol(symbol)!;
+    // Expired contracts are history, not orders.
+    if (new Date(`${leg.expiry}T20:00:00Z`).getTime() < now) {
+      return reject(`That contract expired on ${leg.expiry}.`);
+    }
+  }
   if (input.type === "limit" && !(input.limitPrice && input.limitPrice > 0))
     return reject("Limit orders need a limit price.");
   if (input.type === "stop" && !(input.stopPrice && input.stopPrice > 0))
@@ -106,8 +123,17 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
   if ((await getPlatformConfig()).tradingHalted) return reject("Trading is temporarily halted by the platform.");
 
   // Fetch the quote BEFORE the transaction — never hold a lock across network.
-  const quote = await getQuote(symbol);
-  if (!quote) return reject(`No market data for ${symbol}.`);
+  // Options price from the chain; everything else from the tape.
+  let quote: { symbol: string; price: number } | null;
+  if (isOption) {
+    const marks = await optionQuotes([symbol]);
+    const px = marks.get(symbol);
+    quote = px != null ? { symbol, price: px } : null;
+    if (!quote) return reject(`No live market for ${symbol} right now.`);
+  } else {
+    quote = await getQuote(symbol);
+    if (!quote) return reject(`No market data for ${symbol}.`);
+  }
 
   const row = {
     id, userId, symbol, side: input.side, type: input.type, qty: input.qty,
@@ -152,20 +178,29 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     if (isCrypto && q1 < -1e-9) {
       return rejectIn("Crypto can't be shorted here — it trades cash and long-only.");
     }
+    // Options are long-only: writing them carries open-ended risk whose margin
+    // model this simulator doesn't teach yet. Buy to open, sell to close.
+    if (isOption && q1 < -1e-9) {
+      return rejectIn("Options are long-only here — you can buy to open and sell to close, but not write contracts.");
+    }
 
     // Mark each symbol: this order's symbol at the live quote, others at cost.
     const markOf = (s: string, avg: number) => (s === symbol ? quote.price : avg);
     // Initial requirement over all positions with the target updated, plus a
     // conservative reservation for resting orders (assume they fill).
+    // Requirements are in dollars, so every term carries its contract size.
     let requirement = 0;
     for (const p of positions) {
       const qty = p.symbol === symbol ? q1 : p.qty;
-      requirement += initialRate(p.symbol) * Math.abs(qty * markOf(p.symbol, p.avgEntryPrice));
+      requirement += initialRate(p.symbol)
+        * Math.abs(qty * markOf(p.symbol, p.avgEntryPrice)) * multiplierFor(p.symbol);
     }
-    if (!cur && Math.abs(q1) > 1e-9) requirement += initialRate(symbol) * Math.abs(q1 * quote.price);
+    if (!cur && Math.abs(q1) > 1e-9) {
+      requirement += initialRate(symbol) * Math.abs(q1 * quote.price) * multiplierFor(symbol);
+    }
     for (const o of resting) {
       const px = o.limitPrice ?? o.stopPrice ?? quote.price;
-      requirement += initialRate(o.symbol) * px * o.qty;
+      requirement += initialRate(o.symbol) * px * o.qty * multiplierFor(o.symbol);
     }
     // Deleveraging (shrinking the target's absolute exposure) is always allowed;
     // otherwise you must hold enough equity to meet the initial requirement.
@@ -286,9 +321,12 @@ async function settle(tx: Tx, order: PlacedOrder, fillPrice: number) {
   const now = Date.now();
 
   const r = applyFill(pos?.qty ?? 0, pos?.avgEntryPrice ?? 0, order.side, order.qty, fillPrice);
+  // An option contract controls 100 shares: cash and realized P&L scale by it,
+  // while qty and the average price stay per-contract (what the chain quotes).
+  const mult = multiplierFor(symbol);
 
   await tx.update(schema.accounts)
-    .set({ cash: account.cash + r.cashFlow })
+    .set({ cash: account.cash + r.cashFlow * mult })
     .where(eq(schema.accounts.userId, userId));
 
   if (r.closedQty > 0) {
@@ -296,7 +334,8 @@ async function settle(tx: Tx, order: PlacedOrder, fillPrice: number) {
     await tx.insert(schema.journalEntries).values({
       id: randomUUID(), userId, symbol,
       side: (pos?.qty ?? 0) > 0 ? "sell" : "cover", qty: r.closedQty,
-      entryPrice: pos?.avgEntryPrice ?? 0, exitPrice: fillPrice, pnl: r.realized,
+      entryPrice: pos?.avgEntryPrice ?? 0, exitPrice: fillPrice,
+      pnl: r.realized * mult,
       thesis: null, agentId: order.agentId, createdAt: now,
     });
   }
@@ -328,11 +367,16 @@ export async function accountRisk(userId: string): Promise<AccountRisk> {
   const positions = await db.select().from(schema.positions).where(eq(schema.positions.userId, userId));
   const cash = account?.cash ?? 0;
   let longValue = 0, shortValue = 0, initialReq = 0, maintenance = 0;
-  const quotes = positions.length ? await getQuotes(positions.map((p) => p.symbol)) : [];
+  const plainSyms = positions.filter((p) => !isOptionSymbol(p.symbol)).map((p) => p.symbol);
+  const optSyms = positions.filter((p) => isOptionSymbol(p.symbol)).map((p) => p.symbol);
+  const [quotes, optMarks] = await Promise.all([
+    plainSyms.length ? getQuotes(plainSyms) : Promise.resolve([]),
+    optSyms.length ? optionQuotes(optSyms) : Promise.resolve(new Map<string, number>()),
+  ]);
   const mark = new Map(quotes.map((q) => [q.symbol, q.price]));
   for (const p of positions) {
-    const px = mark.get(p.symbol) ?? p.avgEntryPrice;
-    const val = p.qty * px; // signed
+    const px = optMarks.get(p.symbol) ?? mark.get(p.symbol) ?? p.avgEntryPrice;
+    const val = p.qty * px * multiplierFor(p.symbol); // signed, contract-scaled
     if (val >= 0) longValue += val; else shortValue += -val;
     initialReq += initialRate(p.symbol) * Math.abs(val);
     maintenance += maintRate(p.symbol) * Math.abs(val);
@@ -398,10 +442,17 @@ export async function markEquity(userId: string) {
 
   let value = 0;
   if (positions.length) {
-    const quotes = await getQuotes(positions.map((p) => p.symbol));
+    // Options price from the chain, everything else from the tape.
+    const opts = positions.filter((p) => isOptionSymbol(p.symbol)).map((p) => p.symbol);
+    const plain = positions.filter((p) => !isOptionSymbol(p.symbol)).map((p) => p.symbol);
+    const [quotes, optMarks] = await Promise.all([
+      plain.length ? getQuotes(plain) : Promise.resolve([]),
+      opts.length ? optionQuotes(opts) : Promise.resolve(new Map<string, number>()),
+    ]);
     const bySymbol = new Map(quotes.map((q) => [q.symbol, q.price]));
     for (const p of positions) {
-      value += (bySymbol.get(p.symbol) ?? p.avgEntryPrice) * p.qty;
+      const mark = optMarks.get(p.symbol) ?? bySymbol.get(p.symbol) ?? p.avgEntryPrice;
+      value += mark * p.qty * multiplierFor(p.symbol);
     }
   }
   const equity = account.cash + value;
@@ -422,4 +473,79 @@ export async function markEquity(userId: string) {
     await db.insert(schema.equityHistory)
       .values({ id: randomUUID(), userId, time: Date.now(), equity });
   }
+}
+
+/*
+  Expiry settlement — the step that makes options honest.
+
+  At expiry a contract stops existing: in-the-money it settles for its
+  intrinsic value (cash-settled here rather than delivering 100 shares, which
+  keeps a $100k simulated account from being blown up by an assignment it
+  never chose), out-of-the-money it expires worthless. Either way the position
+  is closed and journaled, so the trade shows up in the record like any other.
+
+  Called from the heartbeat, so it happens whether or not anyone is watching.
+*/
+export async function settleExpiredOptions(userId: string): Promise<number> {
+  const positions = await db.select().from(schema.positions)
+    .where(eq(schema.positions.userId, userId));
+  const expired = positions
+    .map((p) => ({ p, leg: parseOptionSymbol(p.symbol) }))
+    .filter((x) => x.leg && new Date(`${x.leg.expiry}T20:00:00Z`).getTime() < Date.now());
+  if (!expired.length) return 0;
+
+  // Underlying marks decide intrinsic value.
+  const unders = [...new Set(expired.map((x) => x.leg!.underlying))];
+  const quotes = await getQuotes(unders);
+  const spot = new Map(quotes.map((q) => [q.symbol, q.price]));
+  const now = Date.now();
+  let settled = 0;
+
+  for (const { p, leg } of expired) {
+    const under = spot.get(leg!.underlying);
+    // No mark for the underlying? Leave it for the next pass rather than
+    // settling at a number we can't stand behind.
+    if (under == null) continue;
+
+    const intrinsic = leg!.type === "call"
+      ? Math.max(0, under - leg!.strike)
+      : Math.max(0, leg!.strike - under);
+    const proceeds = intrinsic * p.qty * CONTRACT_SIZE;
+    const pnl = (intrinsic - p.avgEntryPrice) * p.qty * CONTRACT_SIZE;
+
+    await db.transaction(async (tx) => {
+      const [acct] = await tx.select().from(schema.accounts)
+        .where(eq(schema.accounts.userId, userId)).for("update");
+      if (!acct) return;
+      await tx.update(schema.accounts)
+        .set({ cash: acct.cash + proceeds })
+        .where(eq(schema.accounts.userId, userId));
+      await tx.insert(schema.journalEntries).values({
+        id: randomUUID(), userId, symbol: p.symbol,
+        side: intrinsic > 0 ? "exercised" : "expired",
+        qty: Math.abs(p.qty),
+        entryPrice: p.avgEntryPrice, exitPrice: intrinsic, pnl,
+        thesis: intrinsic > 0
+          ? `Expired in the money — settled at $${intrinsic.toFixed(2)} intrinsic.`
+          : "Expired worthless. The premium was the whole risk.",
+        agentId: null, createdAt: now,
+      });
+      await tx.delete(schema.positions).where(eq(schema.positions.id, p.id));
+    });
+    settled++;
+  }
+  return settled;
+}
+
+/** Settle expired options for every account holding one. Heartbeat entry point. */
+export async function settleAllExpiredOptions(): Promise<number> {
+  // Only users who actually hold an option get looked at.
+  const holders = await db.selectDistinct({ userId: schema.positions.userId })
+    .from(schema.positions);
+  let total = 0;
+  for (const h of holders) {
+    try { total += await settleExpiredOptions(h.userId); }
+    catch { /* one account's failure must not stop the sweep */ }
+  }
+  return total;
 }
