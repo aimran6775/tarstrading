@@ -114,11 +114,11 @@ export default function PulseStrip({ rows, breadth, marketOpen, asOf, stale }: {
         </div>
       </header>
 
-      <div className="grid gap-x-2 gap-y-3 p-2 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_minmax(180px,1.15fr)] lg:items-center lg:gap-3">
+      <div className="grid grid-cols-2 gap-x-2 gap-y-2 p-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_minmax(180px,1.15fr)] lg:items-center lg:gap-3">
         {PROXIES.map((p) => (
           <ProxyTile key={p.symbol} symbol={p.symbol} name={p.name} row={rows.get(p.symbol)} loading={loading} />
         ))}
-        <div className="border-t border-hairline px-3 pb-1 pt-3 sm:col-span-2 lg:col-span-1 lg:border-l lg:border-t-0 lg:py-1 lg:pl-4">
+        <div className="col-span-2 border-t border-hairline px-3 pb-1 pt-3 lg:col-span-1 lg:border-l lg:border-t-0 lg:py-1 lg:pl-4">
           <BreadthMeter breadth={breadth} />
         </div>
       </div>

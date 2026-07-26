@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties,
+} from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import AppNav from "@/components/app-nav";
@@ -35,18 +37,46 @@ import { usd, pct, categoryOf, type Quote, type Account, type BoardEntry, type M
 type Category = "Trending" | "Stocks" | "Crypto" | "ETFs" | "Watchlist";
 const CATEGORIES: Category[] = ["Trending", "Stocks", "Crypto", "ETFs", "Watchlist"];
 
+const NAME = new Map(SYMBOLS.map((e) => [e.symbol, e.name]));
+const POLL_MS = 20_000;
+
+/* ---- the remembered view --------------------------------------------------
+   Table or grid is preference state living outside React (localStorage), so
+   it's read as an external store: the server snapshot is null — one frame of
+   skeleton — and the client resolves to the stored choice, or to the screen's
+   own default (table on a desk, grid on a phone). */
+
 type View = "table" | "grid";
 const VIEW_KEY = "tars.markets.view";
 
-const NAME = new Map(SYMBOLS.map((e) => [e.symbol, e.name]));
-const POLL_MS = 20_000;
+let viewCache: View | null = null;
+const viewListeners = new Set<() => void>();
+
+function readView(): View {
+  if (viewCache) return viewCache;
+  let saved: string | null = null;
+  try { saved = window.localStorage.getItem(VIEW_KEY); } catch { /* private mode */ }
+  viewCache = saved === "table" || saved === "grid"
+    ? saved
+    : window.matchMedia("(min-width: 768px)").matches ? "table" : "grid";
+  return viewCache;
+}
+function writeView(v: View) {
+  viewCache = v;
+  try { window.localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ }
+  viewListeners.forEach((cb) => cb());
+}
+function subscribeView(cb: () => void) {
+  viewListeners.add(cb);
+  return () => { viewListeners.delete(cb); };
+}
 
 export default function Browse({ userName, welcome, board }: {
   userName: string; welcome: boolean; board: BoardEntry[];
 }) {
   const rm = useReducedMotion();
   const [category, setCategory] = useState<Category>("Trending");
-  const [view, setView] = useState<View | null>(null);
+  const view = useSyncExternalStore<View | null>(subscribeView, readView, () => null);
   const [account, setAccount] = useState<Account | null>(null);
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [rows, setRows] = useState<BoardRow[]>([]);
@@ -135,23 +165,16 @@ export default function Browse({ userName, welcome, board }: {
       if (typeof document !== "undefined" && document.hidden) return;
       loadBoard(); loadOffBoardQuotes();
     };
+    // …but coming back to the tab shouldn't mean staring at a stale board.
+    const onVisibility = () => { if (!document.hidden) { loadBoard(); loadOffBoardQuotes(); } };
+    document.addEventListener("visibilitychange", onVisibility);
     const q = setInterval(tick, POLL_MS);
     const s = setInterval(loadSparks, 5 * 60_000);
-    return () => { clearInterval(q); clearInterval(s); };
+    return () => {
+      clearInterval(q); clearInterval(s);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [loadAccount, loadBoard, loadOffBoardQuotes, loadSparks]);
-
-  // Remembered view: table is the desk default, grid the small-screen one.
-  useEffect(() => {
-    let saved: string | null = null;
-    try { saved = window.localStorage.getItem(VIEW_KEY); } catch { /* private mode */ }
-    if (saved === "table" || saved === "grid") setView(saved);
-    else setView(window.matchMedia("(min-width: 768px)").matches ? "table" : "grid");
-  }, []);
-
-  const chooseView = useCallback((v: View) => {
-    setView(v);
-    try { window.localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ }
-  }, []);
 
   // ------------------------------------------------------------- watchlist ops
 
@@ -270,7 +293,7 @@ export default function Browse({ userName, welcome, board }: {
   ) : null;
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden">
+    <div className="flex min-h-screen flex-col">
       <AppNav active="terminal" right={equityStrip} />
       <GettingStarted />
 
@@ -316,7 +339,10 @@ export default function Browse({ userName, welcome, board }: {
         </nav>
       </div>
 
-      <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 pb-24 md:px-6 md:pb-10">
+      {/* overflow-x-clip, not hidden: the hero's aura bleeds past the column and
+          must not make the page scroll sideways — and `clip` isn't a scrollport,
+          so the sticky category strip above keeps sticking. */}
+      <main className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-clip px-4 py-5 pb-24 md:px-6 md:pb-10">
         {/* 1 — the state of the market */}
         <PulseStrip rows={rowMap} breadth={breadth} marketOpen={marketOpen} asOf={asOf} stale={stale} />
 
@@ -350,7 +376,7 @@ export default function Browse({ userName, welcome, board }: {
               : `${displayRows.length} market${displayRows.length === 1 ? "" : "s"}`}
             {stamp && <span className={stale ? "text-warning" : ""}> · updated {stamp}</span>}
           </p>
-          <ViewToggle view={view} onChange={chooseView} />
+          <ViewToggle view={view} onChange={writeView} />
         </div>
 
         {view === null ? (

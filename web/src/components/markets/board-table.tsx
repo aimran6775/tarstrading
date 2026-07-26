@@ -98,7 +98,9 @@ export default function BoardTable({ rows, loading, emptyNote, onRemove }: {
     });
   }, [rows, sortKey, dir]);
 
-  const headCell = "sticky top-0 z-20 bg-bg1 border-b border-hairline px-2.5 py-2 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-4";
+  // The header's rule is an inset shadow, not a border: a collapsed border on a
+  // sticky cell detaches from it while the body scrolls under.
+  const headCell = "sticky top-0 bg-bg1 shadow-[inset_0_-1px_0_var(--hairline)] px-2.5 py-2 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-4";
 
   return (
     <div className="raised overflow-hidden">
@@ -114,7 +116,7 @@ export default function BoardTable({ rows, loading, emptyNote, onRemove }: {
                 return (
                   <th key={c.key} scope="col"
                     aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
-                    className={`${headCell} ${c.width} ${i === 0 ? "left-0 z-30" : ""} ${c.numeric ? "text-right" : "text-left"}`}>
+                    className={`${headCell} ${c.width} ${i === 0 ? "left-0 z-30" : "z-20"} ${c.numeric ? "text-right" : "text-left"}`}>
                     <button type="button" onClick={() => toggle(c.key)} title={c.full ?? c.label}
                       className={`group/th flex w-full items-center gap-1 whitespace-nowrap transition-colors hover:text-ink-1 ${
                         active ? "text-ink-1" : ""
@@ -125,7 +127,7 @@ export default function BoardTable({ rows, loading, emptyNote, onRemove }: {
                   </th>
                 );
               })}
-              {onRemove && <th scope="col" className={`${headCell} w-[52px] text-right`}><span className="sr-only">Remove</span></th>}
+              {onRemove && <th scope="col" className={`${headCell} z-20 w-[52px] text-right`}><span className="sr-only">Remove</span></th>}
             </tr>
           </thead>
 
