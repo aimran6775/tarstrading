@@ -5,6 +5,7 @@ import { and, eq, desc } from "drizzle-orm";
 import { getQuote, getQuotes, isUSMarketOpen, etDay } from "./market";
 import { getPlatformConfig } from "./platform";
 import { isOptionSymbol, parseOptionSymbol, optionQuotes, CONTRACT_SIZE } from "./options";
+import { isFxSymbol, isFxOpen, fxQuotes } from "./fx";
 
 /*
   The simulated exchange. Every user trades an isolated $100k account.
@@ -44,6 +45,10 @@ const isCryptoSym = (s: string) => s.includes("/");
    requirement like crypto — you pay the premium, full stop. */
 const initialRate = (s: string) => (isCryptoSym(s) || isOptionSymbol(s) ? 1 : 0.5);
 const maintRate = (s: string) => (isCryptoSym(s) || isOptionSymbol(s) ? 1 : 0.25);
+/* FX is a 24/5 venue of its own; crypto never closes; everything else follows
+   the US equity session. Options list on the equity session too. */
+const venueOpenFor = (s: string) =>
+  isCryptoSym(s) ? true : isFxSymbol(s) ? isFxOpen() : isUSMarketOpen();
 
 /** Contract multiplier: an option covers 100 shares, everything else is 1:1. */
 export const multiplierFor = (s: string) => (isOptionSymbol(s) ? CONTRACT_SIZE : 1);
@@ -130,6 +135,11 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     const px = marks.get(symbol);
     quote = px != null ? { symbol, price: px } : null;
     if (!quote) return reject(`No live market for ${symbol} right now.`);
+  } else if (isFxSymbol(symbol)) {
+    const marks = await fxQuotes([symbol]);
+    const px = marks.get(symbol)?.price;
+    quote = px != null ? { symbol, price: px } : null;
+    if (!quote) return reject(`No market data for ${symbol}.`);
   } else {
     quote = await getQuote(symbol);
     if (!quote) return reject(`No market data for ${symbol}.`);
@@ -146,7 +156,7 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     filledAt: null as number | null,
     agentId: input.agentId ?? null, rejectReason: null as string | null, createdAt: now,
   };
-  const venueOpen = isCrypto || isUSMarketOpen();
+  const venueOpen = venueOpenFor(symbol);
 
   // Atomic check → insert → (maybe) settle, serialized per user by the account
   // row lock. Accounts for capital and inventory already committed to resting
@@ -367,15 +377,20 @@ export async function accountRisk(userId: string): Promise<AccountRisk> {
   const positions = await db.select().from(schema.positions).where(eq(schema.positions.userId, userId));
   const cash = account?.cash ?? 0;
   let longValue = 0, shortValue = 0, initialReq = 0, maintenance = 0;
-  const plainSyms = positions.filter((p) => !isOptionSymbol(p.symbol)).map((p) => p.symbol);
   const optSyms = positions.filter((p) => isOptionSymbol(p.symbol)).map((p) => p.symbol);
-  const [quotes, optMarks] = await Promise.all([
+  const fxSyms = positions.filter((p) => isFxSymbol(p.symbol)).map((p) => p.symbol);
+  const plainSyms = positions
+    .filter((p) => !isOptionSymbol(p.symbol) && !isFxSymbol(p.symbol))
+    .map((p) => p.symbol);
+  const [quotes, optMarks, fxMarks] = await Promise.all([
     plainSyms.length ? getQuotes(plainSyms) : Promise.resolve([]),
     optSyms.length ? optionQuotes(optSyms) : Promise.resolve(new Map<string, number>()),
+    fxSyms.length ? fxQuotes(fxSyms) : Promise.resolve(new Map<string, { price: number; prevClose: number }>()),
   ]);
   const mark = new Map(quotes.map((q) => [q.symbol, q.price]));
   for (const p of positions) {
-    const px = optMarks.get(p.symbol) ?? mark.get(p.symbol) ?? p.avgEntryPrice;
+    const px = optMarks.get(p.symbol) ?? fxMarks.get(p.symbol)?.price
+      ?? mark.get(p.symbol) ?? p.avgEntryPrice;
     const val = p.qty * px * multiplierFor(p.symbol); // signed, contract-scaled
     if (val >= 0) longValue += val; else shortValue += -val;
     initialReq += initialRate(p.symbol) * Math.abs(val);
@@ -410,7 +425,7 @@ export async function reconcile(userId: string) {
   // Batch every quote first (network), in ONE call, then settle fills in a
   // locked transaction so we never hold the account lock across I/O.
   const open = isUSMarketOpen();
-  const tradable = resting.filter((o) => o.symbol.includes("/") || open);
+  const tradable = resting.filter((o) => venueOpenFor(o.symbol));
   const quotes = await getQuotes([...new Set(tradable.map((o) => o.symbol))]);
   const bySymbol = new Map(quotes.map((qt) => [qt.symbol, qt.price]));
   const priced: Array<{ order: PlacedOrder; price: number }> = [];
@@ -444,14 +459,19 @@ export async function markEquity(userId: string) {
   if (positions.length) {
     // Options price from the chain, everything else from the tape.
     const opts = positions.filter((p) => isOptionSymbol(p.symbol)).map((p) => p.symbol);
-    const plain = positions.filter((p) => !isOptionSymbol(p.symbol)).map((p) => p.symbol);
-    const [quotes, optMarks] = await Promise.all([
+    const fx = positions.filter((p) => isFxSymbol(p.symbol)).map((p) => p.symbol);
+    const plain = positions
+      .filter((p) => !isOptionSymbol(p.symbol) && !isFxSymbol(p.symbol))
+      .map((p) => p.symbol);
+    const [quotes, optMarks, fxMarks] = await Promise.all([
       plain.length ? getQuotes(plain) : Promise.resolve([]),
       opts.length ? optionQuotes(opts) : Promise.resolve(new Map<string, number>()),
+      fx.length ? fxQuotes(fx) : Promise.resolve(new Map<string, { price: number; prevClose: number }>()),
     ]);
     const bySymbol = new Map(quotes.map((q) => [q.symbol, q.price]));
     for (const p of positions) {
-      const mark = optMarks.get(p.symbol) ?? bySymbol.get(p.symbol) ?? p.avgEntryPrice;
+      const mark = optMarks.get(p.symbol) ?? fxMarks.get(p.symbol)?.price
+        ?? bySymbol.get(p.symbol) ?? p.avgEntryPrice;
       value += mark * p.qty * multiplierFor(p.symbol);
     }
   }

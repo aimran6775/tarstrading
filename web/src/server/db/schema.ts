@@ -409,3 +409,67 @@ export const platformSymbols = pgTable("platform_symbols", {
   note: text("note"),
   addedAt: epochMs("added_at").notNull(),
 }, (t) => [index("psym_enabled").on(t.enabled), index("psym_category").on(t.category)]);
+
+/*
+  ---- Private markets ----
+  A different animal from the exchange: you don't buy a share at a price, you
+  COMMIT capital to a fund that calls it down over years and returns it as
+  investments exit. That shape — the J-curve — is the whole lesson, so it's
+  modeled properly rather than faked as a slow-moving stock.
+*/
+
+/** A simulated fund an allocator can commit to. Curated from the console. */
+export const peFunds = pgTable("pe_funds", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  /** "buyout" | "venture" | "growth" | "credit" | "real_estate" | "secondaries" */
+  strategy: text("strategy").notNull(),
+  vintage: integer("vintage").notNull(),
+  /** Fund life and investment period, in years. */
+  termYears: integer("term_years").notNull().default(10),
+  /** Manager economics: 2% management fee, 20% carry is the classic pair. */
+  mgmtFee: doublePrecision("mgmt_fee").notNull().default(0.02),
+  carry: doublePrecision("carry").notNull().default(0.2),
+  /** Preferred return ("hurdle") the LP earns before carry applies. */
+  hurdle: doublePrecision("hurdle").notNull().default(0.08),
+  /** Target gross multiple and the volatility of the outcome, for simulation. */
+  targetMultiple: doublePrecision("target_multiple").notNull().default(2.2),
+  volatility: doublePrecision("volatility").notNull().default(0.35),
+  minCommitment: doublePrecision("min_commitment").notNull().default(25000),
+  blurb: text("blurb"),
+  enabled: integer("enabled").notNull().default(1),
+  createdAt: epochMs("created_at").notNull(),
+}, (t) => [index("pe_funds_enabled").on(t.enabled)]);
+
+/** One LP's commitment to one fund. */
+export const peCommitments = pgTable("pe_commitments", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  fundId: text("fund_id").notNull().references(() => peFunds.id),
+  /** What you promised. Only `called` has actually left your account. */
+  committed: doublePrecision("committed").notNull(),
+  called: doublePrecision("called").notNull().default(0),
+  distributed: doublePrecision("distributed").notNull().default(0),
+  /** Current mark on the unrealized remainder (the fund's NAV share). */
+  nav: doublePrecision("nav").notNull().default(0),
+  /** Simulation clock: quarters elapsed since the commitment. */
+  quarters: integer("quarters").notNull().default(0),
+  /** The outcome multiple drawn at commitment — fixed, so the fund's fate is
+      set the day you invest, exactly like the real thing. */
+  outcomeMultiple: doublePrecision("outcome_multiple").notNull(),
+  status: text("status").$type<"investing" | "harvesting" | "closed">().notNull().default("investing"),
+  createdAt: epochMs("created_at").notNull(),
+}, (t) => [index("pe_commit_user").on(t.userId)]);
+
+/** Every capital call and distribution — the LP's cash-flow record. */
+export const peCashflows = pgTable("pe_cashflows", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  commitmentId: text("commitment_id").notNull().references(() => peCommitments.id),
+  /** "call" takes cash from you; "distribution" returns it. */
+  kind: text("kind").$type<"call" | "distribution">().notNull(),
+  amount: doublePrecision("amount").notNull(),
+  quarter: integer("quarter").notNull(),
+  note: text("note"),
+  createdAt: epochMs("created_at").notNull(),
+}, (t) => [index("pe_flows_user").on(t.userId), index("pe_flows_commit").on(t.commitmentId)]);

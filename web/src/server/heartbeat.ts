@@ -4,6 +4,7 @@ import { tickAllRunningAgents } from "./agents";
 import { purgeExpiredSessions } from "./auth";
 import { backfillTick } from "./backfill";
 import { settleAllExpiredOptions } from "./exchange";
+import { tickAllPrivateMarkets } from "./private-markets";
 import { maybeSyncTickers } from "./tickers";
 import { db, schema } from "./db";
 import { lt } from "drizzle-orm";
@@ -25,11 +26,12 @@ export async function runHeartbeat(kind = "tick") {
   // allSettled: one failing task (a flaky backfill fetch, a purge hiccup) must
   // not discard the agent metrics that already succeeded, nor falsely mark the
   // whole run failed.
-  const [aRes, bRes, pRes, oRes] = await Promise.allSettled([
+  const [aRes, bRes, pRes, oRes, peRes] = await Promise.allSettled([
     tickAllRunningAgents(),
     backfillTick(),
     purgeExpiredSessions(),
     settleAllExpiredOptions(),
+    tickAllPrivateMarkets(),
   ]);
   if (aRes.status === "fulfilled") agents = aRes.value;
   if (bRes.status === "fulfilled") backfill = bRes.value;
@@ -37,6 +39,11 @@ export async function runHeartbeat(kind = "tick") {
   // whether or not its owner is watching.
   if (oRes.status === "fulfilled" && oRes.value > 0) {
     agents = { ...agents, actions: agents.actions + oRes.value };
+  }
+  // Private-markets quarters advance on their own slower clock (see
+  // tickAllPrivateMarkets); capital calls and distributions count as actions.
+  if (peRes.status === "fulfilled") {
+    agents = { ...agents, actions: agents.actions + peRes.value.calls + peRes.value.distributions };
   }
   const ok = aRes.status === "fulfilled" && bRes.status === "fulfilled" && pRes.status === "fulfilled" ? 1 : 0;
 
