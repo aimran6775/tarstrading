@@ -40,6 +40,21 @@ describe("peMetrics", () => {
     expect(m.tvpi).toBeCloseTo(75_000 / 60_000, 6);  // 1.25× total value
   });
 
+  it("dates IRR off the SIMULATED quarter, not wall-clock time", () => {
+    // A fund that calls $100k and returns $200k over 5 years (20 quarters).
+    // Every flow is written within milliseconds of real time, so an IRR dated
+    // off timestamps would divide by ~zero years and fail — the bug this pins.
+    const m = peMetrics(
+      { committed: 100_000, called: 100_000, distributed: 200_000, nav: 0 },
+      [
+        { kind: "call", amount: 100_000, quarter: 0 },
+        { kind: "distribution", amount: 200_000, quarter: 20 },
+      ],
+    );
+    expect(m.irr).not.toBeNull();
+    expect(m.irr!).toBeCloseTo(Math.pow(2, 1 / 5) - 1, 3); // ~14.9% a year
+  });
+
   it("is zero-safe before the first call", () => {
     const m = peMetrics({ committed: 50_000, called: 0, distributed: 0, nav: 0 });
     expect(m.tvpi).toBe(0);

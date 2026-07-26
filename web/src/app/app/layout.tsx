@@ -22,9 +22,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Icon.Spark className="h-3.5 w-3.5 shrink-0" /> {announcement}
         </div>
       )}
-      {/* Clearance: ticker (2.25rem) everywhere; + mobile tab bar (3.5rem) below sm.
+      {/* Clearance: ticker (2.25rem) everywhere; + mobile tab bar (3.5rem) below md,
+          which is where the header hands navigation over to the bottom bar.
           relative/z-10 keeps content above the fixed atmosphere layers. */}
-      <div className="relative z-10 pb-[calc(5.75rem+env(safe-area-inset-bottom))] sm:pb-9">{children}</div>
+      <div className="relative z-10 pb-[calc(5.75rem+env(safe-area-inset-bottom))] md:pb-9">{children}</div>
       <MarketFooter />
     </ToastProvider>
   );

@@ -61,11 +61,19 @@ export function irrOf(flows: { amount: number; atMs: number }[]): number | null 
   return (lo + hi) / 2;
 }
 
-/** The standard LP ratios, plus IRR when the flows can support one. */
+/**
+ * The standard LP ratios, plus IRR when the flows can support one.
+ *
+ * IRR is dated off the SIMULATED quarter, not wall-clock time. The fund clock
+ * runs far faster than real time (a ten-year fund plays out in days), so an
+ * IRR computed from timestamps would divide by a near-zero year count and
+ * either explode or fail to solve — which is exactly what it did before this
+ * was fixed. `quarter` is the fund's own age, and that's what an LP means.
+ */
 export function peMetrics(
   c: { committed: number; called: number; distributed: number; nav: number },
-  flows: { kind: "call" | "distribution"; amount: number; createdAt: number }[] = [],
-  navAtMs = Date.now(),
+  flows: { kind: "call" | "distribution"; amount: number; quarter: number }[] = [],
+  navAtQuarter?: number,
 ): PeMetrics {
   const unfunded = Math.max(0, c.committed - c.called);
   const tvpi = c.called > 0 ? (c.distributed + c.nav) / c.called : 0;
@@ -74,11 +82,17 @@ export function peMetrics(
 
   // A call is money out (negative), a distribution money in, and the current
   // NAV counts as a terminal inflow — the standard way to get a live IRR.
+  // irrOf works in milliseconds, so quarters are expressed as elapsed time.
+  const YEAR_MS = 365 * 86_400_000;
+  const atQuarter = (q: number) => (q / 4) * YEAR_MS;
   const dated = flows.map((f) => ({
     amount: f.kind === "call" ? -f.amount : f.amount,
-    atMs: f.createdAt,
+    atMs: atQuarter(f.quarter),
   }));
-  if (c.nav > 0) dated.push({ amount: c.nav, atMs: navAtMs });
+  if (c.nav > 0) {
+    const last = flows.length ? Math.max(...flows.map((f) => f.quarter)) : 0;
+    dated.push({ amount: c.nav, atMs: atQuarter(navAtQuarter ?? last + 1) });
+  }
 
   return {
     committed: c.committed, called: c.called, distributed: c.distributed, nav: c.nav,
@@ -320,7 +334,7 @@ export async function privatePortfolio(userId: string) {
     called: rows.reduce((s, r) => s + r.called, 0),
     distributed: rows.reduce((s, r) => s + r.distributed, 0),
     nav: rows.reduce((s, r) => s + r.nav, 0),
-  }, flows.map((f) => ({ kind: f.kind, amount: f.amount, createdAt: f.createdAt })));
+  }, flows.map((f) => ({ kind: f.kind, amount: f.amount, quarter: f.quarter })));
 
   return { commitments: rows, totals, flows };
 }
