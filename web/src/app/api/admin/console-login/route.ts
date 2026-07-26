@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { consoleCredentialsOk, startConsoleSession, endConsoleSession, rateLimit } from "@/server/auth";
+import { consoleCredentialsOk, startConsoleSession, endConsoleSession, rateLimit, clientIp } from "@/server/auth";
 
 /*
   Control-console sign-in. Credentials live in env (never in the DB, never in
@@ -9,7 +9,7 @@ import { consoleCredentialsOk, startConsoleSession, endConsoleSession, rateLimit
 */
 export async function POST(req: Request) {
   const h = await headers();
-  const ip = (h.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
+  const ip = clientIp(h);
   const allowed = await rateLimit(`console:${ip}`, 8, 10 * 60_000);
   if (!allowed) {
     return NextResponse.json({ ok: false, error: "Too many attempts. Wait a few minutes." }, { status: 429 });

@@ -155,7 +155,15 @@ export async function marketStats(symbols: string[]): Promise<MarketStat[]> {
     const v = vault.get(symbol);
 
     const price = num(s?.latestTrade?.p) ?? num(s?.dailyBar?.c) ?? num(v?.last_close);
-    const prevClose = num(s?.prevDailyBar?.c) ?? num(v?.close_1m) ?? null;
+    /*
+      The previous close comes from the snapshot or it is unknown — full stop.
+      An earlier version fell back to the vault's close ~30 days ago, so any
+      snapshot hiccup turned a MONTH's return into "today's change": a stock up
+      8% on the month printed +8.00% as its day move, and the movers rails and
+      breadth counter silently became a monthly leaderboard labelled daily.
+      A null here costs a dash; a wrong number costs trust.
+    */
+    const prevClose = num(s?.prevDailyBar?.c);
     const change = price != null && prevClose != null ? price - prevClose : null;
     const changePercent = change != null && prevClose ? change / prevClose : null;
 

@@ -80,6 +80,10 @@ function store(key: string, data: unknown) {
 }
 
 function massiveTicker(symbol: string): string {
+  // Crypto → X:BTCUSD, FX → C:EURUSD, everything else is already the ticker.
+  // Without the FX branch a pair reached upstream as "FX:EURUSD" and 404'd, so
+  // resting FX orders could never be priced and never filled.
+  if (symbol.startsWith("FX:")) return "C:" + symbol.slice(3);
   return symbol.includes("/") ? "X:" + symbol.replace("/", "") : symbol;
 }
 

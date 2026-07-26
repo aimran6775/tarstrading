@@ -74,7 +74,14 @@ export default async function FloorPage() {
 
   const marked = positions.map((p) => {
     const price = q.get(p.symbol)?.price ?? p.avgEntryPrice;
-    return { symbol: p.symbol, qty: p.qty, value: price * p.qty, openPnl: (price - p.avgEntryPrice) * p.qty };
+    // An option contract covers 100 shares. Without this the Floor's "Open P&L"
+    // KPI contradicted account equity, which applies the multiplier correctly.
+    const mult = /^[A-Z]{1,6}\d{6}[CP]\d{8}$/.test(p.symbol) ? 100 : 1;
+    return {
+      symbol: p.symbol, qty: p.qty,
+      value: price * p.qty * mult,
+      openPnl: (price - p.avgEntryPrice) * p.qty * mult,
+    };
   }).sort((a, b) => b.value - a.value);
   const movers = moverSymbols.map((s) => q.get(s)).filter(Boolean)
     .map((x) => ({ symbol: x!.symbol, price: x!.price, changePercent: x!.changePercent }));

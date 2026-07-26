@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/server/auth";
 import { db, schema } from "@/server/db";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gte, inArray } from "drizzle-orm";
 
 /*
   Sparklines for market cards — served STRICTLY from the bar vault, never
@@ -18,10 +18,22 @@ export async function GET(request: Request) {
     .split(",").map((s) => s.trim().toUpperCase()).filter(Boolean).slice(0, 32);
   if (!symbols.length) return NextResponse.json({ ok: false, error: "No symbols." }, { status: 400 });
 
+  /*
+    Sparklines come from the DAILY series windowed to ~90 days, not from a "3M"
+    series. The historian only ever writes 1Y and 5Y, and backfill only touches
+    watchlists, positions, agent universes and ten house symbols — so 3M held
+    bars for 11 symbols out of 1,601 and 99% of the board rendered an empty
+    line forever. The daily series already covers everything.
+  */
+  const since = Math.floor(Date.now() / 1000) - 90 * 86_400;
   const rows = await db.select({
     symbol: schema.bars.symbol, t: schema.bars.t, c: schema.bars.c,
   }).from(schema.bars)
-    .where(and(eq(schema.bars.timeframe, "3M"), inArray(schema.bars.symbol, symbols)))
+    .where(and(
+      eq(schema.bars.timeframe, "1Y"),
+      inArray(schema.bars.symbol, symbols),
+      gte(schema.bars.t, since),
+    ))
     .orderBy(asc(schema.bars.t));
 
   const series = new Map<string, number[]>();

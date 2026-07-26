@@ -20,7 +20,11 @@ export default async function MarketPage({ params, searchParams }: {
 
   const { symbol: raw } = await params;
   const symbol = decodeURIComponent(raw).toUpperCase();
-  if (!/^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/.test(symbol)) notFound();
+  /* Equity/crypto ticker, an FX: pair, or an OCC option contract. FX was listed
+     on the board while this regex still rejected the colon, so all 16 pairs
+     404'd — visible in Markets, unreachable when clicked. */
+  const ROUTABLE = /^([A-Z.]{1,8}(\/[A-Z]{3,4})?|FX:[A-Z]{6}|[A-Z]{1,6}\d{6}[CP]\d{8})$/;
+  if (!ROUTABLE.test(symbol)) notFound();
 
   const sp = await searchParams;
   return <MarketView symbol={symbol} initialTray={sp.tray} initialSide={sp.side} />;

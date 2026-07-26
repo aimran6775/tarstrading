@@ -471,7 +471,19 @@ export async function markEquity(userId: string) {
     const bySymbol = new Map(quotes.map((q) => [q.symbol, q.price]));
     for (const p of positions) {
       const mark = optMarks.get(p.symbol) ?? fxMarks.get(p.symbol)?.price
-        ?? bySymbol.get(p.symbol) ?? p.avgEntryPrice;
+        ?? bySymbol.get(p.symbol);
+      if (mark == null) {
+        /*
+          No mark means we do not know this position's value right now. Falling
+          back to entry price would report unrealized P&L of exactly $0.00 —
+          and because this function PERSISTS equity and appends to the equity
+          curve, that fiction would be written permanently into Sharpe,
+          drawdown and CAGR, where recovery never removes it. So we abandon the
+          whole pass: a stale equity number is honest, a fabricated one isn't.
+          (settleExpiredOptions already refuses to settle without a mark.)
+        */
+        return;
+      }
       value += mark * p.qty * multiplierFor(p.symbol);
     }
   }

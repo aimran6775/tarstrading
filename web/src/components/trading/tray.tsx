@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import HoldButton from "@/components/hold-button";
 import AnalyticsBoard from "./analytics-board";
-import { usd, type Quote, type Position, type Order } from "./shared";
+import { usd, contractSize, type Quote, type Position, type Order } from "./shared";
 
 /*
   The portfolio tray — the persistent bottom band of every market page.
@@ -45,8 +45,10 @@ export function Positions({ positions, quotes, onSelect, onClosed }: {
     <ul className="divide-y divide-[var(--hairline)]">
       {positions.map((p) => {
         const q = quotes.get(p.symbol);
-        const value = (q?.price ?? p.avgEntryPrice) * p.qty;
-        const pnl = q ? (q.price - p.avgEntryPrice) * p.qty : 0;
+        // An option contract covers 100 shares — see contractSize().
+        const mult = contractSize(p.symbol);
+        const value = (q?.price ?? p.avgEntryPrice) * p.qty * mult;
+        const pnl = q ? (q.price - p.avgEntryPrice) * p.qty * mult : 0;
         return (
           <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3 md:px-5">
             <button onClick={() => onSelect(p.symbol)} className="pressable min-h-11 min-w-[110px] text-left">

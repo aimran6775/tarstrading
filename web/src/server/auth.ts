@@ -261,3 +261,28 @@ export async function rateLimit(key: string, max: number, windowMs: number): Pro
 export async function purgeExpiredSessions() {
   await db.delete(schema.sessions).where(lt(schema.sessions.expiresAt, Date.now()));
 }
+
+/*
+  The client's real IP, for throttling.
+
+  NOT the left-most X-Forwarded-For hop: that value is supplied by the client,
+  and Cloudflare APPENDS the true address rather than replacing the header. So
+  a caller who sends their own X-Forwarded-For lands in a fresh rate-limit
+  bucket on every request — which silently defeated login, signup AND console
+  throttling, leaving the operator password brute-forceable at full speed.
+
+  CF-Connecting-IP is set by Cloudflare and cannot be forged through it. We fall
+  back to the RIGHT-most forwarded hop (the one our own edge appended) and only
+  then to a constant, so a misconfiguration throttles everyone together rather
+  than nobody at all.
+*/
+export function clientIp(h: Headers): string {
+  const cf = h.get("cf-connecting-ip")?.trim();
+  if (cf) return cf;
+  const xff = h.get("x-forwarded-for");
+  if (xff) {
+    const hops = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    if (hops.length) return hops[hops.length - 1];
+  }
+  return h.get("x-real-ip")?.trim() || "unknown";
+}

@@ -96,3 +96,14 @@ export function marketHrefFor(symbol: string): string {
     ? `/app/m/${encodeURIComponent(m[1])}?tray=options`
     : `/app/m/${encodeURIComponent(symbol)}`;
 }
+
+/*
+  One option contract controls 100 shares. The exchange applies this in cash,
+  realized P&L, equity marks and every margin term — but the DISPLAY surfaces
+  didn't, so a 5-lot bought at $4.20 showed a value of $21 instead of $2,100
+  while account equity showed the truth. The app contradicted itself about
+  money, which is the worst thing a trading product can do.
+*/
+const OCC_RE = /^[A-Z]{1,6}\d{6}[CP]\d{8}$/;
+export const isOptionTicker = (s: string) => OCC_RE.test(s.toUpperCase());
+export const contractSize = (s: string) => (isOptionTicker(s) ? 100 : 1);
