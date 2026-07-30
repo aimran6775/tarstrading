@@ -476,14 +476,33 @@ export async function indicesIntradayTick(): Promise<number> {
 
 type FuturesProduct = { code: string; name: string };
 
-/** The majors across CME/CBOT/NYMEX/COMEX — index, energy, metals, grains, rates, FX. */
+/** The full free entitlement — CME, CBOT, NYMEX and COMEX, every liquid
+    product family those venues clear: equity index, the whole Treasury
+    curve, energy, precious and base metals, grains and oilseeds, livestock,
+    and currency futures. (ICE products — softs, Brent — are a different
+    exchange group and not in the free tier.) */
 export const FUTURES_PRODUCTS: FuturesProduct[] = [
+  // Equity index (CME)
   { code: "ES", name: "E-mini S&P 500" }, { code: "NQ", name: "E-mini Nasdaq 100" },
   { code: "YM", name: "E-mini Dow" }, { code: "RTY", name: "E-mini Russell 2000" },
+  // Rates — the Treasury curve (CBOT)
+  { code: "ZT", name: "2-Year T-Note" }, { code: "ZF", name: "5-Year T-Note" },
+  { code: "ZN", name: "10-Year T-Note" }, { code: "ZB", name: "30-Year T-Bond" },
+  // Energy (NYMEX)
   { code: "CL", name: "Crude Oil (WTI)" }, { code: "NG", name: "Natural Gas" },
+  { code: "RB", name: "RBOB Gasoline" }, { code: "HO", name: "Heating Oil" },
+  // Metals (COMEX / NYMEX)
   { code: "GC", name: "Gold" }, { code: "SI", name: "Silver" }, { code: "HG", name: "Copper" },
+  { code: "PL", name: "Platinum" }, { code: "PA", name: "Palladium" },
+  // Grains & oilseeds (CBOT)
   { code: "ZC", name: "Corn" }, { code: "ZS", name: "Soybeans" }, { code: "ZW", name: "Wheat" },
-  { code: "ZN", name: "10-Year T-Note" }, { code: "6E", name: "Euro FX" },
+  { code: "ZL", name: "Soybean Oil" }, { code: "ZM", name: "Soybean Meal" },
+  // Livestock (CME)
+  { code: "LE", name: "Live Cattle" }, { code: "HE", name: "Lean Hogs" },
+  // Currency futures (CME)
+  { code: "6E", name: "Euro FX" }, { code: "6B", name: "British Pound" },
+  { code: "6J", name: "Japanese Yen" }, { code: "6A", name: "Australian Dollar" },
+  { code: "6C", name: "Canadian Dollar" },
 ];
 
 type FuturesState = {
