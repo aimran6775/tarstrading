@@ -41,8 +41,11 @@ describe("deriveFxPairs", () => {
     expect(p.get("FX:EURGBP")!).toBeCloseTo(0.7525 / 0.87873, 6);
   });
 
-  it("covers all 16 pairs, and drops pairs whose currency is missing", () => {
-    expect(deriveFxPairs(rates).size).toBe(16);
+  it("covers all 17 pairs, and drops pairs whose currency is missing", () => {
+    const withKrw = { ...rates, KRW: 1391.2 };
+    expect(deriveFxPairs(withKrw).size).toBe(17);
+    expect(deriveFxPairs(withKrw).get("FX:USDKRW")!).toBeCloseTo(1391.2, 6);
+    expect(deriveFxPairs(rates).size).toBe(16); // no KRW rate → pair honestly absent
     const partial = deriveFxPairs({ EUR: 0.9 });
     expect(partial.get("FX:EURUSD")).toBeDefined();
     expect(partial.get("FX:USDJPY")).toBeUndefined();  // no JPY rate → no pair

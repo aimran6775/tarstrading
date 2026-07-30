@@ -132,11 +132,23 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
           </div>
 
           <div className="flex items-center gap-2 md:gap-3">
+            {/* Search: label + shortcut on desktop; below lg the same palette
+                opens from an icon — a phone has no ⌘K, and a market search
+                you can't reach isn't a feature. */}
             <button
               onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
               className="pressable hidden items-center gap-1.5 rounded-full border border-hairline px-3 py-1.5 text-[11px] text-ink-4 hover:text-ink-2 lg:flex"
               aria-label="Open command palette">
               <span>Search</span><span className="tnum rounded bg-bg3 px-1.5 py-0.5">⌘K</span>
+            </button>
+            <button
+              onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+              className="pressable flex min-h-10 min-w-10 items-center justify-center rounded-full border border-hairline text-ink-3 hover:text-ink-1 lg:hidden"
+              aria-label="Search markets">
+              <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="7" /><path d="m20 20-3.8-3.8" />
+              </svg>
             </button>
             {xp != null && xp > 0 && (
               <span className="tnum hidden items-center gap-1.5 rounded-full bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold lg:flex"

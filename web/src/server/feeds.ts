@@ -180,7 +180,7 @@ export function deriveFxPairs(rates: Record<string, number>): Map<string, number
     ["FX:NZDUSD", "NZD", true],
     ["FX:USDJPY", "JPY", false], ["FX:USDCHF", "CHF", false], ["FX:USDCAD", "CAD", false],
     ["FX:USDMXN", "MXN", false], ["FX:USDSEK", "SEK", false], ["FX:USDNOK", "NOK", false],
-    ["FX:USDSGD", "SGD", false],
+    ["FX:USDSGD", "SGD", false], ["FX:USDKRW", "KRW", false],
   ];
   for (const [pair, ccy, invert] of direct) {
     const v = r(ccy);
@@ -210,7 +210,7 @@ export async function fxDailyTick(): Promise<{ pairs: number } | { skipped: stri
   let json: { date?: string; rates?: Record<string, number> };
   try {
     const res = await fetch(
-      "https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR,GBP,JPY,CHF,CAD,AUD,NZD,MXN,SEK,NOK,SGD",
+      "https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR,GBP,JPY,CHF,CAD,AUD,NZD,MXN,SEK,NOK,SGD,KRW",
       { cache: "no-store" });
     if (!res.ok) throw new Error(`frankfurter ${res.status}`);
     json = await res.json();

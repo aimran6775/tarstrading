@@ -41,7 +41,7 @@ const toPolygon = (symbol: string) => `C:${symbol.toUpperCase().replace(FX_PREFI
 export const FX_PAIRS = [
   "FX:EURUSD", "FX:GBPUSD", "FX:USDJPY", "FX:USDCHF", "FX:AUDUSD", "FX:USDCAD",
   "FX:NZDUSD", "FX:EURGBP", "FX:EURJPY", "FX:GBPJPY", "FX:EURCHF", "FX:AUDJPY",
-  "FX:USDMXN", "FX:USDSEK", "FX:USDNOK", "FX:USDSGD",
+  "FX:USDMXN", "FX:USDSEK", "FX:USDNOK", "FX:USDSGD", "FX:USDKRW",
 ];
 
 /**
