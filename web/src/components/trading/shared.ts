@@ -118,10 +118,12 @@ const FUT_MONTHS: Record<string, string> = {
 };
 export function futDisplay(symbol: string): string {
   const t = symbol.toUpperCase().slice(FUT_PREFIX.length);
-  const m = /^([A-Z0-9]{1,3}?)([FGHJKMNQUVXZ])(\d)$/.exec(t);
+  // Venues mix year formats: ESU6 (one digit) and NGU26 (two). Both are real.
+  const m = /^([A-Z0-9]{1,3}?)([FGHJKMNQUVXZ])(\d{1,2})$/.exec(t);
   if (!m) return t;
   // Single-digit years are this decade's: 6 → '26. Good until 2030, reviewed then.
-  return `${m[1]} ${FUT_MONTHS[m[2]]} '2${m[3]}`;
+  const year = m[3].length === 2 ? m[3] : `2${m[3]}`;
+  return `${m[1]} ${FUT_MONTHS[m[2]]} '${year}`;
 }
 
 /** The pills the browse page groups markets under. */
