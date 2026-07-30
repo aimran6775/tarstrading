@@ -47,7 +47,8 @@ import {
    Income (preferreds, closed-end funds, bond vehicles). */
 type Category = "Trending" | MarketCategory | "Watchlist";
 const CATEGORIES: Category[] = [
-  "Trending", "Stocks", "ETFs", "Crypto", "Global", "FX", "Income", "Watchlist",
+  "Trending", "Stocks", "ETFs", "Crypto", "Global", "FX", "Income",
+  "Indices", "Futures", "Watchlist",
 ];
 
 /** A section is a slice of the board the server can page for us. */
@@ -63,6 +64,8 @@ const EMPTY_NOTE: Record<Category, string> = {
   Global: "No world markets on the board yet — ADRs and country funds land here.",
   FX: "No currency pairs on the board yet.",
   Income: "No income instruments on the board yet — preferreds and bond funds land here.",
+  Indices: "No index levels yet — the feeds mesh publishes them after its first daily run.",
+  Futures: "No futures contracts yet — front months land here after the feeds mesh discovers them.",
   Watchlist: "Nothing on your watchlist yet. Add a ticker above and it follows you everywhere.",
 };
 
@@ -285,7 +288,8 @@ export default function Browse({ userName, welcome, board }: {
       m.set(r.symbol, {
         symbol: r.symbol, price: r.price,
         previousClose: r.prevClose ?? r.price,
-        changePercent: r.changePercent, asOf: stamp,
+        changePercent: r.changePercent, asOf: r.asOf ?? stamp,
+        provenance: r.source ?? undefined,
       });
     }
     return m;
@@ -306,6 +310,7 @@ export default function Browse({ userName, welcome, board }: {
       open: null, dayHigh: null, dayLow: null, volume: null, bid: null, ask: null,
       high52: null, low52: null, avgVolume: null, rangePosition: null,
       return1M: null, return1Y: null,
+      source: q?.provenance ?? null, asOf: q?.asOf ?? null,
     };
   }, [rowMap, extraQuotes, categoryFor]);
 

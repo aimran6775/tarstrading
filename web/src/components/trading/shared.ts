@@ -1,6 +1,31 @@
 /* Shared trading types + formatters for the browse home, market pages, and tray. */
 
-export type Quote = { symbol: string; price: number; previousClose: number; changePercent: number; asOf: number };
+export type Quote = { symbol: string; price: number; previousClose: number; changePercent: number; asOf: number; provenance?: Provenance };
+
+/* ---- provenance -----------------------------------------------------------
+   Every price carries where it came from, and the UI says so — the same
+   honesty rule as the PAPER banner, applied to data. The client copy of the
+   server's Provenance type (src/server/market.ts is server-only). */
+export type Provenance = "live" | "delayed" | "eod" | "derived" | "indicative";
+
+/** Badge text per provenance. Short enough for a chip, honest enough to teach:
+    a learner should leave knowing what "delayed" and "derived" mean. */
+export const PROVENANCE_LABEL: Record<Provenance, string> = {
+  live: "LIVE",
+  delayed: "DELAYED 15M",
+  eod: "EOD",
+  derived: "DERIVED",
+  indicative: "INDICATIVE",
+};
+
+/** One-line explanations for tooltips/legends. */
+export const PROVENANCE_HELP: Record<Provenance, string> = {
+  live: "Real-time trade ticks.",
+  delayed: "Consolidated market data, 15 minutes behind.",
+  eod: "Last official close — updates daily.",
+  derived: "Computed from a related instrument (e.g. an index from its ETF).",
+  indicative: "Modeled between official prints — not a market quote.",
+};
 export type Account = { cash: number; equity: number; dayStartEquity: number };
 export type Position = { id: string; symbol: string; qty: number; avgEntryPrice: number };
 export type Order = {
@@ -38,8 +63,13 @@ export function fxDisplay(symbol: string): string {
 }
 
 /** What a user reads. The route still travels on the real symbol. */
-export const displaySymbol = (symbol: string) =>
-  isFxSymbol(symbol) ? fxDisplay(symbol) : symbol;
+export const displaySymbol = (symbol: string) => {
+  if (isFxSymbol(symbol)) return fxDisplay(symbol);
+  const u = symbol.toUpperCase();
+  if (u.startsWith("IDX:")) return u.slice(4);
+  if (u.startsWith("FUT:")) return futDisplay(symbol);
+  return symbol;
+};
 
 /* Quote currencies that trade in the hundreds rather than around 1 — a yen
    cross prints 157.2354 where a major prints 1.16352. The scale belongs to the
@@ -69,11 +99,37 @@ export function formatSignedPrice(symbol: string, value: number): string {
   return `${value >= 0 ? "+" : "−"}${formatPrice(symbol, Math.abs(value))}`;
 }
 
+/* ---- indices & futures ----------------------------------------------------
+   Index levels (IDX:SPX) and futures contracts (FUT:ESU6) are QUOTE-ONLY:
+   you don't buy the S&P 500 number, you buy SPY — and the futures desk needs
+   a margin model we haven't built yet. Prefixed like FX so nothing ambiguous
+   ever reaches the exchange; the order API's symbol regex rejects both. */
+export const IDX_PREFIX = "IDX:";
+export const FUT_PREFIX = "FUT:";
+export const isIndexSymbol = (s: string) => s.toUpperCase().startsWith(IDX_PREFIX);
+export const isFutureSymbol = (s: string) => s.toUpperCase().startsWith(FUT_PREFIX);
+/** Quote-only instruments: shown, charted, never tradable. */
+export const isQuoteOnly = (s: string) => isIndexSymbol(s) || isFutureSymbol(s);
+
+/** IDX:SPX → SPX; FUT:ESU6 → ES Sep '26 (CME month codes). */
+const FUT_MONTHS: Record<string, string> = {
+  F: "Jan", G: "Feb", H: "Mar", J: "Apr", K: "May", M: "Jun",
+  N: "Jul", Q: "Aug", U: "Sep", V: "Oct", X: "Nov", Z: "Dec",
+};
+export function futDisplay(symbol: string): string {
+  const t = symbol.toUpperCase().slice(FUT_PREFIX.length);
+  const m = /^([A-Z0-9]{1,3}?)([FGHJKMNQUVXZ])(\d)$/.exec(t);
+  if (!m) return t;
+  // Single-digit years are this decade's: 6 → '26. Good until 2030, reviewed then.
+  return `${m[1]} ${FUT_MONTHS[m[2]]} '2${m[3]}`;
+}
+
 /** The pills the browse page groups markets under. */
 /* The board's sections. Global = foreign companies (ADRs) and country/region
    funds — real US-listed securities that carry world-market exposure without a
-   foreign data feed. FX = spot currency pairs (FX: prefixed). */
-export type MarketCategory = "Crypto" | "ETFs" | "Stocks" | "Global" | "FX" | "Income";
+   foreign data feed. FX = spot currency pairs (FX: prefixed). Indices and
+   Futures are quote-only reference markets. */
+export type MarketCategory = "Crypto" | "ETFs" | "Stocks" | "Global" | "FX" | "Income" | "Indices" | "Futures";
 
 /** One row of the curated house board, as served to the client by the server. */
 export type BoardEntry = { symbol: string; category: MarketCategory; featured: boolean };
@@ -84,6 +140,8 @@ const ETFS = new Set(["SPY", "QQQ", "DIA", "IWM", "VTI", "VOO", "GLD"]);
     additions) and when the curated board is unavailable. */
 export function categoryOf(symbol: string): MarketCategory {
   if (isFxSymbol(symbol)) return "FX";
+  if (isIndexSymbol(symbol)) return "Indices";
+  if (isFutureSymbol(symbol)) return "Futures";
   if (symbol.includes("/")) return "Crypto";
   if (ETFS.has(symbol)) return "ETFs";
   return "Stocks";

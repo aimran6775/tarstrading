@@ -14,7 +14,7 @@ import { usePathname, useRouter } from "next/navigation";
   never what the data means.
 */
 
-type IconKey = "deck" | "markets" | "academy" | "users" | "data" | "controls";
+type IconKey = "deck" | "markets" | "academy" | "users" | "data" | "controls" | "feeds";
 type Item = { label: string; href: string; icon: IconKey };
 type Group = { title?: string; items: Item[] };
 
@@ -31,6 +31,7 @@ const NAV: Group[] = [
   {
     title: "Operations",
     items: [
+      { label: "Feeds", href: "/admin/feeds", icon: "feeds" },
       { label: "Data ops", href: "/admin/data", icon: "data" },
       { label: "Controls", href: "/admin/system", icon: "controls" },
     ],
@@ -81,6 +82,14 @@ function Glyph({ name, className }: { name: IconKey; className?: string }) {
           <ellipse cx="12" cy="6.1" rx="7.1" ry="2.8" />
           <path d="M4.9 6.1v11.8c0 1.55 3.18 2.8 7.1 2.8s7.1-1.25 7.1-2.8V6.1" />
           <path d="M4.9 12c0 1.55 3.18 2.8 7.1 2.8s7.1-1.25 7.1-2.8" />
+        </>
+      )}
+      {name === "feeds" && (
+        <>
+          {/* radio waves: the mesh's signal */}
+          <circle cx="12" cy="13.4" r="1.7" />
+          <path d="M8.5 9.9a5 5 0 0 1 7 0M6 7.4a8.5 8.5 0 0 1 12 0" />
+          <path d="M12 15.1v5.3" />
         </>
       )}
       {name === "controls" && (

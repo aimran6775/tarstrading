@@ -4,6 +4,7 @@ import { tickAllRunningAgents } from "./agents";
 import { purgeExpiredSessions } from "./auth";
 import { backfillTick } from "./backfill";
 import { settleAllExpiredOptions, reconcileRestingOrders } from "./exchange";
+import { feedsSlowTick } from "./feeds";
 import { tickAllPrivateMarkets } from "./private-markets";
 import { maybeSyncTickers } from "./tickers";
 import { db, schema } from "./db";
@@ -33,6 +34,9 @@ export async function runHeartbeat(kind = "tick") {
     settleAllExpiredOptions(),
     tickAllPrivateMarkets(),
     reconcileRestingOrders(),
+    // The slow feeds (FX daily, index closes/calibration, futures) ride this
+    // 5-minute beat and each no-op until stale; the 60s sweep has its own beat.
+    feedsSlowTick(),
   ]);
   if (aRes.status === "fulfilled") agents = aRes.value;
   if (bRes.status === "fulfilled") backfill = bRes.value;
@@ -56,6 +60,9 @@ export async function runHeartbeat(kind = "tick") {
   // Retention: api_calls is pure telemetry that otherwise grows forever and
   // slows the admin feed. Keep a week. (Fire-and-forget; never fails a run.)
   db.delete(schema.apiCalls).where(lt(schema.apiCalls.createdAt, Date.now() - 7 * 86_400_000)).catch(() => {});
+  // quote_history backs intraday chart density; a week is more than any
+  // intraday view reads and keeps the table from growing without bound.
+  db.delete(schema.quoteHistory).where(lt(schema.quoteHistory.t, Date.now() - 7 * 86_400_000)).catch(() => {});
 
   // Keep the tradable-universe directory fresh (no-op when recent; runs in
   // the background paced by the market token bucket).

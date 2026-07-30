@@ -16,6 +16,10 @@
 
 const EVERY_MS = 5 * 60_000;
 const FIRST_MS = 15_000;
+// The feeds sweep keeps the whole board's quote cache ≤60s old — that cadence
+// is what makes Markets feel alive on the free data tiers.
+const FEEDS_EVERY_MS = 60_000;
+const FEEDS_FIRST_MS = 30_000;
 
 declare global {
   var __tarsHeartbeat: boolean | undefined;
@@ -29,14 +33,18 @@ export async function register() {
   globalThis.__tarsHeartbeat = true;
 
   const port = process.env.PORT ?? "3000";
-  const beat = () => {
-    fetch(`http://127.0.0.1:${port}/api/cron/tick`, {
+  const hit = (path: string) => () => {
+    fetch(`http://127.0.0.1:${port}${path}`, {
       method: "POST",
       headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
-    }).catch(() => { /* logged in cron_runs when it lands; next beat retries */ });
+    }).catch(() => { /* logged when it lands; next beat retries */ });
   };
+  const beat = hit("/api/cron/tick");
+  const feeds = hit("/api/cron/feeds");
 
   setTimeout(beat, FIRST_MS);
   setInterval(beat, EVERY_MS);
-  console.log(`[tars] backend heartbeat armed — every ${EVERY_MS / 60_000}m via loopback cron`);
+  setTimeout(feeds, FEEDS_FIRST_MS);
+  setInterval(feeds, FEEDS_EVERY_MS);
+  console.log(`[tars] backend heartbeat armed — tick every ${EVERY_MS / 60_000}m, feeds every ${FEEDS_EVERY_MS / 1000}s`);
 }

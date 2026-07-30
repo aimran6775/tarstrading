@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import HoldButton from "@/components/hold-button";
 import { useToast } from "@/components/toast";
 import LearnLink from "@/components/academy/learn-link";
-import { usd, type Quote, type Order } from "./shared";
+import { usd, isQuoteOnly, isIndexSymbol, displaySymbol, type Quote, type Order } from "./shared";
 
 /*
   The order ticket, right-rail edition: a vertical card that lives beside the
@@ -26,6 +26,7 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
   presetSide?: "buy" | "sell" | null;
 }) {
   const rm = useReducedMotion();
+  const quoteOnly = isQuoteOnly(symbol);
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [type, setType] = useState<"market" | "limit" | "stop" | "stop_limit" | "trailing_stop">("market");
   const [trailPct, setTrailPct] = useState("");
@@ -96,6 +97,26 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
   }
 
   const isCrypto = symbol.includes("/");
+
+  /*
+    Quote-only instruments: an index is a NUMBER (you'd trade SPY, not the
+    S&P 500 itself) and the futures desk has no margin model yet, so neither
+    gets an order form. The server rejects these symbols too — this panel just
+    explains why instead of letting a dead ticket 400.
+  */
+  if (quoteOnly) {
+    return (
+      <section className="raised relative overflow-hidden p-4">
+        <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/45 to-transparent" />
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Trade</h2>
+        <p className="mt-3 text-sm leading-relaxed text-ink-2">
+          {isIndexSymbol(symbol)
+            ? <>{displaySymbol(symbol)} is an index — a reference level, not a security. To take this exposure, trade its ETF (for example SPY tracks the S&amp;P&nbsp;500, QQQ the Nasdaq&nbsp;100).</>
+            : <>{displaySymbol(symbol)} is a futures contract, shown for reference. Futures trading isn&apos;t on the desk yet — it needs its own margin model.</>}
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="raised relative overflow-hidden p-4">

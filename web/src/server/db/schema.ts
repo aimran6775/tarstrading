@@ -368,6 +368,21 @@ export const quoteCache = pgTable("quote_cache", {
   changePercent: doublePrecision("change_percent").notNull(),
   asOf: epochMs("as_of").notNull(),
   updatedAt: epochMs("updated_at").notNull(),
+  /** Provenance: where this price came from — flows to the UI badges.
+      'live' (websocket tick) | 'delayed' (15-min SIP) | 'eod' (prev close) |
+      'derived' (computed from a proxy) | 'indicative' (interpolated). */
+  source: text("source").$type<"live" | "delayed" | "eod" | "derived" | "indicative">()
+    .notNull().default("eod"),
+});
+
+/** Per-feed health for the console: one row per data source (sweep, fx,
+    indices, futures, live-slots) — last run, ok flag, coverage, detail. */
+export const feedStatus = pgTable("feed_status", {
+  source: text("source").primaryKey(),
+  lastRunAt: epochMs("last_run_at"),
+  ok: integer("ok").notNull().default(1),
+  covered: integer("covered").notNull().default(0),
+  detail: text("detail"),
 });
 
 /** Cross-instance rate-limit buckets (auth throttle). Keyed by e.g.

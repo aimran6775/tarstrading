@@ -1,4 +1,4 @@
-import { formatPrice, formatSignedPrice, type MarketCategory } from "@/components/trading/shared";
+import { formatPrice, formatSignedPrice, type MarketCategory, type Provenance } from "@/components/trading/shared";
 
 /*
   The Markets board — shapes and formatters shared by the pulse strip, the
@@ -33,6 +33,11 @@ export type BoardRow = {
   rangePosition: number | null;
   return1M: number | null;
   return1Y: number | null;
+  /** Provenance of the price (LIVE / DELAYED 15M / EOD / DERIVED); null when
+      the row has no price at all. */
+  source: Provenance | null;
+  /** When the price was struck, epoch ms; null when unknown. */
+  asOf: number | null;
 };
 
 export type Breadth = { advancing: number; declining: number; unchanged: number };

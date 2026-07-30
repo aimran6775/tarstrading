@@ -2,8 +2,9 @@
 
 import { useId } from "react";
 import Link from "next/link";
-import { pct, displaySymbol, formatPrice, type Quote, type MarketCategory } from "./trading/shared";
+import { pct, displaySymbol, formatPrice, isQuoteOnly, type Quote, type MarketCategory } from "./trading/shared";
 import { instrumentOf } from "./markets/instrument";
+import { ProvenanceBadge } from "./provenance-badge";
 
 /*
   A market card — the unit of the browse page. Sparkline from the bar vault,
@@ -99,10 +100,13 @@ export default function MarketCard({ symbol, name, kind, quote, spark }: {
 
       <div className="flex items-baseline justify-between">
         {quote
-          ? <span className="tnum text-lg font-semibold tracking-tight text-ink-1">{formatPrice(symbol, quote.price)}</span>
+          ? <span className="flex items-baseline gap-2">
+              <span className="tnum text-lg font-semibold tracking-tight text-ink-1">{formatPrice(symbol, quote.price)}</span>
+              <ProvenanceBadge source={quote.provenance} />
+            </span>
           : <span className="skeleton h-6 w-20" />}
         <span className="flex items-center gap-1 text-[11px] font-medium text-gold opacity-0 transition-all duration-200 [transition-timing-function:var(--ease-spring)] group-hover:translate-x-0 group-hover:opacity-100 -translate-x-1 [@media(hover:none)]:translate-x-0 [@media(hover:none)]:opacity-70">
-          Trade
+          {isQuoteOnly(symbol) ? "View" : "Trade"}
           <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M5 12h14M13 6l6 6-6 6" />
           </svg>

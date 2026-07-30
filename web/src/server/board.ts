@@ -52,6 +52,8 @@ function toCategory(section: string, symbol: string): MarketCategory {
     case "global": return "Global";
     case "fx": case "forex": return "FX";
     case "income": return "Income";
+    case "indices": case "index": return "Indices";
+    case "futures": return "Futures";
     default: return categoryOf(symbol); // unknown section → infer, never drop
   }
 }

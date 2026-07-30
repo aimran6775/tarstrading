@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RangeMeter } from "./range-meter";
 import { instrumentOf } from "./instrument";
+import { ProvenanceBadge } from "@/components/provenance-badge";
 import { displaySymbol } from "@/components/trading/shared";
 import {
   DASH, compact, marketPath, money, pctOf, positionIn, signedMoney, toneOf, type BoardRow,
@@ -177,9 +178,12 @@ export default function BoardTable({ rows, loading, emptyNote, names, onRemove }
                       <span className="truncate text-[13px] font-semibold tracking-tight text-ink-1 group-hover:text-gold">
                         {shown}
                       </span>
-                      <span title={kind.title}
-                        className="truncate font-mono text-[9px] uppercase tracking-[0.16em] text-ink-4">
-                        {kind.label}
+                      <span className="flex items-center gap-1.5 truncate">
+                        <span title={kind.title}
+                          className="truncate font-mono text-[9px] uppercase tracking-[0.16em] text-ink-4">
+                          {kind.label}
+                        </span>
+                        <ProvenanceBadge source={r.source} />
                       </span>
                     </Link>
                   </td>

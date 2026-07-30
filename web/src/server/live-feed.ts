@@ -27,6 +27,11 @@ type Lane = {
   ws: WebSocket | null;
   authed: boolean;
   wanted: Set<string>;
+  /** Console-chosen symbols that outrank organic `wanted` traffic when the
+      lane has a symbol budget (the stocks lane's free-plan cap of 30). */
+  priority: Set<string>;
+  /** Max concurrent subscriptions (Infinity = uncapped, e.g. crypto). */
+  maxSymbols: number;
   subscribed: Set<string>;
   retryMs: number;
   lastError: string | null;
@@ -48,8 +53,11 @@ const state: FeedState = globalThis.__tarsFeed ??= {
   ticks: new Map(),
   tickCount: 0,
   lanes: {
-    stocks: { url: STOCK_URL, ws: null, authed: false, wanted: new Set(), subscribed: new Set(), retryMs: 2_000, lastError: null },
-    crypto: { url: CRYPTO_URL, ws: null, authed: false, wanted: new Set(), subscribed: new Set(), retryMs: 2_000, lastError: null },
+    // The free plan's IEX stream carries at most 30 symbols; subscribing past
+    // that silently fails, so the cap is enforced HERE with console-set
+    // priorities rather than first-come-wins.
+    stocks: { url: STOCK_URL, ws: null, authed: false, wanted: new Set(), priority: new Set(), maxSymbols: 30, subscribed: new Set(), retryMs: 2_000, lastError: null },
+    crypto: { url: CRYPTO_URL, ws: null, authed: false, wanted: new Set(), priority: new Set(), maxSymbols: Infinity, subscribed: new Set(), retryMs: 2_000, lastError: null },
   },
 };
 const { ticks, lanes } = state;
@@ -110,10 +118,33 @@ function connect(lane: Lane) {
 
 function flushSubscriptions(lane: Lane) {
   if (!lane.ws || lane.ws.readyState !== WebSocket.OPEN || !lane.authed) return;
-  const missing = [...lane.wanted].filter((s) => !lane.subscribed.has(s));
-  if (!missing.length) return;
-  lane.ws.send(JSON.stringify({ action: "subscribe", trades: missing }));
-  missing.forEach((s) => lane.subscribed.add(s));
+  // Desired roster: priority symbols first, then organic traffic up to the cap.
+  const desired = new Set<string>();
+  for (const s of lane.priority) { if (desired.size >= lane.maxSymbols) break; desired.add(s); }
+  for (const s of lane.wanted) { if (desired.size >= lane.maxSymbols) break; desired.add(s); }
+
+  const missing = [...desired].filter((s) => !lane.subscribed.has(s));
+  const evicted = [...lane.subscribed].filter((s) => !desired.has(s));
+  if (evicted.length) {
+    lane.ws.send(JSON.stringify({ action: "unsubscribe", trades: evicted }));
+    evicted.forEach((s) => lane.subscribed.delete(s));
+  }
+  if (missing.length) {
+    lane.ws.send(JSON.stringify({ action: "subscribe", trades: missing }));
+    missing.forEach((s) => lane.subscribed.add(s));
+  }
+}
+
+/** The console's live-slot roster (feeds.syncLiveSlots): these stocks hold the
+    30 free real-time slots; everything else stays on the delayed tier. */
+export function setPriorityStocks(symbols: string[]) {
+  const lane = lanes.stocks;
+  const next = new Set(symbols.slice(0, lane.maxSymbols));
+  const changed = next.size !== lane.priority.size || [...next].some((s) => !lane.priority.has(s));
+  lane.priority = next;
+  if (!hasLiveFeed) return;
+  if (!lane.ws) connect(lane);
+  else if (changed) flushSubscriptions(lane);
 }
 
 /** Make sure the feed is running and covering these symbols. Cheap to call
@@ -140,6 +171,7 @@ export function liveFeedStatus() {
     connected: l.ws?.readyState === WebSocket.OPEN,
     authed: l.authed,
     subscribed: l.subscribed.size,
+    slots: Number.isFinite(l.maxSymbols) ? { used: l.priority.size, max: l.maxSymbols } : null,
     lastError: l.lastError,
   });
   return {

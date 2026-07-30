@@ -11,6 +11,7 @@ import { SYMBOLS } from "@/lib/symbols";
 import { usd, pct, categoryOf, marketHrefFor, type Quote, type Account, type Position, type Order, type Timeframe }
   from "@/components/trading/shared";
 import LearnLink from "@/components/academy/learn-link";
+import { ProvenanceBadge } from "@/components/provenance-badge";
 import KeyStatistics, { type SymbolStat, type StatsState } from "@/components/markets/key-statistics";
 import OptionChain from "@/components/markets/option-chain";
 import type { ChartBar } from "@/components/price-chart";
@@ -278,13 +279,23 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
                   <span className={`tnum text-lg font-semibold ${chg > 0 ? "text-gain" : chg < 0 ? "text-loss" : "text-ink-3"}`}>
                     {chg > 0 ? "▲" : chg < 0 ? "▼" : ""} {pct(chg)}
                   </span>
-                  {Date.now() - quote.asOf < 90_000 ? (
+                  {/* Provenance is stated, not inferred: a 15-min-delayed SIP
+                      print is honest data wearing its badge — timestamp age
+                      alone can't tell "live but quiet" from "delayed". */}
+                  {quote.provenance === "live" || (!quote.provenance && Date.now() - quote.asOf < 90_000) ? (
                     <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-gain">
                       <span className="relative flex h-2 w-2">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-60" />
                         <span className="relative inline-flex h-2 w-2 rounded-full bg-gain" />
                       </span>
                       Live
+                    </span>
+                  ) : quote.provenance ? (
+                    <span className="flex items-baseline gap-2">
+                      <ProvenanceBadge source={quote.provenance} className="!text-[10px]" />
+                      <span className="text-[11px] text-ink-4">
+                        as of {new Date(quote.asOf).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                      </span>
                     </span>
                   ) : Date.now() - quote.asOf > 5 * 60_000 ? (
                     <span className="text-[11px] text-ink-4">

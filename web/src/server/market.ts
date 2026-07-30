@@ -20,12 +20,17 @@ import { livePrice, ensureLiveFeed } from "./live-feed";
   Without a key, a deterministic demo market takes over (same shapes).
 */
 
+/** Where a price came from — carried to the UI as a badge, same honesty
+    principle as the PAPER banner. */
+export type Provenance = "live" | "delayed" | "eod" | "derived" | "indicative";
+
 export type Quote = {
   symbol: string;
   price: number;
   previousClose: number;
   changePercent: number;
   asOf: number; // epoch ms
+  provenance: Provenance;
 };
 
 export type BarPoint = {
@@ -129,7 +134,7 @@ type AggsReply = { results?: { t: number; o: number; h: number; l: number; c: nu
 // ---------- L2: shared Postgres quote cache ----------
 function rowToQuote(r: typeof schema.quoteCache.$inferSelect): Quote {
   return { symbol: r.symbol, price: r.price, previousClose: r.previousClose,
-    changePercent: r.changePercent, asOf: r.asOf };
+    changePercent: r.changePercent, asOf: r.asOf, provenance: r.source };
 }
 
 /** Read fresh (< TTL) quotes from the shared cache for the given symbols. */
@@ -151,17 +156,48 @@ async function writeQuoteCache(q: Quote): Promise<void> {
     const now = Date.now();
     await db.insert(schema.quoteCache)
       .values({ symbol: q.symbol, price: q.price, previousClose: q.previousClose,
-        changePercent: q.changePercent, asOf: q.asOf, updatedAt: now })
+        changePercent: q.changePercent, asOf: q.asOf, updatedAt: now, source: q.provenance })
       .onConflictDoUpdate({
         target: schema.quoteCache.symbol,
         set: { price: q.price, previousClose: q.previousClose,
-          changePercent: q.changePercent, asOf: q.asOf, updatedAt: now },
+          changePercent: q.changePercent, asOf: q.asOf, updatedAt: now, source: q.provenance },
       });
     // The tick log: intraday charts grow denser with every fresh quote.
     await db.insert(schema.quoteHistory)
       .values({ symbol: q.symbol, t: now, price: q.price })
       .onConflictDoNothing();
   } catch { /* best-effort */ }
+}
+
+/**
+ * The feeds mesh's write path (see feeds.ts): store many quotes in L1 + L2
+ * with their provenance, in a handful of batched statements — the whole-board
+ * sweep runs every minute, and 1,700 per-symbol round trips to Postgres per
+ * minute would be its own denial of service. No quote_history append here:
+ * the sweep is mostly unchanged prices (retention noise, not chart density);
+ * history still grows from the websocket/getQuote path.
+ */
+export async function putQuotes(quotes: Quote[]): Promise<void> {
+  if (!quotes.length) return;
+  const now = Date.now();
+  for (const q of quotes) store(`q:${q.symbol}`, q);
+  try {
+    for (let i = 0; i < quotes.length; i += 500) {
+      await db.insert(schema.quoteCache)
+        .values(quotes.slice(i, i + 500).map((q) => ({
+          symbol: q.symbol, price: q.price, previousClose: q.previousClose,
+          changePercent: q.changePercent, asOf: q.asOf, updatedAt: now, source: q.provenance,
+        })))
+        .onConflictDoUpdate({
+          target: schema.quoteCache.symbol,
+          set: {
+            price: dsql`excluded.price`, previousClose: dsql`excluded.previous_close`,
+            changePercent: dsql`excluded.change_percent`, asOf: dsql`excluded.as_of`,
+            updatedAt: dsql`excluded.updated_at`, source: dsql`excluded.source`,
+          },
+        });
+    }
+  } catch { /* best-effort — the sweep retries next tick */ }
 }
 
 async function fetchQuote(symbol: string): Promise<Quote | null> {
@@ -174,6 +210,7 @@ async function fetchQuote(symbol: string): Promise<Quote | null> {
     previousClose: bar.o,
     changePercent: bar.o > 0 ? bar.c / bar.o - 1 : 0,
     asOf: bar.t,
+    provenance: "eod", // Massive prev-day aggregate — a close, not a tick
   };
   store(`q:${symbol}`, quote);     // L1 (this instance)
   await writeQuoteCache(quote);    // L2 (shared) — so other instances skip the fetch
@@ -191,6 +228,7 @@ function withLive(q: Quote): Quote {
     price: t.price,
     changePercent: q.previousClose > 0 ? t.price / q.previousClose - 1 : q.changePercent,
     asOf: t.at,
+    provenance: "live", // a real trade tick beat the baseline
   };
 }
 
@@ -447,6 +485,7 @@ function demoQuote(symbol: string): Quote {
     previousClose: base,
     changePercent: drift,
     asOf: Date.now() - 60_000,
+    provenance: "indicative", // the keyless demo market is openly synthetic
   };
 }
 

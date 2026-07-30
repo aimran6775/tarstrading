@@ -69,7 +69,9 @@ async function fetchBatch(
       limit: "10000",
     });
     // Split/dividend-adjusted prices for equities — charts should be continuous.
-    if (!crypto) { qs.set("adjustment", "split"); qs.set("feed", "iex"); }
+    // delayed_sip: consolidated-tape bars (real volume), 15-min delay is
+    // irrelevant for stored history and free-plan compatible.
+    if (!crypto) { qs.set("adjustment", "split"); qs.set("feed", "delayed_sip"); }
     if (pageToken) qs.set("page_token", pageToken);
 
     const res = await fetch(`${base}?${qs}`, { headers: headers(), cache: "no-store" });

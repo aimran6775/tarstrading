@@ -17,8 +17,9 @@ export const dynamic = "force-dynamic";
 
 /* Board sections. "global" carries ADRs and country/region funds; "income"
    carries preferreds, closed-end funds and bond vehicles; "fx" is spot
-   currency. The product maps these to its category pills. */
-const CATEGORIES = new Set(["stocks", "crypto", "etf", "global", "fx", "income"]);
+   currency; "indices" and "futures" are quote-only reference markets fed by
+   the feeds mesh. The product maps these to its category pills. */
+const CATEGORIES = new Set(["stocks", "crypto", "etf", "global", "fx", "income", "indices", "futures"]);
 
 /** GET — the board, enriched with data coverage so operators see what's warm. */
 export async function GET() {
