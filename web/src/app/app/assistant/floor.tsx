@@ -1,26 +1,38 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import HoldButton from "@/components/hold-button";
 import AssistantChat from "@/components/assistant-chat";
 import LearnLink from "@/components/academy/learn-link";
-import { Icon } from "@/components/icons";
+import { AnalystSigil } from "@/components/analyst-sigil";
 
 /*
-  The Agent Lab: your analyst floor, run by conversation. You TALK to your
-  analyst — plain English in, transparent rules out: it hires (compiles your
-  strategy), tests honestly (70/30 backtest), deploys, pauses, and kills on
-  your word, and remembers the whole conversation. The roster alongside is
-  the audit view: live status, P&L, and a kill switch that never needs the
-  model's permission.
+  The analyst floor — your desk of automated traders, run by conversation or
+  by one click from the bench.
+
+  Three ways in, for three kinds of people:
+  - The bench: six pre-tuned archetypes with the discipline already installed.
+    Hire in one click, backtest in one more. No jargon required.
+  - The conversation: tell the assistant what you want in plain English.
+  - The rule engine underneath: for the person who wants to see every gear.
+
+  Nothing here promises profit. The 70/30 backtest is the resume, the
+  out-of-sample number is the interview, and the activity feed narrates every
+  decision after the fact. The kill switch never needs anyone's permission.
 */
 
 type IndicatorRef =
   | { kind: "price" } | { kind: "sma"; period: number }
   | { kind: "ema"; period: number } | { kind: "rsi"; period: number }
+  | { kind: "roc"; period: number }
+  | { kind: "bollUpper"; period: number } | { kind: "bollLower"; period: number }
+  | { kind: "highest"; period: number } | { kind: "lowest"; period: number }
   | { kind: "constant"; value: number };
 type Rule = { lhs: IndicatorRef; comparator: string; rhs: IndicatorRef };
-type Strategy = { universe: string[]; entry: Rule[]; exit: Rule[] };
+type Strategy = {
+  universe: string[]; entry: Rule[]; exit: Rule[];
+  risk?: { stopLoss?: number; takeProfit?: number; cooldownBars?: number };
+};
 type SegmentStats = { return: number; maxDrawdown: number; trades: number; winRate: number };
 type Backtest = {
   splitIndex: number; barsUsed: number;
@@ -34,6 +46,10 @@ type Agent = {
   status: "draft" | "backtested" | "running" | "paused" | "killed";
   backtest: Backtest | null; thesis: string; pnl: number;
 };
+type BenchSeat = {
+  key: string; name: string; sigil: string; creed: string; method: string;
+  allocation: number; maxDrawdown: number;
+};
 type Activity = { id: string; agentName: string; text: string; createdAt: number };
 
 const usd = (v: number) => v.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -41,6 +57,7 @@ const pctf = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 export default function AnalystFloor() {
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [bench, setBench] = useState<BenchSeat[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,13 +66,20 @@ export default function AnalystFloor() {
     const res = await fetch("/api/agents");
     if (!res.ok) return;
     const data = await res.json();
-    if (data.ok) { setAgents(data.agents); setActivity(data.activity); }
+    if (data.ok) {
+      setAgents(data.agents);
+      setActivity(data.activity);
+      if (Array.isArray(data.bench)) setBench(data.bench);
+    }
   }, []);
 
   useEffect(() => {
     load();
     // The desk tick fires app-wide from AppNav; here we just refresh the view.
-    const id = setInterval(load, 15_000);
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      load();
+    }, 15_000);
     return () => clearInterval(id);
   }, [load]);
 
@@ -78,6 +102,41 @@ export default function AnalystFloor() {
     load();
   }
 
+  async function floorAction(action: "pauseAll" | "resumeAll") {
+    setBusy(action); setError(null);
+    await fetch("/api/agents", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    setBusy(null);
+    load();
+  }
+
+  async function hirePreset(key: string) {
+    setBusy(`bench:${key}`); setError(null);
+    const res = await fetch("/api/agents", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preset: key }),
+    });
+    const data = await res.json();
+    if (!data.ok) setError(data.error ?? "Couldn't hire from the bench.");
+    setBusy(null);
+    load();
+  }
+
+  const floor = useMemo(() => {
+    const active = agents.filter((a) => a.status === "running");
+    const deployed = agents.filter((a) => ["running", "paused", "killed"].includes(a.status));
+    return {
+      running: active.length,
+      paused: agents.filter((a) => a.status === "paused").length,
+      allocated: active.reduce((s, a) => s + a.allocation, 0),
+      pnl: deployed.reduce((s, a) => s + a.pnl, 0),
+    };
+  }, [agents]);
+
+  const hiredNames = useMemo(() => new Set(agents.map((a) => a.name)), [agents]);
+
   return (
     <main className="relative isolate mx-auto w-full max-w-5xl flex-1 overflow-x-clip px-5 pb-24 pt-10 md:pb-10 md:px-8">
       {/* the analyst floor's ambient — violet is the agent domain */}
@@ -90,14 +149,57 @@ export default function AnalystFloor() {
           <p className="kicker">The assistant</p>
           <LearnLink concept="ai" />
         </div>
-        <h1 className="display text-4xl text-ink-1 md:text-5xl">Talk to your assistant.</h1>
+        <h1 className="display text-4xl text-ink-1 md:text-5xl">Your floor of analysts.</h1>
         <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-2">
-          Tell it what you want and it hires an analyst to run it — plain English
-          in, transparent rules out. It backtests honestly and deploys on your
-          word, and it remembers everything. Analysts halt at their drawdown
-          limit, and the kill switch is always yours.
+          Automated traders that work while you don&apos;t — hired from the bench in
+          one click or built in plain English with your assistant. Every one is
+          transparent rules plus installed discipline: stops, cooldowns, an
+          honest backtest before any allocation, and a kill switch that is
+          always yours.
         </p>
       </div>
+
+      {/* ---- floor summary: the desk at a glance + the master switches ---- */}
+      <section className="raised relative z-10 mt-8 overflow-hidden">
+        <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-agent/50 to-transparent" />
+        <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+          <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-ink-4">On the floor</p>
+              <p className="tnum mt-0.5 text-xl font-semibold text-ink-1">
+                {floor.running}
+                <span className="ml-1.5 text-xs font-normal text-ink-4">
+                  running{floor.paused > 0 ? ` · ${floor.paused} paused` : ""}
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-ink-4">Allocated</p>
+              <p className="tnum mt-0.5 text-xl font-semibold text-ink-1">{usd(floor.allocated)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-ink-4">Floor P&amp;L</p>
+              <p className={`tnum mt-0.5 text-xl font-semibold ${floor.pnl > 0 ? "text-gain" : floor.pnl < 0 ? "text-loss" : "text-ink-2"}`}>
+                {floor.pnl >= 0 ? "+" : ""}{usd(floor.pnl)}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {floor.running > 0 && (
+              <button disabled={busy === "pauseAll"} onClick={() => floorAction("pauseAll")}
+                className="pressable rounded-full border border-hairline px-4 py-2 text-xs text-ink-1 hover:border-ink-4 disabled:opacity-50">
+                Pause the floor
+              </button>
+            )}
+            {floor.paused > 0 && (
+              <button disabled={busy === "resumeAll"} onClick={() => floorAction("resumeAll")}
+                className="pressable rounded-full bg-agent/15 px-4 py-2 text-xs font-semibold text-agent disabled:opacity-50">
+                Resume the floor
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
 
       {error && (
         <p role="alert" className="mt-4 rounded-lg border border-loss/40 bg-loss/10 px-4 py-2.5 text-sm text-loss">
@@ -105,7 +207,44 @@ export default function AnalystFloor() {
         </p>
       )}
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+      {/* ---- the bench: archetypes anyone can hire in one click ---- */}
+      <section className="relative z-10 mt-8">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">The bench</h2>
+          <p className="text-[11px] text-ink-4">Pre-tuned archetypes — discipline included, backtest still required</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {bench.map((seat) => {
+            const hired = hiredNames.has(seat.name);
+            return (
+              <article key={seat.key}
+                className="raised lift group relative overflow-hidden p-4">
+                <span aria-hidden className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-agent/10 blur-2xl transition-opacity duration-300 opacity-0 group-hover:opacity-100" />
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-agent/12 text-agent ring-1 ring-inset ring-agent/25">
+                    <AnalystSigil sigil={seat.sigil} className="h-5.5 w-5.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink-1">{seat.name}</p>
+                    <p className="tnum text-[10px] text-ink-4">
+                      {usd(seat.allocation)} · halts at −{pctf(seat.maxDrawdown)}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs italic leading-relaxed text-ink-2">&ldquo;{seat.creed}&rdquo;</p>
+                <p className="mt-2 text-[11px] leading-relaxed text-ink-4">{seat.method}</p>
+                <button disabled={busy === `bench:${seat.key}` || hired}
+                  onClick={() => hirePreset(seat.key)}
+                  className="pressable mt-3 w-full rounded-full bg-agent/15 py-2 text-xs font-semibold text-agent transition-colors hover:bg-agent/22 disabled:opacity-45">
+                  {hired ? "On your floor" : busy === `bench:${seat.key}` ? "Hiring…" : "Hire"}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <div className="relative z-10 mt-8 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         {/* The conversation IS the builder. */}
         <AssistantChat onDeskChanged={load} />
 
@@ -115,9 +254,9 @@ export default function AnalystFloor() {
             <section className="raised flex flex-col items-center gap-3 px-6 py-14 text-center">
               <p className="text-sm text-ink-2">The floor is empty.</p>
               <p className="max-w-sm text-xs text-ink-4">
-                Ask your assistant to hire one — a single symbol, a simple
-                moving-average cross, smallest allocation. Watch it work for a
-                week before giving it a raise.
+                Hire from the bench above, or ask your assistant for one — a
+                single symbol, a simple idea, smallest allocation. Watch it work
+                for a week before giving it a raise.
               </p>
             </section>
           )}
@@ -128,9 +267,9 @@ export default function AnalystFloor() {
         </div>
       </div>
 
-      <section className="raised mt-8 overflow-hidden">
+      <section className="raised relative z-10 mt-8 overflow-hidden">
         <div className="flex items-center gap-2 border-b border-hairline px-5 py-3">
-          <Icon.Journal className="h-4 w-4 text-agent" />
+          <span className="text-agent"><AnalystSigil sigil="custom" className="h-4 w-4" /></span>
           <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Activity — every decision, narrated</h2>
         </div>
         {activity.length === 0 ? (
@@ -155,7 +294,9 @@ export default function AnalystFloor() {
       </section>
 
       <p className="mt-8 text-center text-xs text-ink-4">
-        Your analysts trade simulated capital only, while your desk is open. Every order is tagged and auditable.
+        Your analysts trade simulated capital only. Every order is tagged and
+        auditable, backtests are honest by construction, and nothing on this
+        floor promises a profit — it shows you its work instead.
       </p>
     </main>
   );
@@ -177,12 +318,19 @@ function AnalystCard({ agent, busy, onAction, onDelete }: {
 }) {
   const bt = agent.backtest;
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const running = agent.status === "running";
   return (
-    <section className={`raised lift rise-in p-5 ${agent.status === "killed" ? "opacity-70" : ""}`}>
+    <section className={`raised lift rise-in relative overflow-hidden p-5 ${agent.status === "killed" ? "opacity-70" : ""}`}>
+      {/* a running analyst wears a live thread along its top edge */}
+      {running && (
+        <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-agent/60 to-transparent" />
+      )}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-agent/12 ring-1 ring-inset ring-agent/25" aria-hidden>
-            <Icon.Analyst className="h-4.5 w-4.5 text-agent" />
+          <span className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-agent ring-1 ring-inset ${
+            running ? "bg-agent/16 ring-agent/40 shadow-[0_0_18px_-4px_var(--agent)]" : "bg-agent/10 ring-agent/20"
+          }`} aria-hidden>
+            <AnalystSigil sigil={agent.emoji} className="h-5.5 w-5.5" />
           </span>
           <div>
             <p className="text-sm font-semibold text-ink-1">{agent.name}</p>
@@ -197,7 +345,7 @@ function AnalystCard({ agent, busy, onAction, onDelete }: {
           </div>
         </div>
         <span className={`tnum text-[10px] uppercase tracking-[0.2em] ${STATUS_STYLE[agent.status]}`}>
-          {agent.status === "running" && <span className="pulse-ring mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-gain align-middle" />}
+          {running && <span className="pulse-ring mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-gain align-middle" />}
           {agent.status}
         </span>
       </div>
@@ -278,6 +426,13 @@ function BacktestStrip({ bt }: { bt: Backtest }) {
   return (
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-12 w-full" preserveAspectRatio="none" aria-hidden>
+        <defs>
+          <linearGradient id={`bt-fill-${splitX.toFixed(0)}-${curve.length}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--agent)" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="var(--agent)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polygon points={`0,${H} ${pts} ${W},${H}`} fill={`url(#bt-fill-${splitX.toFixed(0)}-${curve.length})`} stroke="none" />
         <line x1={splitX} x2={splitX} y1="0" y2={H} stroke="var(--gold)" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
         <polyline points={pts} fill="none" stroke="var(--agent)" strokeWidth="1.5" />
       </svg>
@@ -306,34 +461,3 @@ function BacktestStrip({ bt }: { bt: Backtest }) {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-
-const INDICATORS = [
-  { label: "Price", value: "price" },
-  { label: "SMA", value: "sma" },
-  { label: "EMA", value: "ema" },
-  { label: "RSI", value: "rsi" },
-  { label: "Number", value: "constant" },
-] as const;
-
-const COMPARATORS = [
-  { label: "crosses above", value: "crossesAbove" },
-  { label: "crosses below", value: "crossesBelow" },
-  { label: "is above", value: "greaterThan" },
-  { label: "is below", value: "lessThan" },
-] as const;
-
-type RefDraft = { kind: string; period: string; value: string };
-type RuleDraft = { lhs: RefDraft; comparator: string; rhs: RefDraft };
-
-const defaultEntry: RuleDraft = {
-  lhs: { kind: "sma", period: "20", value: "" },
-  comparator: "crossesAbove",
-  rhs: { kind: "sma", period: "50", value: "" },
-};
-const defaultExit: RuleDraft = {
-  lhs: { kind: "sma", period: "20", value: "" },
-  comparator: "crossesBelow",
-  rhs: { kind: "sma", period: "50", value: "" },
-};

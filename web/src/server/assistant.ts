@@ -1,11 +1,12 @@
 import "server-only";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { callModel, type ChatMsg } from "./llm";
 import {
   backtest, describeStrategy, sanitizeStrategy, agentPnL, type Strategy, type BacktestResult,
 } from "./agents";
+import { presetByKey } from "./presets";
 
 /*
   The assistant — your trading-desk manager, as a conversation. You tell it
@@ -24,45 +25,50 @@ import {
 */
 
 // Finance-character codenames — assigned when you don't name an analyst
-// yourself. Personas people recognize, not human names.
-const ANALYST_NAMES: Array<{ name: string; emoji: string }> = [
-  { name: "Momentum", emoji: "🚀" },
-  { name: "The Contrarian", emoji: "🎭" },
-  { name: "Value Hound", emoji: "🐕" },
-  { name: "The Scalper", emoji: "⚡" },
-  { name: "Swing", emoji: "🎯" },
-  { name: "The Quant", emoji: "🧮" },
-  { name: "Breakout", emoji: "📈" },
-  { name: "Dip Buyer", emoji: "🪂" },
-  { name: "Trend Rider", emoji: "🌊" },
-  { name: "Mean Reverter", emoji: "⚖️" },
-  { name: "The Sentinel", emoji: "🛡️" },
-  { name: "The Oracle", emoji: "🔮" },
+// yourself. Personas people recognize, not human names. Each carries a sigil
+// key (see components/analyst-sigil.tsx), never an emoji.
+const ANALYST_NAMES: Array<{ name: string; sigil: string }> = [
+  { name: "Momentum", sigil: "momentum" },
+  { name: "The Contrarian", sigil: "reverter" },
+  { name: "Value Hound", sigil: "dip" },
+  { name: "Swing", sigil: "trend" },
+  { name: "The Quant", sigil: "custom" },
+  { name: "Breakout", sigil: "breakout" },
+  { name: "Dip Buyer", sigil: "dip" },
+  { name: "Trend Rider", sigil: "trend" },
+  { name: "Mean Reverter", sigil: "reverter" },
+  { name: "The Sentinel", sigil: "sentinel" },
 ];
 
-const SYSTEM = `You are the user's trading-desk assistant at Tars Trading, a simulated-money platform. You run their floor of automated ANALYSTS — you turn their plain-English instructions into precise, transparent trading rules, and you hire, test, deploy, pause, and retire analysts on their word. Personality: sharp, warm, concise; a good listener who confirms what it understood before acting. The ideas are theirs; the execution is yours. All money is simulated.
+const SYSTEM = `You are the user's trading-desk assistant at Tars Trading, a simulated-money platform. You run their floor of automated ANALYSTS — you turn their plain-English instructions into precise, transparent trading rules, and you hire, test, deploy, pause, and retire analysts on their word. Personality: sharp, warm, concise; a good listener who confirms what it understood before acting. Meet people where they are: a beginner gets plain words and small sizes suggested; an expert gets terse precision. The ideas are theirs; the execution is yours. All money is simulated. Never use emojis.
 
 THE RULE LANGUAGE (all an analyst can run):
-- Indicators: {"kind":"price"} | {"kind":"sma","period":N} | {"kind":"ema","period":N} | {"kind":"rsi","period":N} | {"kind":"constant","value":X}  (periods 2-200)
+- Indicators: {"kind":"price"} | {"kind":"sma","period":N} | {"kind":"ema","period":N} | {"kind":"rsi","period":N} | {"kind":"roc","period":N} (momentum, % change over N bars) | {"kind":"bollUpper","period":N} | {"kind":"bollLower","period":N} (Bollinger 2-sigma bands) | {"kind":"highest","period":N} | {"kind":"lowest","period":N} (channel of the previous N bars) | {"kind":"constant","value":X}  (periods 2-200)
 - Comparators: "crossesAbove" | "crossesBelow" | "greaterThan" | "lessThan"
 - Rule: {"lhs":IND,"comparator":CMP,"rhs":IND}
-- Strategy: {"universe":["NVDA",...max 6],"entry":[rules... ALL must fire to buy],"exit":[rules... ANY fires to sell]}
+- Strategy: {"universe":["NVDA",...max 6],"entry":[rules... ALL must fire to buy],"exit":[rules... ANY fires to sell],"risk":{"stopLoss":0.02-0.5?,"takeProfit":0.02-2?,"cooldownBars":0-30?}}
+- The risk block is the discipline: suggest a stopLoss for every hire unless the user refuses one.
 - allocation: 500-50000 (simulated $). maxDrawdown: 0.05-0.5 (auto-halt on drawdown from peak).
+
+THE BENCH (pre-tuned archetypes; hire by key with {"type":"hirePreset","key":...}):
+trend (The Trend Rider — SMA 20/50 cross on SPY+QQQ), dip (The Dip Buyer — RSI<30 on megacaps), breakout (The Breakout Hunter — 55-bar channel on semis), reverter (The Mean Reverter — lower Bollinger band on index ETFs), momentum (The Momentum Desk — 3-month ROC on tech), sentinel (The Sentinel — SPY above/below its 200-day). When someone is new or vague ("just make me something good"), offer the bench and let them choose — don't invent a strategy unprompted.
 
 RESPOND WITH ONLY A JSON OBJECT, nothing outside it:
 {"reply":"<what you say — short, plain, confirm what you did or ask ONE question>",
  "action": null
-   | {"type":"hire","name":null,"emoji":"🤖","allocation":N,"maxDrawdown":0.2,"strategy":{...}}
+   | {"type":"hire","name":null,"sigil":"trend|dip|breakout|reverter|momentum|sentinel|custom","allocation":N,"maxDrawdown":0.2,"strategy":{...}}
+   | {"type":"hirePreset","key":"trend|dip|breakout|reverter|momentum|sentinel"}
    | {"type":"backtest","name":"<analyst name>"}
    | {"type":"deploy","name":"..."} | {"type":"pause","name":"..."} | {"type":"retire","name":"..."}
+   | {"type":"pauseAll"} | {"type":"resumeAll"}
    | {"type":"status","name":null}}
 
 Rules of engagement:
-- If the instruction is complete enough, act. Sensible defaults: allocation 5000, maxDrawdown 0.2.
-- For "hire": set name to the user's name if they gave one, else null (the platform assigns a finance-character codename). Pick an emoji that fits the idea.
+- If the instruction is complete enough, act. Sensible defaults: allocation 5000, maxDrawdown 0.2, a stopLoss near 0.08.
+- For "hire": set name to the user's name if they gave one, else null (the platform assigns a codename). Pick the sigil that fits the idea.
 - If something essential is missing or ambiguous (which symbol? buy on what condition?), ask ONE question, action null.
 - After hiring, remind them you can backtest it — but only backtest when they say so.
-- If asked a general trading question, answer it in "reply" with action null: teach, explain, critique reasoning. NEVER give directive advice ("buy X", price targets, "now is a good time"). Redirect "what should I buy" to process: thesis, invalidation, sizing, risk.
+- If asked a general trading question, answer it in "reply" with action null: teach, explain, critique reasoning. NEVER give directive advice ("buy X", price targets, "now is a good time"). NEVER promise profits or claim any strategy beats the market — the honest backtest speaks, you don't. Redirect "what should I buy" to process: thesis, invalidation, sizing, risk.
 - Never fabricate results — the platform appends real numbers after an action runs.
 - If asked for something the rule language can't express (news, fundamentals, options), say so honestly and offer the nearest expressible rule.`;
 
@@ -95,18 +101,22 @@ async function floorState(userId: string): Promise<{ text: string; names: string
 }
 
 /** Pick a finance-character codename not already on the floor. */
-function assignName(taken: string[]): { name: string; emoji: string } {
+function assignName(taken: string[]): { name: string; sigil: string } {
   const used = new Set(taken.map((n) => n.toLowerCase()));
   const free = ANALYST_NAMES.find((n) => !used.has(n.name.toLowerCase()));
   if (free) return free;
   // Floor is deep — number the overflow.
   const base = ANALYST_NAMES[taken.length % ANALYST_NAMES.length];
-  return { name: `${base.name} ${Math.floor(taken.length / ANALYST_NAMES.length) + 2}`, emoji: base.emoji };
+  return { name: `${base.name} ${Math.floor(taken.length / ANALYST_NAMES.length) + 2}`, sigil: base.sigil };
 }
 
+const SIGILS = new Set(["trend", "dip", "breakout", "reverter", "momentum", "sentinel", "custom"]);
+
 type Action =
-  | { type: "hire"; name?: string | null; emoji?: string; allocation?: number; maxDrawdown?: number; strategy?: unknown }
+  | { type: "hire"; name?: string | null; sigil?: string; emoji?: string; allocation?: number; maxDrawdown?: number; strategy?: unknown }
+  | { type: "hirePreset"; key?: string }
   | { type: "backtest" | "deploy" | "pause" | "retire"; name?: string }
+  | { type: "pauseAll" } | { type: "resumeAll" }
   | { type: "status"; name?: string | null };
 
 async function findAnalyst(userId: string, name: string | undefined) {
@@ -125,54 +135,85 @@ async function execute(userId: string, action: Action, floorNames: string[]): Pr
   switch (action.type) {
     case "hire": {
       const strategy = sanitizeStrategy(action.strategy);
-      if (!strategy) return "⚠ I couldn't compile that into valid rules — tell me the entry and exit conditions again.";
+      if (!strategy) return "Couldn't compile that into valid rules — tell me the entry and exit conditions again.";
+      const requestedSigil = String(action.sigil ?? "").trim();
       const named = action.name?.trim()
-        ? { name: action.name.trim().slice(0, 40), emoji: String(action.emoji ?? "🤖").slice(0, 8) }
+        ? { name: action.name.trim().slice(0, 40), sigil: SIGILS.has(requestedSigil) ? requestedSigil : "custom" }
         : assignName(floorNames);
       const allocation = Math.min(Math.max(Number(action.allocation) || 5000, 500), 50000);
       const maxDrawdown = Math.min(Math.max(Number(action.maxDrawdown) || 0.2, 0.05), 0.5);
       await db.insert(schema.agents).values({
-        id: randomUUID(), userId, name: named.name, emoji: named.emoji,
+        id: randomUUID(), userId, name: named.name, emoji: named.sigil,
         strategy: JSON.stringify(strategy), allocation, maxDrawdown,
         status: "draft", backtest: null, createdAt: Date.now(),
       });
-      return `✔ Hired ${named.emoji} ${named.name} — ${describeStrategy(strategy)} Allocation $${allocation.toLocaleString()}, halts at ${(maxDrawdown * 100).toFixed(0)}% drawdown. Draft until backtested.`;
+      return `Hired ${named.name} — ${describeStrategy(strategy)} Allocation $${allocation.toLocaleString()}, halts at ${(maxDrawdown * 100).toFixed(0)}% drawdown. Draft until backtested.`;
+    }
+    case "hirePreset": {
+      const preset = presetByKey(String(action.key ?? ""));
+      if (!preset) return "That archetype isn't on the bench. The bench: trend, dip, breakout, reverter, momentum, sentinel.";
+      const taken = new Set(floorNames);
+      let name = preset.name;
+      for (let n = 2; taken.has(name); n++) name = `${preset.name} ${n}`;
+      await db.insert(schema.agents).values({
+        id: randomUUID(), userId, name, emoji: preset.sigil,
+        strategy: JSON.stringify(preset.strategy),
+        allocation: preset.allocation, maxDrawdown: preset.maxDrawdown,
+        status: "draft", backtest: null, createdAt: Date.now(),
+      });
+      return `Hired ${name} from the bench — ${preset.method} Draft until backtested; say "backtest ${name}" to see the honest resume.`;
     }
     case "backtest": {
       const a = await findAnalyst(userId, action.name);
-      if (!a) return `⚠ No analyst named "${action.name}" on the floor.`;
+      if (!a) return `No analyst named "${action.name}" on the floor.`;
       const result: BacktestResult | null = await backtest(JSON.parse(a.strategy) as Strategy);
-      if (!result) return "⚠ Not enough history for that universe — need at least 60 daily bars.";
+      if (!result) return "Not enough history for that universe — need at least 60 daily bars.";
       await db.update(schema.agents).set({
         backtest: JSON.stringify(result),
         status: a.status === "running" ? "running" : "backtested",
       }).where(eq(schema.agents.id, a.id));
-      return `✔ Backtest ${a.name}: in-sample ${fmt(result.inSample.return)} (win ${(result.inSample.winRate * 100).toFixed(0)}%, ${result.inSample.trades} trades) · out-of-sample ${fmt(result.outOfSample.return)} (win ${(result.outOfSample.winRate * 100).toFixed(0)}%, ${result.outOfSample.trades} trades) · verdict: ${result.verdict}. The out-of-sample number is the résumé.`;
+      return `Backtest ${a.name}: in-sample ${fmt(result.inSample.return)} (win ${(result.inSample.winRate * 100).toFixed(0)}%, ${result.inSample.trades} trades) · out-of-sample ${fmt(result.outOfSample.return)} (win ${(result.outOfSample.winRate * 100).toFixed(0)}%, ${result.outOfSample.trades} trades) · verdict: ${result.verdict}. The out-of-sample number is the résumé.`;
     }
     case "deploy": {
       const a = await findAnalyst(userId, action.name);
-      if (!a) return `⚠ No analyst named "${action.name}" on the floor.`;
-      if (!a.backtest) return `⚠ ${a.name} has no backtest — no backtest, no allocation. Say "backtest ${a.name}" first.`;
-      if (a.status === "killed") return `⚠ ${a.name} was retired at its drawdown limit. Ask me to revive it as a draft first — deliberately.`;
+      if (!a) return `No analyst named "${action.name}" on the floor.`;
+      if (!a.backtest) return `${a.name} has no backtest — no backtest, no allocation. Say "backtest ${a.name}" first.`;
+      if (a.status === "killed") return `${a.name} was retired at its drawdown limit. Ask me to revive it as a draft first — deliberately.`;
       await db.update(schema.agents).set({ status: "running" }).where(eq(schema.agents.id, a.id));
       await db.insert(schema.agentActivity).values({
         id: randomUUID(), userId, agentId: a.id, agentName: a.name,
         text: "Put on the floor. Trading within its allocation and drawdown limit.",
         createdAt: Date.now(),
       });
-      return `✔ ${a.name} is live — trading on the desk tick, 24/7 via the server heartbeat.`;
+      return `${a.name} is live — trading on the desk tick, 24/7 via the server heartbeat.`;
     }
     case "pause": {
       const a = await findAnalyst(userId, action.name);
-      if (!a) return `⚠ No analyst named "${action.name}" on the floor.`;
+      if (!a) return `No analyst named "${action.name}" on the floor.`;
       await db.update(schema.agents).set({ status: "paused" }).where(eq(schema.agents.id, a.id));
-      return `✔ ${a.name} paused. Open positions stay open.`;
+      return `${a.name} paused. Open positions stay open.`;
     }
     case "retire": {
       const a = await findAnalyst(userId, action.name);
-      if (!a) return `⚠ No analyst named "${action.name}" on the floor.`;
+      if (!a) return `No analyst named "${action.name}" on the floor.`;
       await db.update(schema.agents).set({ status: "killed" }).where(eq(schema.agents.id, a.id));
-      return `✔ ${a.name} retired. It won't trade again unless you bring it back as a draft.`;
+      return `${a.name} retired. It won't trade again unless you bring it back as a draft.`;
+    }
+    case "pauseAll": {
+      const rows = await db.update(schema.agents).set({ status: "paused" })
+        .where(and(eq(schema.agents.userId, userId), eq(schema.agents.status, "running")))
+        .returning({ id: schema.agents.id });
+      return rows.length
+        ? `Floor paused — ${rows.length} analyst${rows.length === 1 ? "" : "s"} standing down. Open positions stay open.`
+        : "Nothing was running.";
+    }
+    case "resumeAll": {
+      const rows = await db.update(schema.agents).set({ status: "running" })
+        .where(and(eq(schema.agents.userId, userId), eq(schema.agents.status, "paused")))
+        .returning({ id: schema.agents.id });
+      return rows.length
+        ? `Floor resumed — ${rows.length} analyst${rows.length === 1 ? "" : "s"} back to work.`
+        : "Nothing was paused.";
     }
     case "status":
       return (await floorState(userId)).text;

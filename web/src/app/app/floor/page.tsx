@@ -106,7 +106,7 @@ export default async function FloorPage() {
     openOrders: c.open_orders,
     agentsRunning: c.agents_running,
     agentsAlloc: c.agents_alloc,
-    agentName: running ? `${running.emoji} ${running.name}` : null,
+    agentName: running ? running.name : null,
     movers,
     journal: journal.map((j) => ({ symbol: j.symbol, pnl: j.pnl, createdAt: j.createdAt })),
     academy: {

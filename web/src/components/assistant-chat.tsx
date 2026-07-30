@@ -11,10 +11,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Msg = { id: string; role: "user" | "analyst"; text: string; createdAt: number };
 
+/* Openers for every kind of person: someone who has never traded, someone
+   protective, someone curious, and someone who speaks indicator. Each is a
+   real, complete instruction — tap it and the desk moves. */
 const OPENERS = [
-  "Hire an analyst that buys NVDA when the 10-day SMA crosses above the 30-day, sells when RSI(14) goes over 70. Give it $10k.",
-  "Backtest my newest analyst.",
+  "I'm new to this. What would you suggest I start with?",
+  "Hire the Sentinel from the bench — I want something careful.",
+  "Explain what my analysts did today, in plain words.",
+  "Hire an analyst that buys NVDA when the 10-day SMA crosses above the 30-day, sells when RSI(14) goes over 70, with an 8% stop-loss. Give it $10k.",
+];
+
+/* Once the conversation is running, keep two quiet shortcuts within reach. */
+const FOLLOW_UPS = [
   "How is the floor doing?",
+  "Pause everything.",
 ];
 
 export default function AssistantChat({ onDeskChanged }: { onDeskChanged: () => void }) {
@@ -126,7 +136,18 @@ export default function AssistantChat({ onDeskChanged }: { onDeskChanged: () => 
 
       <form
         onSubmit={(e) => { e.preventDefault(); send(); }}
-        className="flex gap-2 border-t border-hairline p-3">
+        className="flex flex-col gap-2 border-t border-hairline p-3">
+        {messages.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto">
+            {FOLLOW_UPS.map((f) => (
+              <button key={f} onClick={() => send(f)} type="button"
+                className="pressable shrink-0 rounded-full border border-hairline px-3 py-1.5 text-[11px] text-ink-3 hover:text-ink-1">
+                {f}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -142,6 +163,7 @@ export default function AssistantChat({ onDeskChanged }: { onDeskChanged: () => 
           className="pressable cta-gold rounded-xl px-5 text-sm font-semibold disabled:opacity-50">
           Send
         </button>
+        </div>
       </form>
     </section>
   );

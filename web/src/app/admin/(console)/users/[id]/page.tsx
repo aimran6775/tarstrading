@@ -98,7 +98,7 @@ export default async function AdminUserDetail(props: { params: Promise<{ id: str
       <SectionHeader>Analysts</SectionHeader>
       <DataTable empty="No analysts."
         cols={[{ label: "Name" }, { label: "Status" }, { label: "Allocation", align: "right" }]}
-        rows={d.agents.map((a) => [`${a.emoji} ${a.name}`, a.status, usd(a.allocation)])} />
+        rows={d.agents.map((a) => [a.name, a.status, usd(a.allocation)])} />
 
       <SectionHeader>Recent closes</SectionHeader>
       <DataTable empty="No closed trades."
