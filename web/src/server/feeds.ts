@@ -3,7 +3,7 @@ import { db, schema } from "./db";
 import { and, asc, eq, inArray, sql as dsql } from "drizzle-orm";
 import { putQuotes, tryTakeToken, isUSMarketOpen, type Quote, type Provenance } from "./market";
 import { fetchSnapshots } from "./marketstats";
-import { ensureLiveFeed, setPriorityStocks } from "./live-feed";
+import { ensureLiveFeed, setPriorityStocks, livePrice } from "./live-feed";
 import { FX_PAIRS, isFxSymbol, isFxOpen } from "./fx";
 
 /*
@@ -438,12 +438,18 @@ export async function indicesIntradayTick(): Promise<number> {
     const ratio = cal?.ratios[def.symbol] ?? SEED_RATIOS[def.symbol];
     const proxy = bySymbol.get(def.proxy);
     if (!ratio || !proxy || Date.now() - proxy.updatedAt > 10 * 60_000) continue;
-    const price = ratio * proxy.price;
+    // The proxy ETFs hold live-slot websocket ticks — derive from the freshest
+    // print, not the 15-minute-delayed cache row. Verified against the real
+    // tape: delayed-derived SPX ran ~0.2% behind the published index; the
+    // live tick closes most of that to ratio drift alone.
+    const tick = livePrice(def.proxy);
+    const proxyPx = tick?.price ?? proxy.price;
+    const price = ratio * proxyPx;
     const prevClose = cal?.closes[def.symbol]?.price ?? ratio * proxy.previousClose;
     quotes.push({
       symbol: def.symbol, price, previousClose: prevClose,
       changePercent: prevClose > 0 ? price / prevClose - 1 : 0,
-      asOf: proxy.asOf, provenance: "derived",
+      asOf: tick?.at ?? proxy.asOf, provenance: "derived",
     });
   }
   await putQuotes(quotes);
