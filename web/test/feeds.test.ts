@@ -100,4 +100,15 @@ describe("pickFrontMonth", () => {
     expect(pickFrontMonth(contracts, "2027-04-01")).toBeNull();
     expect(pickFrontMonth([{ ticker: "X" }], "2026-01-01")).toBeNull();
   });
+
+  it("never picks a calendar spread, even when it expires first", () => {
+    // The live endpoint lists spreads (ESU6-ESZ6) beside outrights with the
+    // SAME last_trade_date; ties must resolve to the outright.
+    const withSpreads = [
+      { ticker: "ESU6-ESZ6", last_trade_date: "2026-09-18" },
+      { ticker: "ESU6", last_trade_date: "2026-09-18" },
+      { ticker: "ESZ6", last_trade_date: "2026-12-18" },
+    ];
+    expect(pickFrontMonth(withSpreads, "2026-07-29")!.ticker).toBe("ESU6");
+  });
 });

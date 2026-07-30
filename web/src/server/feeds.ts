@@ -437,12 +437,16 @@ type FuturesState = {
 const MASSIVE = "https://api.massive.com";
 
 /** Pick the front month from a contract list: nearest last_trade_date that is
-    at least 3 days out (roll before expiry week chaos). Pure, for tests. */
+    at least 3 days out (roll before expiry week chaos). Calendar spreads
+    (ESU6-ESZ6) are quotes on the DIFFERENCE between two months, not a market
+    of their own here — excluded, or the desk would show "ES Sep-Dec spread"
+    as the S&P future. Pure, for tests. */
 export function pickFrontMonth(
   contracts: Array<{ ticker: string; last_trade_date?: string }>, todayIso: string,
 ): { ticker: string; lastTradeDate: string } | null {
   const floor = new Date(Date.parse(todayIso) + 3 * 86_400_000).toISOString().slice(0, 10);
   const live = contracts
+    .filter((c) => !c.ticker.includes("-"))
     .filter((c) => typeof c.last_trade_date === "string" && c.last_trade_date >= floor)
     .sort((a, b) => a.last_trade_date!.localeCompare(b.last_trade_date!));
   const f = live[0];
@@ -471,8 +475,14 @@ export async function futuresTick(): Promise<{ updated: number } | { skipped: st
     if (!front || front.lastTradeDate <= new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10)) {
       if (!tryTakeToken()) break;
       try {
+        /*
+          date=<today> pins the listing to a single as-of day — without it the
+          endpoint returns one row per contract PER DAY, ticker-sorted, and a
+          limited page never reaches the near months (the first live run
+          "discovered" ESH0, March 2030, as the S&P front month).
+        */
         const res = await fetch(
-          `${MASSIVE}/futures/v1/contracts?product_code=${product.code}&active=true&limit=50&apiKey=${key}`,
+          `${MASSIVE}/futures/v1/contracts?product_code=${product.code}&date=${today}&limit=1000&apiKey=${key}`,
           { cache: "no-store" });
         const json = await res.json() as { results?: Array<{ ticker: string; last_trade_date?: string }> };
         const picked = pickFrontMonth(json.results ?? [], today);

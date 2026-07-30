@@ -1,4 +1,4 @@
-import { isFxSymbol, fxDisplay, type MarketCategory } from "@/components/trading/shared";
+import { isFxSymbol, isIndexSymbol, isFutureSymbol, fxDisplay, type MarketCategory } from "@/components/trading/shared";
 
 /*
   What kind of thing is this, really?
@@ -69,6 +69,14 @@ const STOCK: Instrument = {
   label: "Stock",
   title: "Common stock — a share of one company.",
 };
+const INDEX: Instrument = {
+  label: "Index",
+  title: "A market index — a reference level, not a security. Trade its ETF instead.",
+};
+const FUTURE: Instrument = {
+  label: "Futures",
+  title: "A futures contract — an exchange-traded agreement on a future price. Quote-only here.",
+};
 
 /* Registered names are the ticker directory's own text ("… American Depositary
    Shares", "… 5.375% Non-Cumulative Perpetual Preferred Stock"), so matching
@@ -90,6 +98,8 @@ export function instrumentOf(
 ): Instrument {
   // 1 — shape. Unambiguous, and true whatever the board says.
   if (isFxSymbol(symbol)) return FX_PAIR;
+  if (isIndexSymbol(symbol)) return INDEX;
+  if (isFutureSymbol(symbol)) return FUTURE;
   if (symbol.includes("/")) return CRYPTO_PAIR;
 
   // 2 — the security's own name, most specific first.
