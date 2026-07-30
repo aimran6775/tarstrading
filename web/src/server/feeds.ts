@@ -344,14 +344,31 @@ export async function indicesDailyTick(): Promise<{ indices: number } | { skippe
   }
 
   // Publish EOD quotes and make sure each index is listed on the board.
+  // An index with no official source at all (RUT — no free feed anywhere)
+  // still gets an overnight level: ratio × its proxy's last close, wearing
+  // DERIVED. Without this it would sit priceless every night and weekend.
+  const proxyLastClose = new Map<string, { price: number; date: string }>();
+  for (const r of proxyRows) {
+    proxyLastClose.set(r.symbol, { price: r.c, date: new Date(r.t * 1000).toISOString().slice(0, 10) });
+  }
   const quotes: Quote[] = [];
   for (const def of INDICES) {
     const close = cal.closes[def.symbol];
-    if (!close) continue;
-    quotes.push({
-      symbol: def.symbol, price: close.price, previousClose: close.price,
-      changePercent: 0, asOf: Date.parse(`${close.date}T21:00:00Z`), provenance: "eod",
-    });
+    if (close) {
+      quotes.push({
+        symbol: def.symbol, price: close.price, previousClose: close.price,
+        changePercent: 0, asOf: Date.parse(`${close.date}T21:00:00Z`), provenance: "eod",
+      });
+      continue;
+    }
+    const proxy = def.proxy ? proxyLastClose.get(def.proxy) : undefined;
+    const ratio = cal.ratios[def.symbol] ?? SEED_RATIOS[def.symbol];
+    if (proxy && ratio) {
+      quotes.push({
+        symbol: def.symbol, price: ratio * proxy.price, previousClose: ratio * proxy.price,
+        changePercent: 0, asOf: Date.parse(`${proxy.date}T21:00:00Z`), provenance: "derived",
+      });
+    }
   }
   await putQuotes(quotes);
   await db.insert(schema.platformSymbols).values(INDICES.map((def, i) => ({
