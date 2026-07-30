@@ -6,6 +6,7 @@ import { getQuote, getQuotes, isUSMarketOpen, etDay } from "./market";
 import { getPlatformConfig } from "./platform";
 import { isOptionSymbol, parseOptionSymbol, optionQuotes, CONTRACT_SIZE } from "./options";
 import { isFxSymbol, isFxOpen, fxQuotes } from "./fx";
+import { isFuturesSymbol, futuresSpec, futuresMarks, isFuturesOpen, pickLiquidations } from "./futures";
 
 /*
   The simulated exchange. Every user trades an isolated $100k account.
@@ -45,13 +46,26 @@ const isCryptoSym = (s: string) => s.includes("/");
    requirement like crypto — you pay the premium, full stop. */
 const initialRate = (s: string) => (isCryptoSym(s) || isOptionSymbol(s) ? 1 : 0.5);
 const maintRate = (s: string) => (isCryptoSym(s) || isOptionSymbol(s) ? 1 : 0.25);
-/* FX is a 24/5 venue of its own; crypto never closes; everything else follows
-   the US equity session. Options list on the equity session too. */
+/*
+  Futures are the exception to rate-based margin entirely: their requirement is
+  a fixed DOLLAR amount per contract from the spec sheet (IM to open, MM to
+  hold), not a percentage of notional — and no principal ever changes hands.
+  Both requirement loops below branch on this.
+*/
+const futuresIM = (s: string, qty: number) => (futuresSpec(s)?.im ?? Infinity) * Math.abs(qty);
+const futuresMM = (s: string, qty: number) => (futuresSpec(s)?.mm ?? Infinity) * Math.abs(qty);
+/* FX is a 24/5 venue of its own; crypto never closes; futures run the Globex
+   clock; everything else follows the US equity session. */
 const venueOpenFor = (s: string) =>
-  isCryptoSym(s) ? true : isFxSymbol(s) ? isFxOpen() : isUSMarketOpen();
+  isCryptoSym(s) ? true
+    : isFxSymbol(s) ? isFxOpen()
+    : isFuturesSymbol(s) ? isFuturesOpen()
+    : isUSMarketOpen();
 
-/** Contract multiplier: an option covers 100 shares, everything else is 1:1. */
-export const multiplierFor = (s: string) => (isOptionSymbol(s) ? CONTRACT_SIZE : 1);
+/** Contract multiplier: options cover 100 shares, futures carry their spec
+    multiplier (ES = $50/point), everything else is 1:1. */
+export const multiplierFor = (s: string) =>
+  isOptionSymbol(s) ? CONTRACT_SIZE : futuresSpec(s)?.multiplier ?? 1;
 
 /** Any drizzle executor — the base db or a transaction handle. */
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -102,11 +116,15 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
   };
 
   const isOption = isOptionSymbol(symbol);
+  const isFutures = isFuturesSymbol(symbol);
   if (!Number.isFinite(input.qty) || input.qty <= 0) return reject("Quantity must be positive.");
-  // Equities trade in whole shares and options in whole contracts; only crypto
-  // is fractional.
+  // Equities trade in whole shares, options and futures in whole contracts;
+  // only crypto is fractional.
   if (!isCrypto && !Number.isInteger(input.qty)) {
-    return reject(isOption ? "Options trade in whole contracts." : "Stocks trade in whole shares.");
+    return reject(isOption || isFutures ? "Contracts trade whole." : "Stocks trade in whole shares.");
+  }
+  if (isFutures && !futuresSpec(symbol)) {
+    return reject("That contract has no margin spec on this desk.");
   }
   if (isOption) {
     const leg = parseOptionSymbol(symbol)!;
@@ -140,6 +158,11 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     const px = marks.get(symbol)?.price;
     quote = px != null ? { symbol, price: px } : null;
     if (!quote) return reject(`No market data for ${symbol}.`);
+  } else if (isFutures) {
+    const marks = await futuresMarks([symbol]);
+    const px = marks.get(symbol);
+    quote = px != null ? { symbol, price: px } : null;
+    if (!quote) return reject(`No settlement mark for ${symbol}.`);
   } else {
     quote = await getQuote(symbol);
     if (!quote) return reject(`No market data for ${symbol}.`);
@@ -198,25 +221,30 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     const markOf = (s: string, avg: number) => (s === symbol ? quote.price : avg);
     // Initial requirement over all positions with the target updated, plus a
     // conservative reservation for resting orders (assume they fill).
-    // Requirements are in dollars, so every term carries its contract size.
+    // Requirements are in dollars: rate × notional for securities, the spec
+    // sheet's fixed IM per contract for futures (no principal moves there).
+    const initialReqOf = (s: string, qty: number, px: number) =>
+      isFuturesSymbol(s) ? futuresIM(s, qty)
+        : initialRate(s) * Math.abs(qty * px) * multiplierFor(s);
     let requirement = 0;
     for (const p of positions) {
       const qty = p.symbol === symbol ? q1 : p.qty;
-      requirement += initialRate(p.symbol)
-        * Math.abs(qty * markOf(p.symbol, p.avgEntryPrice)) * multiplierFor(p.symbol);
+      requirement += initialReqOf(p.symbol, qty, markOf(p.symbol, p.avgEntryPrice));
     }
     if (!cur && Math.abs(q1) > 1e-9) {
-      requirement += initialRate(symbol) * Math.abs(q1 * quote.price) * multiplierFor(symbol);
+      requirement += initialReqOf(symbol, q1, quote.price);
     }
     for (const o of resting) {
       const px = o.limitPrice ?? o.stopPrice ?? quote.price;
-      requirement += initialRate(o.symbol) * px * o.qty * multiplierFor(o.symbol);
+      requirement += initialReqOf(o.symbol, o.qty, px);
     }
     // Deleveraging (shrinking the target's absolute exposure) is always allowed;
     // otherwise you must hold enough equity to meet the initial requirement.
     const reducing = Math.abs(q1) < Math.abs(q0) - 1e-9;
     if (!reducing && requirement > equity + 1e-6) {
-      return rejectIn("This order exceeds your buying power (Reg-T margin: 2:1 equities, cash on crypto).");
+      return rejectIn(isFutures
+        ? `Initial margin exceeds your equity: this book would require $${Math.round(requirement).toLocaleString()} against $${Math.round(equity).toLocaleString()}.`
+        : "This order exceeds your buying power (Reg-T margin: 2:1 equities, cash on crypto).");
     }
 
     await tx.insert(schema.orders).values(row);
@@ -335,8 +363,16 @@ async function settle(tx: Tx, order: PlacedOrder, fillPrice: number) {
   // while qty and the average price stay per-contract (what the chain quotes).
   const mult = multiplierFor(symbol);
 
+  /*
+    Futures move NO principal: a fill posts margin (a requirement, not a
+    debit) and cash changes only by realized P&L on whatever exposure the
+    fill closed — variation margin at the moment of trade. Everything else
+    keeps the buy-debits/sell-credits flow.
+  */
+  const cashDelta = isFuturesSymbol(symbol) ? r.realized * mult : r.cashFlow * mult;
+
   await tx.update(schema.accounts)
-    .set({ cash: account.cash + r.cashFlow * mult })
+    .set({ cash: account.cash + cashDelta })
     .where(eq(schema.accounts.userId, userId));
 
   if (r.closedQty > 0) {
@@ -377,31 +413,47 @@ export async function accountRisk(userId: string): Promise<AccountRisk> {
   const positions = await db.select().from(schema.positions).where(eq(schema.positions.userId, userId));
   const cash = account?.cash ?? 0;
   let longValue = 0, shortValue = 0, initialReq = 0, maintenance = 0;
+  let futuresPnl = 0, futuresGross = 0, futuresNet = 0;
   const optSyms = positions.filter((p) => isOptionSymbol(p.symbol)).map((p) => p.symbol);
   const fxSyms = positions.filter((p) => isFxSymbol(p.symbol)).map((p) => p.symbol);
+  const futSyms = positions.filter((p) => isFuturesSymbol(p.symbol)).map((p) => p.symbol);
   const plainSyms = positions
-    .filter((p) => !isOptionSymbol(p.symbol) && !isFxSymbol(p.symbol))
+    .filter((p) => !isOptionSymbol(p.symbol) && !isFxSymbol(p.symbol) && !isFuturesSymbol(p.symbol))
     .map((p) => p.symbol);
-  const [quotes, optMarks, fxMarks] = await Promise.all([
+  const [quotes, optMarks, fxMarks, futMarks] = await Promise.all([
     plainSyms.length ? getQuotes(plainSyms) : Promise.resolve([]),
     optSyms.length ? optionQuotes(optSyms) : Promise.resolve(new Map<string, number>()),
     fxSyms.length ? fxQuotes(fxSyms) : Promise.resolve(new Map<string, { price: number; prevClose: number }>()),
+    futSyms.length ? futuresMarks(futSyms) : Promise.resolve(new Map<string, number>()),
   ]);
   const mark = new Map(quotes.map((q) => [q.symbol, q.price]));
   for (const p of positions) {
     const px = optMarks.get(p.symbol) ?? fxMarks.get(p.symbol)?.price
-      ?? mark.get(p.symbol) ?? p.avgEntryPrice;
+      ?? futMarks.get(p.symbol) ?? mark.get(p.symbol) ?? p.avgEntryPrice;
+    if (isFuturesSymbol(p.symbol)) {
+      // Futures: equity carries the unrealized VM, exposure carries the
+      // NOTIONAL (a real margin desk counts the whole contract), and the
+      // requirements come off the spec sheet in dollars.
+      const mult = multiplierFor(p.symbol);
+      futuresPnl += (px - p.avgEntryPrice) * p.qty * mult;
+      futuresGross += Math.abs(p.qty * px * mult);
+      futuresNet += p.qty * px * mult;
+      initialReq += futuresIM(p.symbol, p.qty);
+      maintenance += futuresMM(p.symbol, p.qty);
+      continue;
+    }
     const val = p.qty * px * multiplierFor(p.symbol); // signed, contract-scaled
     if (val >= 0) longValue += val; else shortValue += -val;
     initialReq += initialRate(p.symbol) * Math.abs(val);
     maintenance += maintRate(p.symbol) * Math.abs(val);
   }
-  const equity = cash + longValue - shortValue;
-  const gross = longValue + shortValue;
+  const equity = cash + longValue - shortValue + futuresPnl;
+  // Gross/net exposure count futures at full notional — leverage the honest way.
+  const gross = longValue + shortValue + futuresGross;
   // Buying power: extra equity-notional you can still add at the initial rate.
   const buyingPower = Math.max(0, (equity - initialReq) / 0.5);
   return {
-    equity, cash, longValue, shortValue, gross, net: longValue - shortValue,
+    equity, cash, longValue, shortValue, gross, net: longValue - shortValue + futuresNet,
     maintenance, buyingPower, marginUsedPct: equity > 0 ? Math.min(1, initialReq / equity) : 0,
   };
 }
@@ -460,18 +512,20 @@ export async function markEquity(userId: string) {
     // Options price from the chain, everything else from the tape.
     const opts = positions.filter((p) => isOptionSymbol(p.symbol)).map((p) => p.symbol);
     const fx = positions.filter((p) => isFxSymbol(p.symbol)).map((p) => p.symbol);
+    const futs = positions.filter((p) => isFuturesSymbol(p.symbol)).map((p) => p.symbol);
     const plain = positions
-      .filter((p) => !isOptionSymbol(p.symbol) && !isFxSymbol(p.symbol))
+      .filter((p) => !isOptionSymbol(p.symbol) && !isFxSymbol(p.symbol) && !isFuturesSymbol(p.symbol))
       .map((p) => p.symbol);
-    const [quotes, optMarks, fxMarks] = await Promise.all([
+    const [quotes, optMarks, fxMarks, futMarks] = await Promise.all([
       plain.length ? getQuotes(plain) : Promise.resolve([]),
       opts.length ? optionQuotes(opts) : Promise.resolve(new Map<string, number>()),
       fx.length ? fxQuotes(fx) : Promise.resolve(new Map<string, { price: number; prevClose: number }>()),
+      futs.length ? futuresMarks(futs) : Promise.resolve(new Map<string, number>()),
     ]);
     const bySymbol = new Map(quotes.map((q) => [q.symbol, q.price]));
     for (const p of positions) {
       const mark = optMarks.get(p.symbol) ?? fxMarks.get(p.symbol)?.price
-        ?? bySymbol.get(p.symbol);
+        ?? futMarks.get(p.symbol) ?? bySymbol.get(p.symbol);
       if (mark == null) {
         /*
           No mark means we do not know this position's value right now. Falling
@@ -484,7 +538,11 @@ export async function markEquity(userId: string) {
         */
         return;
       }
-      value += mark * p.qty * multiplierFor(p.symbol);
+      // A futures position is worth its UNREALIZED move against the VM basis —
+      // the notional never belonged to the account.
+      value += isFuturesSymbol(p.symbol)
+        ? (mark - p.avgEntryPrice) * p.qty * multiplierFor(p.symbol)
+        : mark * p.qty * multiplierFor(p.symbol);
     }
   }
   const equity = account.cash + value;
@@ -577,6 +635,92 @@ export async function settleAllExpiredOptions(): Promise<number> {
   let total = 0;
   for (const h of holders) {
     try { total += await settleExpiredOptions(h.userId); }
+    catch { /* one account's failure must not stop the sweep */ }
+  }
+  return total;
+}
+
+/*
+  Variation margin — the futures lifecycle's defining step.
+
+  Once per session, every futures position settles its mark-to-market to CASH:
+  cash moves by (settlement − basis) × qty × multiplier, and the basis resets
+  to the settlement price — exactly what a real statement does overnight. The
+  vm_stamp records the session settled through, so the sweep is idempotent no
+  matter how often the heartbeat fires.
+
+  After settling, the margin desk checks maintenance: if account equity has
+  fallen below the book's total MM, futures positions liquidate — biggest
+  margin consumer first (pickLiquidations, pure and tested) — and every
+  forced close is journaled as what it is. The margin call is the lesson;
+  hiding it would be the lie.
+*/
+export async function settleFuturesVM(userId: string): Promise<number> {
+  const positions = await db.select().from(schema.positions)
+    .where(eq(schema.positions.userId, userId));
+  const futs = positions.filter((p) => isFuturesSymbol(p.symbol));
+  if (!futs.length) return 0;
+
+  const marks = await futuresMarks(futs.map((p) => p.symbol));
+  const today = etDay();
+  let settled = 0;
+
+  for (const p of futs) {
+    const settle = marks.get(p.symbol);
+    if (settle == null || p.vmStamp === today) continue;
+    const mult = multiplierFor(p.symbol);
+    const vm = (settle - p.avgEntryPrice) * p.qty * mult;
+    await db.transaction(async (tx) => {
+      const [acct] = await tx.select().from(schema.accounts)
+        .where(eq(schema.accounts.userId, userId)).for("update");
+      if (!acct) return;
+      const [fresh] = await tx.select().from(schema.positions)
+        .where(eq(schema.positions.id, p.id));
+      if (!fresh || fresh.vmStamp === today) return; // settled concurrently
+      await tx.update(schema.accounts).set({ cash: acct.cash + vm })
+        .where(eq(schema.accounts.userId, userId));
+      await tx.update(schema.positions)
+        .set({ avgEntryPrice: settle, vmStamp: today, updatedAt: Date.now() })
+        .where(eq(schema.positions.id, p.id));
+    });
+    settled++;
+  }
+
+  // Maintenance check AFTER settlement, on marked equity.
+  const risk = await accountRisk(userId);
+  if (risk.equity < risk.maintenance - 1e-6) {
+    const shortfall = risk.maintenance - risk.equity;
+    const toClose = pickLiquidations(
+      futs.map((p) => ({ symbol: p.symbol, qty: p.qty })), shortfall);
+    for (const c of toClose) {
+      const order = await placeOrder(userId, {
+        symbol: c.symbol,
+        side: c.qty > 0 ? "sell" : "buy",
+        type: "market",
+        qty: Math.abs(c.qty),
+      });
+      if (order.status === "filled") {
+        await db.insert(schema.journalEntries).values({
+          id: randomUUID(), userId, symbol: c.symbol,
+          side: "margin-call", qty: Math.abs(c.qty),
+          entryPrice: 0, exitPrice: order.filledPrice ?? 0, pnl: 0,
+          thesis: `Margin call: equity fell $${Math.round(shortfall).toLocaleString()} below maintenance — the desk closed this position, not you. That is what maintenance margin means.`,
+          agentId: null, createdAt: Date.now(),
+        }).catch(() => {});
+        settled++;
+      }
+    }
+  }
+  return settled;
+}
+
+/** Settle VM for every account holding a futures position. Heartbeat entry. */
+export async function settleAllFuturesVM(): Promise<number> {
+  const holders = await db.selectDistinct({ userId: schema.positions.userId })
+    .from(schema.positions);
+  let total = 0;
+  for (const h of holders) {
+    try { total += await settleFuturesVM(h.userId); }
     catch { /* one account's failure must not stop the sweep */ }
   }
   return total;

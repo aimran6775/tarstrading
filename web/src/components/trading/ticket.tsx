@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import HoldButton from "@/components/hold-button";
 import { useToast } from "@/components/toast";
 import LearnLink from "@/components/academy/learn-link";
-import { usd, isQuoteOnly, isIndexSymbol, displaySymbol, type Quote, type Order } from "./shared";
+import { usd, isQuoteOnly, isIndexSymbol, isFutureSymbol, futuresUiSpec, displaySymbol, type Quote, type Order } from "./shared";
 
 /*
   The order ticket, right-rail edition: a vertical card that lives beside the
@@ -40,11 +40,19 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
 
   const qtyNum = Number(qty) || 0;
   const estPrice = (type === "limit" || type === "stop_limit") ? Number(limitPrice) || quote?.price || 0 : quote?.price || 0;
-  const estCost = qtyNum * estPrice;
+  /*
+    Futures cost nothing to enter — they REQUIRE. The ticket's "cost" becomes
+    the initial margin the desk will hold, with notional shown alongside so
+    the leverage is never hidden. The server enforces; this mirrors.
+  */
+  const futSpec = isFutureSymbol(symbol) ? futuresUiSpec(symbol) : null;
+  const estCost = futSpec ? qtyNum * futSpec.im : qtyNum * estPrice;
+  const notional = futSpec ? qtyNum * estPrice * futSpec.multiplier : 0;
   // Buying power (margin) drives the buy limit; fall back to cash pre-load.
   const power = buyingPower ?? cash;
   const capacity = power > 0 ? estCost / power : 0;
-  const blocked = side === "buy" && estCost > power + 1e-6;
+  // Futures margin gates BOTH sides (a short posts the same IM as a long).
+  const blocked = futSpec ? estCost > power + 1e-6 : side === "buy" && estCost > power + 1e-6;
   // Intent labels: a sell beyond what you hold OPENS a short; a buy against a
   // short COVERS it. Pure labeling — the engine enforces the margin.
   const opensShort = side === "sell" && !symbol.includes("/") && qtyNum > Math.max(0, held);
@@ -100,9 +108,9 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
 
   /*
     Quote-only instruments: an index is a NUMBER (you'd trade SPY, not the
-    S&P 500 itself) and the futures desk has no margin model yet, so neither
-    gets an order form. The server rejects these symbols too — this panel just
-    explains why instead of letting a dead ticket 400.
+    S&P 500 itself), so it gets an explainer, not an order form. The server
+    rejects these symbols too — this panel just says why instead of letting a
+    dead ticket 400. (Futures graduated to full margin trading.)
   */
   if (quoteOnly) {
     return (
@@ -110,9 +118,9 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
         <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/45 to-transparent" />
         <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-3">Trade</h2>
         <p className="mt-3 text-sm leading-relaxed text-ink-2">
-          {isIndexSymbol(symbol)
-            ? <>{displaySymbol(symbol)} is an index — a reference level, not a security. To take this exposure, trade its ETF (for example SPY tracks the S&amp;P&nbsp;500, QQQ the Nasdaq&nbsp;100).</>
-            : <>{displaySymbol(symbol)} is a futures contract, shown for reference. Futures trading isn&apos;t on the desk yet — it needs its own margin model.</>}
+          {displaySymbol(symbol)} is an index — a reference level, not a security.
+          To take this exposure, trade its ETF (SPY tracks the S&amp;P&nbsp;500,
+          QQQ the Nasdaq&nbsp;100) or its futures contract from the Futures board.
         </p>
       </section>
     );
@@ -208,12 +216,20 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
           </label>
         )}
 
-        {/* Cost + capacity */}
+        {/* Cost + capacity. For futures the number is the MARGIN the desk will
+            hold, and the notional it controls is stated right beside it —
+            leverage is the product here, so it is never hidden. */}
         <div className="rounded-xl bg-bg2 px-4 py-3">
           <div className="flex items-baseline justify-between">
-            <span className="text-xs text-ink-3">Est. cost</span>
+            <span className="text-xs text-ink-3">{futSpec ? "Initial margin" : "Est. cost"}</span>
             <span className="tnum text-sm font-semibold text-ink-1">{estCost > 0 ? usd(estCost) : "—"}</span>
           </div>
+          {futSpec && notional > 0 && (
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="text-[11px] text-ink-4">Controls {usd(notional, 0)} notional</span>
+              <span className="tnum text-[11px] text-ink-4">{usd(futSpec.multiplier, 0)}/point</span>
+            </div>
+          )}
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-bg3">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
@@ -224,10 +240,12 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
           </div>
           <p className="tnum mt-1.5 text-[11px] text-ink-3">
             {blocked
-              ? "Exceeds your buying power — reduce quantity."
-              : side === "sell"
-                ? (opensShort ? "Opens a short — margin, not cash." : `Uses ${(capacity * 100).toFixed(0)}% of ${usd(power, 0)} buying power`)
-                : `Uses ${(capacity * 100).toFixed(0)}% of ${usd(power, 0)} buying power`}
+              ? (futSpec ? "Initial margin exceeds your equity — fewer contracts." : "Exceeds your buying power — reduce quantity.")
+              : futSpec
+                ? `Margin held while open. Variation margin settles to cash each session.`
+                : side === "sell"
+                  ? (opensShort ? "Opens a short — margin, not cash." : `Uses ${(capacity * 100).toFixed(0)}% of ${usd(power, 0)} buying power`)
+                  : `Uses ${(capacity * 100).toFixed(0)}% of ${usd(power, 0)} buying power`}
           </p>
         </div>
 

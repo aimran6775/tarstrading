@@ -63,7 +63,12 @@ export const positions = pgTable("positions", {
   userId: text("user_id").notNull().references(() => users.id),
   symbol: text("symbol").notNull(),
   qty: doublePrecision("qty").notNull(),
+  /** For futures this is the VM BASIS — it resets to each session's settlement
+      price when variation margin sweeps, exactly like a real statement. */
   avgEntryPrice: doublePrecision("avg_entry_price").notNull(),
+  /** Session date (YYYY-MM-DD) a futures position has settled VM through.
+      Null for everything that isn't futures. */
+  vmStamp: text("vm_stamp"),
   updatedAt: epochMs("updated_at").notNull(),
 }, (t) => [index("positions_user").on(t.userId)]);
 

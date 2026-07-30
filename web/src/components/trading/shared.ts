@@ -108,8 +108,42 @@ export const IDX_PREFIX = "IDX:";
 export const FUT_PREFIX = "FUT:";
 export const isIndexSymbol = (s: string) => s.toUpperCase().startsWith(IDX_PREFIX);
 export const isFutureSymbol = (s: string) => s.toUpperCase().startsWith(FUT_PREFIX);
-/** Quote-only instruments: shown, charted, never tradable. */
-export const isQuoteOnly = (s: string) => isIndexSymbol(s) || isFutureSymbol(s);
+/** Quote-only instruments: shown, charted, never tradable. Futures graduated
+    to full trading when the margin desk landed — only index levels remain. */
+export const isQuoteOnly = (s: string) => isIndexSymbol(s);
+
+/* ---- futures contract specs (client copy) ---------------------------------
+   Multiplier and margins mirror src/server/futures.ts — the server enforces;
+   this copy lets the ticket SHOW what it is about to require. */
+export type FuturesUiSpec = { multiplier: number; im: number; mm: number };
+export const FUTURES_UI: Record<string, FuturesUiSpec> = {
+  ES: { multiplier: 50, im: 23000, mm: 21000 }, NQ: { multiplier: 20, im: 26000, mm: 24000 },
+  YM: { multiplier: 5, im: 12000, mm: 11000 }, RTY: { multiplier: 50, im: 9500, mm: 8600 },
+  MES: { multiplier: 5, im: 2300, mm: 2100 }, MNQ: { multiplier: 2, im: 2600, mm: 2400 },
+  MYM: { multiplier: 0.5, im: 1200, mm: 1100 }, M2K: { multiplier: 5, im: 950, mm: 860 },
+  ZT: { multiplier: 2000, im: 2200, mm: 2000 }, ZF: { multiplier: 1000, im: 2700, mm: 2500 },
+  ZN: { multiplier: 1000, im: 3600, mm: 3300 }, ZB: { multiplier: 1000, im: 5200, mm: 4700 },
+  CL: { multiplier: 1000, im: 12000, mm: 11000 }, NG: { multiplier: 10000, im: 6500, mm: 5900 },
+  RB: { multiplier: 42000, im: 9500, mm: 8600 }, HO: { multiplier: 42000, im: 9500, mm: 8600 },
+  MCL: { multiplier: 100, im: 1200, mm: 1100 },
+  GC: { multiplier: 100, im: 26000, mm: 24000 }, SI: { multiplier: 5000, im: 32000, mm: 29000 },
+  HG: { multiplier: 25000, im: 11000, mm: 10000 }, PL: { multiplier: 50, im: 6500, mm: 5900 },
+  PA: { multiplier: 100, im: 12000, mm: 11000 }, MGC: { multiplier: 10, im: 2600, mm: 2400 },
+  ZC: { multiplier: 50, im: 2300, mm: 2100 }, ZS: { multiplier: 50, im: 4600, mm: 4200 },
+  ZW: { multiplier: 50, im: 3300, mm: 3000 }, ZL: { multiplier: 600, im: 3300, mm: 3000 },
+  ZM: { multiplier: 100, im: 3100, mm: 2800 },
+  LE: { multiplier: 400, im: 7500, mm: 6800 }, HE: { multiplier: 400, im: 5200, mm: 4700 },
+  "6E": { multiplier: 125000, im: 3600, mm: 3300 }, "6B": { multiplier: 62500, im: 2900, mm: 2700 },
+  "6J": { multiplier: 12500000, im: 4100, mm: 3800 }, "6A": { multiplier: 100000, im: 2700, mm: 2500 },
+  "6C": { multiplier: 100000, im: 2100, mm: 1900 },
+};
+
+/** FUT:ESU6 → its UI spec, or null for unlisted products. */
+export function futuresUiSpec(symbol: string): FuturesUiSpec | null {
+  const t = symbol.toUpperCase().slice(FUT_PREFIX.length);
+  const m = /^([A-Z0-9]{1,3}?)[FGHJKMNQUVXZ]\d{1,2}$/.exec(t);
+  return m ? FUTURES_UI[m[1]] ?? null : null;
+}
 
 /** IDX:SPX → SPX; FUT:ESU6 → ES Sep '26 (CME month codes). */
 const FUT_MONTHS: Record<string, string> = {
@@ -173,4 +207,7 @@ export function marketHrefFor(symbol: string): string {
 */
 const OCC_RE = /^[A-Z]{1,6}\d{6}[CP]\d{8}$/;
 export const isOptionTicker = (s: string) => OCC_RE.test(s.toUpperCase());
-export const contractSize = (s: string) => (isOptionTicker(s) ? 100 : 1);
+/** Dollars per 1.0 of quoted price: options ×100, futures their spec
+    multiplier, everything else 1:1 — every display P&L math uses this. */
+export const contractSize = (s: string) =>
+  isOptionTicker(s) ? 100 : isFutureSymbol(s) ? futuresUiSpec(s)?.multiplier ?? 1 : 1;

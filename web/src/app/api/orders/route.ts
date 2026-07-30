@@ -22,11 +22,13 @@ export async function POST(request: Request) {
   catch { return NextResponse.json({ ok: false, error: "Bad request body." }, { status: 400 }); }
 
   const symbol = String(body.symbol ?? "").toUpperCase().trim();
-  // Equity/crypto tickers, or an OCC option contract (AAPL260727C00335000).
+  // Equity/crypto tickers, an OCC option contract (AAPL260727C00335000), an FX
+  // pair, or a futures outright (FUT:ESU6 / FUT:NGU26). Indices stay quote-only.
   const EQUITY_OR_CRYPTO = /^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/;
   const OCC_OPTION = /^[A-Z]{1,6}\d{6}[CP]\d{8}$/;
   const FX_PAIR = /^FX:[A-Z]{6}$/;
-  if (!EQUITY_OR_CRYPTO.test(symbol) && !OCC_OPTION.test(symbol) && !FX_PAIR.test(symbol)) {
+  const FUTURES = /^FUT:[A-Z0-9]{1,3}[FGHJKMNQUVXZ]\d{1,2}$/;
+  if (!EQUITY_OR_CRYPTO.test(symbol) && !OCC_OPTION.test(symbol) && !FX_PAIR.test(symbol) && !FUTURES.test(symbol)) {
     return NextResponse.json({ ok: false, error: "That doesn't look like a symbol." }, { status: 400 });
   }
   const TYPES = ["market", "limit", "stop", "stop_limit", "trailing_stop"] as const;

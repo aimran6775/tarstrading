@@ -485,6 +485,10 @@ export const FUTURES_PRODUCTS: FuturesProduct[] = [
   // Equity index (CME)
   { code: "ES", name: "E-mini S&P 500" }, { code: "NQ", name: "E-mini Nasdaq 100" },
   { code: "YM", name: "E-mini Dow" }, { code: "RTY", name: "E-mini Russell 2000" },
+  // Micros — one-tenth size: the honest fit for a $100k account
+  { code: "MES", name: "Micro E-mini S&P 500" }, { code: "MNQ", name: "Micro E-mini Nasdaq 100" },
+  { code: "MYM", name: "Micro E-mini Dow" }, { code: "M2K", name: "Micro E-mini Russell 2000" },
+  { code: "MGC", name: "Micro Gold" }, { code: "MCL", name: "Micro Crude Oil" },
   // Rates — the Treasury curve (CBOT)
   { code: "ZT", name: "2-Year T-Note" }, { code: "ZF", name: "5-Year T-Note" },
   { code: "ZN", name: "10-Year T-Note" }, { code: "ZB", name: "30-Year T-Bond" },

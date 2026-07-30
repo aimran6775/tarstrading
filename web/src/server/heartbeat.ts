@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { tickAllRunningAgents } from "./agents";
 import { purgeExpiredSessions } from "./auth";
 import { backfillTick } from "./backfill";
-import { settleAllExpiredOptions, reconcileRestingOrders } from "./exchange";
+import { settleAllExpiredOptions, settleAllFuturesVM, reconcileRestingOrders } from "./exchange";
 import { feedsSlowTick } from "./feeds";
 import { tickAllPrivateMarkets } from "./private-markets";
 import { maybeSyncTickers } from "./tickers";
@@ -42,6 +42,9 @@ export async function runHeartbeat(kind = "tick") {
     settleAllExpiredOptions(),
     tickAllPrivateMarkets(),
     reconcileRestingOrders(),
+    // Futures settle variation margin once per session and the margin desk
+    // checks maintenance right after — whether or not anyone is watching.
+    settleAllFuturesVM(),
   ]);
   void fRes; // reported via feed_status; failures must not fail the run
   if (aRes.status === "fulfilled") agents = aRes.value;
