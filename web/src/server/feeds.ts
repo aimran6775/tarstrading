@@ -72,12 +72,28 @@ const isCrypto = (s: string) => s.includes("/") && !isFxSymbol(s);
 const isIndex = (s: string) => s.startsWith("IDX:");
 const isFuture = (s: string) => s.startsWith("FUT:");
 
-/** Enabled board symbols that Alpaca can quote (equities, ETFs, crypto). */
+/** Enabled board symbols PLUS anything a user watches or holds — the UVIX
+    lesson: an off-board symbol on someone's watchlist served yesterday's
+    close as "the price" until they opened its page. If a person cares about
+    a symbol, the sweep keeps it as fresh as the board. */
 async function sweepableSymbols(): Promise<string[]> {
   const rows = await db.select({ symbol: schema.platformSymbols.symbol })
     .from(schema.platformSymbols).where(eq(schema.platformSymbols.enabled, 1));
-  return rows.map((r) => r.symbol)
-    .filter((s) => !isFxSymbol(s) && !isIndex(s) && !isFuture(s));
+  const out = new Set(rows.map((r) => r.symbol));
+  try {
+    const extra = await db.execute<{ symbol: string }>(dsql`
+      select symbol from watchlist_items
+      union
+      select symbol from positions where qty <> 0
+    `);
+    let added = 0;
+    for (const r of Array.from(extra)) {
+      const s = r.symbol.toUpperCase();
+      if (out.has(s) || added >= 300) continue; // cap: ~3 extra batched calls
+      if (/^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/.test(s)) { out.add(s); added++; }
+    }
+  } catch { /* watch/held union is an enhancement — the board still sweeps */ }
+  return [...out].filter((s) => !isFxSymbol(s) && !isIndex(s) && !isFuture(s));
 }
 
 // ---------- 1. the delayed-SIP sweep (equities + crypto, every minute) ----------

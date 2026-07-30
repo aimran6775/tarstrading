@@ -16,7 +16,17 @@ import "server-only";
 
 const KEY = process.env.ALPACA_KEY_ID ?? "";
 const SECRET = process.env.ALPACA_SECRET_KEY ?? "";
-export const hasLiveFeed = KEY.length > 0 && SECRET.length > 0;
+/*
+  Alpaca allows ONE connection per stream per account. With two services
+  running the same code, the web tier and the backend silently fought for the
+  slot (each 406-ing the other on a ~1-minute cycle) — the product's LIVE
+  badge flickered and the console counted zero ticks, depending on who held
+  the socket that minute. The USER-FACING tier wins by policy: the backend
+  never connects; its marks ride the 60-second sweep cache instead, which is
+  exactly as fresh as the data tier it reads.
+*/
+const isBackendRole = process.env.APP_ROLE === "backend";
+export const hasLiveFeed = KEY.length > 0 && SECRET.length > 0 && !isBackendRole;
 
 const STOCK_URL = "wss://stream.data.alpaca.markets/v2/iex";
 const CRYPTO_URL = "wss://stream.data.alpaca.markets/v1beta3/crypto/us";
@@ -149,8 +159,35 @@ export function setPriorityStocks(symbols: string[]) {
 
 /** Make sure the feed is running and covering these symbols. Cheap to call
     on every quotes request — new symbols subscribe, known ones no-op. */
+/*
+  The 30-slot roster used to be armed only by the backend's feeds beat — but
+  the backend no longer holds sockets, so each web instance arms its own
+  roster from the board's featured flags, refreshed once a minute on the
+  natural traffic it already serves.
+*/
+let rosterAt = 0;
+function refreshRoster() {
+  if (Date.now() - rosterAt < 60_000) return;
+  rosterAt = Date.now();
+  void (async () => {
+    try {
+      const { db, schema } = await import("./db");
+      const { asc, eq } = await import("drizzle-orm");
+      const rows = await db.select({ symbol: schema.platformSymbols.symbol })
+        .from(schema.platformSymbols)
+        .where(eq(schema.platformSymbols.featured, 1))
+        .orderBy(asc(schema.platformSymbols.rank), asc(schema.platformSymbols.symbol));
+      const stocks = rows.map((r) => r.symbol)
+        .filter((s) => !s.includes("/") && !/^(FX|IDX|FUT):/.test(s))
+        .slice(0, lanes.stocks.maxSymbols);
+      if (stocks.length) setPriorityStocks(stocks);
+    } catch { /* roster refresh rides the next request */ }
+  })();
+}
+
 export function ensureLiveFeed(symbols: string[]) {
   if (!hasLiveFeed) return;
+  refreshRoster();
   for (const s of symbols) {
     // Mesh-fed symbols never trade on Alpaca's streams — keep them out of the
     // wanted set so they can't shadow a real stock in the 30-slot budget.

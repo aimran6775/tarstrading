@@ -58,12 +58,13 @@ export default async function Feeds() {
       <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Symbols priced" value={agg.total.toLocaleString()}
           sub={`${agg.fresh2m.toLocaleString()} fresh under 2m`} />
+        {/* The websocket streams live on the WEB tier by policy (one Alpaca
+            connection per stream); this console runs on the backend, so
+            "not connected here" is the healthy state, not an outage. */}
         <StatCard label="Live slots" value={live.stocks.slots ? `${live.stocks.slots.used}/${live.stocks.slots.max}` : "—"}
-          sub={live.stocks.connected ? "IEX stream connected" : "stream down"}
-          tone={live.stocks.connected ? "default" : "warn"} />
+          sub={live.stocks.connected ? "IEX stream connected" : "streams held on the web tier"} />
         <StatCard label="Crypto streams" value={String(live.crypto.subscribed)}
-          sub={live.crypto.connected ? "real-time, 24/7" : "stream down"}
-          tone={live.crypto.connected ? "default" : "warn"} />
+          sub={live.crypto.connected ? "real-time, 24/7" : "streams held on the web tier"} />
         <StatCard label="Ticks seen" value={live.ticksSeen.toLocaleString()}
           sub={`${live.symbolsTicking} symbols ticking`} />
       </div>

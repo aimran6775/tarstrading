@@ -211,15 +211,60 @@ export async function putQuotes(quotes: Quote[]): Promise<void> {
   } catch { /* best-effort — the sweep retries next tick */ }
 }
 
+/**
+ * Preferred miss path for equities and crypto: one Alpaca snapshot. It carries
+ * TODAY's (delayed-SIP) trade and a true prevDailyBar close — so an off-board
+ * symbol prints today's tape against the right anchor, costs no Massive token,
+ * and inherits the same provenance semantics as the board sweep.
+ */
+async function fetchQuoteAlpaca(symbol: string): Promise<Quote | null> {
+  const { fetchSnapshots } = await import("./marketstats");
+  const s = (await fetchSnapshots([symbol])).get(symbol);
+  const price = s?.latestTrade?.p ?? s?.dailyBar?.c;
+  if (typeof price !== "number" || !Number.isFinite(price) || price <= 0) return null;
+  const prevClose = s?.prevDailyBar?.c;
+  const pc = typeof prevClose === "number" && prevClose > 0 ? prevClose : price;
+  const tradeAt = s?.latestTrade?.t ? Date.parse(s.latestTrade.t) : NaN;
+  const quote: Quote = {
+    symbol, price, previousClose: pc,
+    changePercent: pc > 0 ? price / pc - 1 : 0,
+    asOf: Number.isFinite(tradeAt) ? tradeAt : Date.now(),
+    provenance: symbol.includes("/") ? "live" : "delayed",
+  };
+  store(`q:${symbol}`, quote);
+  await writeQuoteCache(quote);
+  return quote;
+}
+
 async function fetchQuote(symbol: string): Promise<Quote | null> {
   const reply = await massive<PrevReply>(`/v2/aggs/ticker/${massiveTicker(symbol)}/prev`);
   const bar = reply.results?.[0];
   if (!bar) return null;
+  /*
+    AUDIT NOTE (the UVIX bug): this row's previousClose was bar.o — the prev
+    day's OPEN wearing the previous-close name. For megacaps open ≈ prior
+    close, so the lie stayed under a basis point for months; UVIX opened 62.02
+    and closed 67.67 the same day, so the live overlay anchored today's move
+    9% low and a −10% day printed as −3%. Massive's /prev returns one bar and
+    cannot know the close before it, so the true prior close comes from the
+    vault when we hold it; failing that, bar.o remains the least-bad anchor
+    and the row is EOD-labeled either way. Equities/crypto normally take the
+    Alpaca snapshot path above and never reach this.
+  */
+  let priorClose: number | null = null;
+  try {
+    const rows = await db.select({ c: schema.bars.c }).from(schema.bars)
+      .where(and(eq(schema.bars.symbol, symbol), eq(schema.bars.timeframe, "1Y"),
+        dsql`t < ${Math.floor(bar.t / 1000)}`))
+      .orderBy(dsql`t desc`).limit(1);
+    priorClose = rows[0]?.c ?? null;
+  } catch { /* vault miss — fall through */ }
+  const pc = priorClose ?? bar.o;
   const quote: Quote = {
     symbol,
     price: bar.c,
-    previousClose: bar.o,
-    changePercent: bar.o > 0 ? bar.c / bar.o - 1 : 0,
+    previousClose: pc,
+    changePercent: pc > 0 ? bar.c / pc - 1 : 0,
     asOf: bar.t,
     provenance: "eod", // Massive prev-day aggregate — a close, not a tick
   };
@@ -262,6 +307,14 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
   // Indices and futures are priced ONLY by the feeds mesh — Massive's
   // stock-quote path can't answer for them, so a miss is a miss.
   if (/^(IDX|FUT):/.test(symbol)) return null;
+  // Equities/crypto: today's tape from one Alpaca snapshot — no Massive token,
+  // true previous close (see the UVIX audit note on fetchQuote).
+  if (!symbol.startsWith("FX:")) {
+    try {
+      const q = await fetchQuoteAlpaca(symbol);
+      if (q) return withLive(q);
+    } catch { /* fall through to the Massive path */ }
+  }
   if (tryTakeToken()) {
     try {
       const q = await fetchQuote(symbol);
