@@ -111,4 +111,19 @@ describe("pickFrontMonth", () => {
     ];
     expect(pickFrontMonth(withSpreads, "2026-07-29")!.ticker).toBe("ESU6");
   });
+
+  it("skips strips and average-price contracts — only the outright counts", () => {
+    // Real tickers from the live NYMEX listing: the crude settlement-average
+    // strip and the natgas calendar strip both expire before the outright and
+    // won a naive nearest-expiry pick in production.
+    const nymex = [
+      { ticker: "CL:SA 02M U6", last_trade_date: "2026-08-15" },
+      { ticker: "NG:CF U6V6X6Z6", last_trade_date: "2026-08-20" },
+      { ticker: "CLU6", last_trade_date: "2026-08-20" },
+      { ticker: "CLZ6", last_trade_date: "2026-11-20" },
+    ];
+    expect(pickFrontMonth(nymex, "2026-07-29", "CL")!.ticker).toBe("CLU6");
+    // Without a product code the generic outright shape still rejects strips.
+    expect(pickFrontMonth(nymex, "2026-07-29")!.ticker).toBe("CLU6");
+  });
 });

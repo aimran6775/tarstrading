@@ -472,16 +472,24 @@ type FuturesState = {
 const MASSIVE = "https://api.massive.com";
 
 /** Pick the front month from a contract list: nearest last_trade_date that is
-    at least 3 days out (roll before expiry week chaos). Calendar spreads
-    (ESU6-ESZ6) are quotes on the DIFFERENCE between two months, not a market
-    of their own here — excluded, or the desk would show "ES Sep-Dec spread"
-    as the S&P future. Pure, for tests. */
+    at least 3 days out (roll before expiry week chaos).
+
+    ONLY plain outrights qualify: `<code><month letter><year digit(s)>`, e.g.
+    ESU6, CLZ6, ZWH7. The listing is full of derived contract types that
+    expire soonest and would win any naive nearest-expiry pick — calendar
+    spreads (ESU6-ESZ6), settlement-average strips ("CL:SA 02M U6"), calendar
+    strip futures ("NG:CF U6V6X6Z6"). A live run actually crowned the crude
+    strip as WTI. Pure, for tests. */
 export function pickFrontMonth(
   contracts: Array<{ ticker: string; last_trade_date?: string }>, todayIso: string,
+  productCode?: string,
 ): { ticker: string; lastTradeDate: string } | null {
   const floor = new Date(Date.parse(todayIso) + 3 * 86_400_000).toISOString().slice(0, 10);
+  const outright = productCode
+    ? new RegExp(`^${productCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[FGHJKMNQUVXZ]\\d{1,2}$`)
+    : /^[A-Z0-9]{1,3}[FGHJKMNQUVXZ]\d{1,2}$/;
   const live = contracts
-    .filter((c) => !c.ticker.includes("-"))
+    .filter((c) => outright.test(c.ticker))
     .filter((c) => typeof c.last_trade_date === "string" && c.last_trade_date >= floor)
     .sort((a, b) => a.last_trade_date!.localeCompare(b.last_trade_date!));
   const f = live[0];
@@ -520,7 +528,7 @@ export async function futuresTick(): Promise<{ updated: number } | { skipped: st
           `${MASSIVE}/futures/v1/contracts?product_code=${product.code}&date=${today}&limit=1000&apiKey=${key}`,
           { cache: "no-store" });
         const json = await res.json() as { results?: Array<{ ticker: string; last_trade_date?: string }> };
-        const picked = pickFrontMonth(json.results ?? [], today);
+        const picked = pickFrontMonth(json.results ?? [], today, product.code);
         if (picked) { front = picked; state.front[product.code] = picked; }
       } catch { ok = false; continue; }
     }

@@ -8,7 +8,7 @@ import Ticket from "@/components/trading/ticket";
 import { Positions, Orders, Alerts, Performance } from "@/components/trading/tray";
 import { useToast } from "@/components/toast";
 import { SYMBOLS } from "@/lib/symbols";
-import { usd, pct, categoryOf, marketHrefFor, type Quote, type Account, type Position, type Order, type Timeframe }
+import { usd, pct, categoryOf, marketHrefFor, displaySymbol, formatPrice, type Quote, type Account, type Position, type Order, type Timeframe }
   from "@/components/trading/shared";
 import LearnLink from "@/components/academy/learn-link";
 import { ProvenanceBadge } from "@/components/provenance-badge";
@@ -259,22 +259,24 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
         <header className="rise-in relative mb-4 flex flex-wrap items-end justify-between gap-4 overflow-hidden">
           {/* the ticker echoed huge behind the price — editorial, aria-hidden */}
           <span aria-hidden className="ghost pointer-events-none absolute -top-4 right-0 z-0 hidden select-none text-[6.5rem] leading-none sm:block md:text-[8.5rem]">
-            {symbol.replace("/", "")}
+            {displaySymbol(symbol).replace("/", "")}
           </span>
           <div className="relative z-10 min-w-0">
             <p className="text-[11px] uppercase tracking-[0.25em] text-ink-4">
               <button onClick={() => router.push("/app")} className="pressable hover:text-ink-2">Markets</button>
               {" · "}{categoryOf(symbol)}
             </p>
+            {/* The FX:/IDX:/FUT: prefixes are plumbing — a reader sees EUR/USD,
+                SPX, ES Sep '26; the route keeps carrying the real symbol. */}
             <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink-1 md:text-3xl">
-              {NAME.get(symbol) ?? symbol}
-              <span className="ml-2 align-middle text-sm font-semibold text-ink-4">{symbol}</span>
+              {NAME.get(symbol) ?? displaySymbol(symbol)}
+              <span className="ml-2 align-middle text-sm font-semibold text-ink-4">{displaySymbol(symbol)}</span>
             </h1>
             <div className="mt-1.5 flex flex-wrap items-baseline gap-3">
               {quote ? (
                 <>
                   <span className="lumina tnum text-4xl font-semibold tracking-tight text-ink-1 md:text-5xl">
-                    {usd(quote.price)}
+                    {formatPrice(symbol, quote.price)}
                   </span>
                   <span className={`tnum text-lg font-semibold ${chg > 0 ? "text-gain" : chg < 0 ? "text-loss" : "text-ink-3"}`}>
                     {chg > 0 ? "▲" : chg < 0 ? "▼" : ""} {pct(chg)}
@@ -388,7 +390,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
               </div>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
                 <dt className="text-ink-4">Prev close</dt>
-                <dd className="tnum text-right text-ink-1">{quote ? usd(quote.previousClose) : "—"}</dd>
+                <dd className="tnum text-right text-ink-1">{quote ? formatPrice(symbol, quote.previousClose) : "—"}</dd>
                 <dt className="text-ink-4">Day change</dt>
                 <dd className={`tnum text-right ${chg > 0 ? "text-gain" : chg < 0 ? "text-loss" : "text-ink-2"}`}>
                   {quote ? pct(chg) : "—"}

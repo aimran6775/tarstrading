@@ -79,10 +79,10 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
         if (o.status === "filled") {
           const past = { Buy: "Bought", Sell: "Sold", Short: "Shorted", Cover: "Covered" }[actionLabel];
           toast({ kind: side === "buy" ? "gain" : "loss",
-            title: `${past} ${o.qty} ${symbol}`,
+            title: `${past} ${o.qty} ${displaySymbol(symbol)}`,
             body: `Filled @ ${usd(o.filledPrice ?? 0)}` });
         } else {
-          toast({ kind: "info", title: `${actionLabel} ${o.qty} ${symbol} resting`,
+          toast({ kind: "info", title: `${actionLabel} ${o.qty} ${displaySymbol(symbol)} resting`,
             body: "It'll fill when price agrees." });
         }
         onPlaced();
@@ -241,7 +241,7 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
           </div>
         ) : (
           <HoldButton
-            label={`${actionLabel} ${qtyNum || ""} ${symbol}`}
+            label={`${actionLabel} ${qtyNum || ""} ${displaySymbol(symbol)}`}
             holdLabel="Keep holding…"
             tone={side === "buy" ? "gold" : "loss"}
             disabled={!valid || phase.kind === "sending" || !quote}
