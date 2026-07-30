@@ -379,6 +379,11 @@ export type SyncResult = "synced" | "fresh" | "no-token" | "error";
  */
 export async function syncSeries(symbol: string, tf: Timeframe): Promise<SyncResult> {
   if (!hasLiveData) return "fresh";
+  // Mesh-owned series: the feeds mesh writes index and futures bars itself
+  // (FRED history, Massive futures sessions). Massive's stock-aggs path knows
+  // nothing about these tickers, so an upstream call here could only burn a
+  // token to fetch a 404.
+  if (symbol.startsWith("IDX:") || symbol.startsWith("FUT:")) return "fresh";
   const meta = await getSeriesMeta(symbol, tf);
   const now = Date.now();
   if (meta?.lastSyncAt && now - meta.lastSyncAt < TAIL_TTL[tf] && (meta.barCount ?? 0) > 0) {

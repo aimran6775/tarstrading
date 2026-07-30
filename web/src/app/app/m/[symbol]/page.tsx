@@ -20,10 +20,13 @@ export default async function MarketPage({ params, searchParams }: {
 
   const { symbol: raw } = await params;
   const symbol = decodeURIComponent(raw).toUpperCase();
-  /* Equity/crypto ticker, an FX: pair, or an OCC option contract. FX was listed
-     on the board while this regex still rejected the colon, so all 16 pairs
-     404'd — visible in Markets, unreachable when clicked. */
-  const ROUTABLE = /^([A-Z.]{1,8}(\/[A-Z]{3,4})?|FX:[A-Z]{6}|[A-Z]{1,6}\d{6}[CP]\d{8})$/;
+  /* Equity/crypto ticker, an FX: pair, an IDX: index level, a FUT: contract,
+     or an OCC option contract. FX taught the lesson here — listed on the
+     board while this regex rejected the colon, so every pair 404'd. When the
+     feeds mesh added indices and futures, the same trap was waiting; the
+     regex now names every prefix the board can serve. (Both new classes are
+     quote-only: the page renders, the ticket explains instead of trading.) */
+  const ROUTABLE = /^([A-Z.]{1,8}(\/[A-Z]{3,4})?|FX:[A-Z]{6}|IDX:[A-Z]{1,6}|FUT:[A-Z0-9]{2,6}|[A-Z]{1,6}\d{6}[CP]\d{8})$/;
   if (!ROUTABLE.test(symbol)) notFound();
 
   const sp = await searchParams;

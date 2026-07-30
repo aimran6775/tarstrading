@@ -273,6 +273,17 @@ type IndexCal = { ratios: Record<string, number>; closes: Record<string, { price
     Pure and exported for tests. */
 export function parseFredCsv(csv: string): Map<string, { value: number; date: string }> {
   const out = new Map<string, { value: number; date: string }>();
+  for (const [id, points] of parseFredCsvSeries(csv)) {
+    const last = points[points.length - 1];
+    if (last) out.set(id, last);
+  }
+  return out;
+}
+
+/** The full series per FRED id — every valid daily observation, in order.
+    Pure and exported for tests. */
+export function parseFredCsvSeries(csv: string): Map<string, Array<{ value: number; date: string }>> {
+  const out = new Map<string, Array<{ value: number; date: string }>>();
   const lines = csv.trim().split(/\r?\n/);
   if (lines.length < 2) return out;
   const header = lines[0].split(",").map((h) => h.trim());
@@ -282,8 +293,11 @@ export function parseFredCsv(csv: string): Map<string, { value: number; date: st
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? "")) continue;
     for (let i = 1; i < header.length; i++) {
       const v = Number(cells[i]);
-      // Last valid observation wins (rows are chronological; gaps are blank).
-      if (Number.isFinite(v) && v > 0) out.set(header[i], { value: v, date: date! });
+      // Gaps are blank cells (holidays, unpublished days) — skipped, not zeroed.
+      if (!Number.isFinite(v) || v <= 0) continue;
+      let arr = out.get(header[i]);
+      if (!arr) { arr = []; out.set(header[i], arr); }
+      arr.push({ value: v, date: date! });
     }
   }
   return out;
@@ -301,17 +315,38 @@ export async function indicesDailyTick(): Promise<{ indices: number } | { skippe
   const cal: IndexCal = (await readFeedDetail<IndexCal>("indices-daily")) ?? { ratios: {}, closes: {} };
   let ok = true;
 
-  // FRED: one CSV for every series we use.
+  // FRED: one CSV covers every series. When the vault has no index history
+  // yet, ask for five YEARS instead of two weeks — same single request — and
+  // store the whole daily series, so index charts are real history, not a
+  // two-point line.
   try {
+    const [{ n: storedBars }] = await db.execute<{ n: number }>(dsql`
+      select count(*)::int as n from bars where symbol like 'IDX:%'
+    `).then((r) => Array.from(r));
+    const deep = (storedBars ?? 0) < 500;
     const ids = INDICES.map((i) => i.fred).filter(Boolean).join(",");
-    const since = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
+    const since = new Date(Date.now() - (deep ? 5 * 365 : 14) * 86_400_000).toISOString().slice(0, 10);
     const res = await fetch(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${ids}&cosd=${since}`,
       { cache: "no-store" });
     if (!res.ok) throw new Error(`fred ${res.status}`);
-    const latest = parseFredCsv(await res.text());
+    const csv = await res.text();
+    const latest = parseFredCsv(csv);
     for (const def of INDICES) {
       const hit = def.fred ? latest.get(def.fred) : undefined;
       if (hit) cal.closes[def.symbol] = { price: hit.value, date: hit.date };
+    }
+    // Store the daily closes as bars (o=h=l=c — FRED publishes closes only).
+    const series = parseFredCsvSeries(csv);
+    for (const def of INDICES) {
+      if (!def.fred) continue;
+      const points = series.get(def.fred) ?? [];
+      for (let i = 0; i < points.length; i += 500) {
+        await db.insert(schema.bars).values(points.slice(i, i + 500).map((p) => ({
+          symbol: def.symbol, timeframe: "1Y" as const,
+          t: Math.floor(Date.parse(`${p.date}T00:00:00Z`) / 1000),
+          o: p.value, h: p.value, l: p.value, c: p.value, v: 0,
+        }))).onConflictDoNothing();
+      }
     }
   } catch { ok = false; }
 
