@@ -523,9 +523,14 @@ export async function futuresTick(): Promise<{ updated: number } | { skipped: st
           endpoint returns one row per contract PER DAY, ticker-sorted, and a
           limited page never reaches the near months (the first live run
           "discovered" ESH0, March 2030, as the S&P front month).
+          type=single keeps strips and spreads out of the page entirely — the
+          natgas book alone carries enough strip contracts that a 1,000-row
+          ticker-sorted page truncated before the near outrights, leaving
+          January '27 as the "front month". pickFrontMonth's outright regex
+          stays as the belt to this suspender.
         */
         const res = await fetch(
-          `${MASSIVE}/futures/v1/contracts?product_code=${product.code}&date=${today}&limit=1000&apiKey=${key}`,
+          `${MASSIVE}/futures/v1/contracts?product_code=${product.code}&date=${today}&type=single&limit=1000&apiKey=${key}`,
           { cache: "no-store" });
         const json = await res.json() as { results?: Array<{ ticker: string; last_trade_date?: string }> };
         const picked = pickFrontMonth(json.results ?? [], today, product.code);
