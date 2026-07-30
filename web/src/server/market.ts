@@ -482,6 +482,20 @@ export async function getBars(symbol: string, timeframe: Timeframe): Promise<Bar
   return out;
 }
 
+/**
+ * The FULL stored daily series — no timeframe windowing. The vault keeps ~5
+ * years of daily bars under the '1Y' key (the deep-fill loads that much);
+ * getBars serves the chart's window, but a BACKTEST wants every bar it can
+ * get: a 200-day strategy evaluated on 366 days has ~150 usable bars and
+ * grades as "no-trades" — starved, not cautious. Syncs the tail first so the
+ * series ends at the latest close.
+ */
+export async function getDailyHistory(symbol: string): Promise<BarPoint[]> {
+  if (!hasLiveData) return demoBars(symbol, "1Y");
+  await syncSeries(symbol, "1Y").catch(() => {});
+  return readStored(symbol, "1Y");
+}
+
 // ---------- US market clock (approximate, ET regular session) ----------
 
 /** The trading day as YYYY-MM-DD in US Eastern time — the anchor for day P&L.

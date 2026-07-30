@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { and, eq, desc } from "drizzle-orm";
-import { getBars, getQuote, getQuotes, isUSMarketOpen, type BarPoint } from "./market";
+import { getDailyHistory, getQuote, getQuotes, isUSMarketOpen, type BarPoint } from "./market";
 import { getPlatformConfig } from "./platform";
 import { placeOrder } from "./exchange";
 
@@ -308,7 +308,10 @@ const BT_SLIPPAGE = 0.0005;
 export async function backtest(strategy: Strategy): Promise<BacktestResult | null> {
   const perSymbol: { closes: number[]; times: number[] }[] = [];
   for (const symbol of strategy.universe) {
-    const bars: BarPoint[] = await getBars(symbol, "1Y");
+    // The FULL daily vault (~5 years), not the chart's 1-year window — a
+    // 200-day strategy graded on 366 days would read as "no-trades" when the
+    // truth is "no data".
+    const bars: BarPoint[] = await getDailyHistory(symbol).catch(() => []);
     if (bars.length >= 60) {
       perSymbol.push({ closes: bars.map((b) => b.close), times: bars.map((b) => b.time * 1000) });
     }
@@ -534,7 +537,9 @@ async function runTick(userId: string): Promise<number> {
       const isCrypto = symbol.includes("/");
       if (!isCrypto && !isUSMarketOpen()) continue;
 
-      const bars = await getBars(symbol, "1Y").catch(() => []);
+      // Same deep series the backtest graded — the resume and the job must
+      // be the same job, and a 200-day rule needs more than a year of bars.
+      const bars = await getDailyHistory(symbol).catch(() => []);
       if (bars.length < 60) continue;
       const quote = await getQuote(symbol);
       if (!quote) continue;
