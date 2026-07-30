@@ -46,6 +46,17 @@ export const hasLiveData = KEY.length > 0;
 
 const QUOTE_TTL = 5 * 60_000;
 
+/*
+  Mesh-fed symbols (FX / indices / futures) update on their own slower clocks —
+  daily ECB rates, official closes, session bars. Judging their cache rows by
+  the equity 5-minute rule made every index quote "stale" all night: getQuote
+  rejected the perfectly good close, burned a Massive token on a ticker Massive
+  can't quote, and served null — a blank price over a real number.
+*/
+const MESH_RE = /^(FX|IDX|FUT):/;
+const MESH_TTL = 4 * 86_400_000; // rides out weekends and holidays
+const cacheTtlFor = (symbol: string) => (MESH_RE.test(symbol) ? MESH_TTL : QUOTE_TTL);
+
 // ---------- rate limiter (token bucket: 5/min, leave 1 in reserve) ----------
 const stamps: number[] = [];
 
@@ -145,7 +156,7 @@ async function readQuoteCacheBatch(symbols: string[]): Promise<Map<string, Quote
       .where(inArray(schema.quoteCache.symbol, symbols));
     const now = Date.now();
     const map = new Map<string, Quote>();
-    for (const r of rows) if (now - r.updatedAt < QUOTE_TTL) map.set(r.symbol, rowToQuote(r));
+    for (const r of rows) if (now - r.updatedAt < cacheTtlFor(r.symbol)) map.set(r.symbol, rowToQuote(r));
     return map;
   } catch { return new Map(); } // cache is an optimization — never fail the request on it
 }
@@ -243,11 +254,14 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
   // real-time ticks, not just symbols on the watchlist poll. Cheap + deduped.
   ensureLiveFeed([symbol]);
   const key = `q:${symbol}`;
-  const hit = cached<Quote>(key, QUOTE_TTL);
+  const hit = cached<Quote>(key, cacheTtlFor(symbol));
   if (hit) return withLive(hit);             // L1 (+ live tick overlay)
   if (!hasLiveData) return withLive(demoQuote(symbol));
   const l2 = (await readQuoteCacheBatch([symbol])).get(symbol);
   if (l2) { store(key, l2); return withLive(l2); } // L2 (shared)
+  // Indices and futures are priced ONLY by the feeds mesh — Massive's
+  // stock-quote path can't answer for them, so a miss is a miss.
+  if (/^(IDX|FUT):/.test(symbol)) return null;
   if (tryTakeToken()) {
     try {
       const q = await fetchQuote(symbol);
@@ -271,7 +285,7 @@ export async function getQuotes(symbols: string[]): Promise<Quote[]> {
   const out: Quote[] = [];
   const need: string[] = [];
   for (const s of symbols) {
-    const l1 = cached<Quote>(`q:${s}`, QUOTE_TTL);
+    const l1 = cached<Quote>(`q:${s}`, cacheTtlFor(s));
     if (l1) out.push(withLive(l1)); else need.push(s);
   }
   if (!need.length) return out;
@@ -431,7 +445,23 @@ export async function getBars(symbol: string, timeframe: Timeframe): Promise<Bar
   if (l1) return l1;
 
   const result = await syncSeries(symbol, timeframe);
-  const stored = await readStored(symbol, timeframe);
+  let stored = await readStored(symbol, timeframe);
+
+  if (!stored.length && timeframe !== "1Y") {
+    /*
+      Fall back to windowing the 1Y daily store. Mesh-fed series (indices,
+      futures, FX) only ever WRITE daily bars under 1Y, so without this every
+      shorter view rendered an empty chart over a vault holding decades of
+      real closes. Daily granularity on a 1W/1M view is honest — sparse beats
+      blank, and the badge already says the data is EOD.
+    */
+    const daily = await readStored(symbol, "1Y");
+    if (daily.length) {
+      const cutoff = Math.floor((Date.now() - TF[timeframe].days * 86_400_000) / 1000);
+      const windowed = daily.filter((b) => b.time >= cutoff);
+      stored = windowed.length ? windowed : daily;
+    }
+  }
 
   if (!stored.length) {
     if (result === "no-token") {

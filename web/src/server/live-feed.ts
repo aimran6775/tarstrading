@@ -152,6 +152,9 @@ export function setPriorityStocks(symbols: string[]) {
 export function ensureLiveFeed(symbols: string[]) {
   if (!hasLiveFeed) return;
   for (const s of symbols) {
+    // Mesh-fed symbols never trade on Alpaca's streams — keep them out of the
+    // wanted set so they can't shadow a real stock in the 30-slot budget.
+    if (/^(FX|IDX|FUT):/.test(s)) continue;
     const lane = laneFor(s);
     if (!lane.wanted.has(s)) lane.wanted.add(s);
     if (!lane.ws) connect(lane);
