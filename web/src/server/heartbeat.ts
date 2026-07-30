@@ -27,6 +27,14 @@ export async function runHeartbeat(kind = "tick") {
   // allSettled: one failing task (a flaky backfill fetch, a purge hiccup) must
   // not discard the agent metrics that already succeeded, nor falsely mark the
   // whole run failed.
+  // The slow feeds (FX daily, index closes/calibration, futures) run FIRST,
+  // alone: they share the Massive token bucket with backfillTick, and when the
+  // two ran concurrently backfill — an unbounded consumer healing ~1,700
+  // series — drained every token every beat, so futures discovery sat at 1/14
+  // and the NDX close never landed. The slow feeds are bounded (a handful of
+  // calls, most beats zero), so they take their tokens off the top and
+  // backfill spends what's genuinely left over.
+  const [fRes] = await Promise.allSettled([feedsSlowTick()]);
   const [aRes, bRes, pRes, oRes, peRes, rRes] = await Promise.allSettled([
     tickAllRunningAgents(),
     backfillTick(),
@@ -34,10 +42,8 @@ export async function runHeartbeat(kind = "tick") {
     settleAllExpiredOptions(),
     tickAllPrivateMarkets(),
     reconcileRestingOrders(),
-    // The slow feeds (FX daily, index closes/calibration, futures) ride this
-    // 5-minute beat and each no-op until stale; the 60s sweep has its own beat.
-    feedsSlowTick(),
   ]);
+  void fRes; // reported via feed_status; failures must not fail the run
   if (aRes.status === "fulfilled") agents = aRes.value;
   if (bRes.status === "fulfilled") backfill = bRes.value;
   // Expiring options settle on the heartbeat, so a contract closes itself

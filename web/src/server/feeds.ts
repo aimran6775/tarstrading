@@ -261,7 +261,10 @@ export const INDICES: IndexDef[] = [
 /** Fallback index/ETF ratios, used only until a real close calibrates them.
     Approximate by nature — which is exactly what the DERIVED badge admits. */
 const SEED_RATIOS: Record<string, number> = {
-  "IDX:SPX": 10.02, "IDX:NDX": 41.3, "IDX:DJI": 100.3, "IDX:RUT": 9.94,
+  // Checked against real same-day closes (2026-07-29): SPX/SPY 7316.15/729.46,
+  // NDX/QQQ 27192.31/666.07, DJI/DIA 51594.14/515.41. RUT has no free official
+  // print anywhere; ~10× IWM is the published relationship.
+  "IDX:SPX": 10.03, "IDX:NDX": 40.8, "IDX:DJI": 100.1, "IDX:RUT": 9.94,
 };
 
 type IndexCal = { ratios: Record<string, number>; closes: Record<string, { price: number; date: string }> };
