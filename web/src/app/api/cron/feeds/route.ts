@@ -21,7 +21,10 @@ async function run(request: Request) {
   if (request.headers.get("authorization") !== `Bearer ${secret}`) {
     // Same throttle as the tick endpoint (gap 49).
     const h = await headers();
-    await rateLimit(`cron:${clientIp(h)}`, 20, 10 * 60_000);
+    const allowed = await rateLimit(`cron:${clientIp(h)}`, 20, 10 * 60_000);
+    if (!allowed) {
+      return NextResponse.json({ ok: false, error: "Too many attempts." }, { status: 429 });
+    }
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
   return NextResponse.json({ ok: true, ...(await feedsFastTick()) });
