@@ -108,9 +108,26 @@ export default function Floor({ data }: { data: Data }) {
     return () => { alive = false; clearInterval(id); };
   }, []);
   const dayPnl = acct.equity - acct.dayStart;
+  /*
+    Equity and day P&L update silently every 20 seconds (gap 36). A sighted
+    user watches the number move; a screen-reader user had no signal at all.
+    A polite live region announces the CHANGE, throttled to something a
+    person can absorb rather than narrating every tick.
+  */
   const dayPct = acct.dayStart ? dayPnl / acct.dayStart : 0;
   const shown = useCountUp(acct.equity, data.dayStart);
   const tone = (n: number): Tone => (n > 0 ? "gain" : n < 0 ? "loss" : "ink-2");
+
+  // Announced at most once a minute — a live region that fires on every poll
+  // is a screen reader talking over the user, not helping them.
+  const [spoken, setSpoken] = useState("");
+  const lastSpoke = useRef(0);
+  useEffect(() => {
+    if (Date.now() - lastSpoke.current < 60_000) return;
+    lastSpoke.current = Date.now();
+    setSpoken(
+      `Equity ${usd(acct.equity)}. Day ${dayPnl >= 0 ? "up" : "down"} ${usd(Math.abs(dayPnl))}.`);
+  }, [acct.equity, dayPnl]);
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -131,6 +148,8 @@ export default function Floor({ data }: { data: Data }) {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-4 md:px-6 md:pb-10">
+      {/* Equity changes announced politely, at most once a minute (gap 36). */}
+      <p role="status" aria-live="polite" className="sr-only">{spoken}</p>
       <h1 className="sr-only">Trading Floor</h1>
       <FloorTour hasAgents={data.agentsRunning > 0} />
 

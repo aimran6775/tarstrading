@@ -23,6 +23,8 @@ export default function HoldButton({
   onCommit: () => void;
 }) {
   const [progress, setProgress] = useState(0);
+  // The no-hold alternative's armed state (gap 40).
+  const [twoStep, setTwoStep] = useState(false);
   const raf = useRef<number>(0);
   const timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rearm = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,6 +45,14 @@ export default function HoldButton({
     clearTimers();
     if (rearm.current) clearTimeout(rearm.current);
   }, []);
+
+  // An armed two-step confirm disarms itself after 8 seconds, so a stray tap
+  // can never leave a live commit button waiting (gap 40).
+  useEffect(() => {
+    if (!twoStep) return;
+    const id = setTimeout(() => setTwoStep(false), 8_000);
+    return () => clearTimeout(id);
+  }, [twoStep]);
 
   /** Start the hold. Shared by pointer and keyboard so both must really hold. */
   function startHold() {
@@ -91,6 +101,7 @@ export default function HoldButton({
     : "bg-loss/15 text-loss border border-loss/40";
 
   return (
+    <>
     <button
       type="button"
       disabled={disabled}
@@ -139,5 +150,38 @@ export default function HoldButton({
       />
       <span className="relative">{progress > 0.02 && progress < 1 ? holdLabel : label}</span>
     </button>
+
+    {/*
+      The no-hold path (gap 40). A sustained ~900ms press is a real barrier
+      for tremor, limited dexterity, or switch access — and WCAG asks that
+      any timing-dependent action have an alternative. Two deliberate taps
+      carry the same intent as one deliberate hold: nothing fires on the
+      first, and the confirm state times out so a stray tap can't leave a
+      live button armed.
+    */}
+    {!disabled && (
+      <div className="mt-1.5 text-center">
+        {twoStep ? (
+          <span className="inline-flex items-center gap-2">
+            <button type="button" onClick={() => { setTwoStep(false); finish(); }}
+              className={`pressable min-h-9 rounded-full px-4 text-xs font-semibold ${
+                tone === "gold" ? "bg-gold/20 text-gold" : "bg-loss/20 text-loss"
+              }`}>
+              Confirm {label}
+            </button>
+            <button type="button" onClick={() => setTwoStep(false)}
+              className="pressable min-h-9 px-2 text-xs text-ink-4 hover:text-ink-2">
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <button type="button" onClick={() => setTwoStep(true)}
+            className="pressable min-h-9 text-[11px] text-ink-4 underline decoration-dotted underline-offset-4 hover:text-ink-2">
+            Can&apos;t hold? Confirm in two taps
+          </button>
+        )}
+      </div>
+    )}
+    </>
   );
 }

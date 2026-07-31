@@ -164,5 +164,26 @@ export default function PriceChart({ bars, height = 420 }: { bars: ChartBar[]; h
     }
   }, [bars, themeTick]);
 
-  return <div ref={holder} className="w-full" style={{ height }} />;
+  /*
+    A canvas chart is invisible to a screen reader (gap 37). The library
+    draws into a canvas with no text at all, so the entire price history was
+    simply absent for anyone not looking at it. A short summary — range,
+    direction, span — carries the shape of what's drawn; role="img" stops the
+    container being announced as an empty group.
+  */
+  const summary = (() => {
+    if (!bars.length) return "Price chart, no data loaded yet.";
+    const first = bars[0].close, last = bars[bars.length - 1].close;
+    const lo = Math.min(...bars.map((b) => b.low));
+    const hi = Math.max(...bars.map((b) => b.high));
+    const move = first > 0 ? ((last / first - 1) * 100).toFixed(1) : "0.0";
+    const dir = last > first ? "up" : last < first ? "down" : "flat";
+    return `Price chart, ${bars.length} bars. ${dir} ${move}% over the period, `
+      + `from ${first.toFixed(2)} to ${last.toFixed(2)}. Range ${lo.toFixed(2)} to ${hi.toFixed(2)}.`;
+  })();
+
+  return (
+    <div ref={holder} className="w-full" style={{ height }}
+      role="img" aria-label={summary} />
+  );
 }

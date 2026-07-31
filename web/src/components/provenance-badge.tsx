@@ -19,7 +19,9 @@ export function ProvenanceBadge({ source, symbol, className = "" }: {
   return (
     <span
       title={PROVENANCE_HELP[source]}
-      className={`inline-flex items-center gap-1 whitespace-nowrap font-mono text-[8.5px] uppercase tracking-[0.14em] ${
+      /* 8.5px carried meaning below any legible minimum (gap 39). 10px with
+         the same tracking stays a quiet chip and can actually be read. */
+      className={`inline-flex items-center gap-1 whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.12em] ${
         live ? "text-gain" : "text-ink-4"
       } ${className}`}
     >
