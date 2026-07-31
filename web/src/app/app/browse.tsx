@@ -12,6 +12,7 @@ import MarketCard from "@/components/market-card";
 import PulseStrip from "@/components/markets/pulse-strip";
 import MoversRails from "@/components/markets/movers-rails";
 import BoardTable from "@/components/markets/board-table";
+import VenueMap from "@/components/markets/venue-map";
 import { moversFromRows, type BoardPayload, type BoardRow, type Movers } from "@/components/markets/board-types";
 import { fxPairName, instrumentOf } from "@/components/markets/instrument";
 import { SYMBOLS } from "@/lib/symbols";
@@ -69,6 +70,19 @@ const EMPTY_NOTE: Record<Category, string> = {
   Watchlist: "Nothing on your watchlist yet. Add a ticker above and it follows you everywhere.",
 };
 
+/* One operational line per room — how this venue actually trades here. The
+   venue tiles say what a thing IS; this says what happens when you buy it. */
+const ROOM_NOTE: Partial<Record<Category, string>> = {
+  Stocks: "Cash equities — market, limit, stop and trailing orders, long or short.",
+  ETFs: "Trade like stocks, every order type works. Leveraged funds decay — visit the Academy before sizing.",
+  Crypto: "Around the clock. Fills carry a 25bps commission, priced into the math.",
+  Global: "Foreign companies and country funds listed in the US — dollar-priced, regular hours.",
+  FX: "Spot pairs marked at daily ECB rates; P&L converts to dollars at the same rates.",
+  Income: "Built for dividends — payouts land in cash automatically on pay dates.",
+  Indices: "Quote-only benchmarks. To trade the level, use its future or its ETF.",
+  Futures: "Post initial margin, settle variation daily. Each ticket lists its contract's $/point.",
+};
+
 const NAME = new Map(SYMBOLS.map((e) => [e.symbol, e.name]));
 /** The name a row deserves: the dictionary's, or a pair spelled out. */
 const nameOf = (symbol: string) => NAME.get(symbol) ?? fxPairName(symbol);
@@ -122,6 +136,10 @@ export default function Browse({ userName, welcome, board }: {
   const [marketOpen, setMarketOpen] = useState<boolean | null>(null);
   const [stale, setStale] = useState(false);
   const [adding, setAdding] = useState("");
+  /* In-room search (client-side over the loaded rows — instant, no request).
+     Cleared when the room changes: a filter that silently follows you into
+     another section reads as "this room is empty". */
+  const [query, setQuery] = useState("");
   const watchRef = useRef<string[]>([]);
 
   // The curated board, unpacked once: order, categories, featured eligibility.
@@ -232,6 +250,10 @@ export default function Browse({ userName, welcome, board }: {
     };
   }, [loadAccount, loadBoard, loadOffBoardQuotes, loadSparks]);
 
+  // Changing rooms drops the search — a filter that silently follows you
+  // into another section reads as "this room is empty".
+  useEffect(() => { setQuery(""); }, [category]);
+
   // The open section keeps its own beat, on the same 20s cadence.
   const openSection = isSection(category) ? category : null;
   useEffect(() => {
@@ -316,18 +338,40 @@ export default function Browse({ userName, welcome, board }: {
 
   /** The rows the active pill is asking for. A section serves its own page
       when it has arrived; until then the headline board's slice stands in. */
-  const displayRows = useMemo(() => {
+  const roomRows = useMemo(() => {
     if (category === "Watchlist") return watchlist.map(rowFor);
     if (category === "Trending") return rows;
     return sections[category] ?? rows.filter((r) => categoryFor(r.symbol) === category);
   }, [category, rows, sections, watchlist, rowFor, categoryFor]);
 
+  /* The search narrows the room by ticker or name — instant, over rows the
+     page already holds. Rails and breadth stay on the unfiltered room: typing
+     "NV" should not convince the page the whole market is up. */
+  const displayRows = useMemo(() => {
+    const q = query.trim().toUpperCase();
+    if (!q) return roomRows;
+    return roomRows.filter((r) =>
+      displaySymbol(r.symbol).includes(q)
+      || r.symbol.toUpperCase().includes(q)
+      || (nameOf(r.symbol) ?? "").toUpperCase().includes(q));
+  }, [roomRows, query]);
+
+  /* A ticker the room doesn't hold is still one keystroke from its page —
+     offered only when the search comes up EMPTY. While matches are on screen
+     the rows themselves are the answer, and a guessy "open X directly" next
+     to real results would route to pages that may not exist. */
+  const jumpSymbol = useMemo(() => {
+    const q = query.trim().toUpperCase();
+    if (!q || displayRows.length > 0) return null;
+    return /^[A-Z.:]{1,10}(\/[A-Z]{3,4})?$/.test(q) ? q : null;
+  }, [query, displayRows]);
+
   /** The rails follow the pill: the whole market's movers on Trending (the
       server already computed them), the slice's own movers otherwise. */
   const railMovers = useMemo(() => {
     if (category === "Trending") return movers;
-    return moversFromRows(displayRows);
-  }, [category, movers, displayRows]);
+    return moversFromRows(roomRows);
+  }, [category, movers, roomRows]);
 
   const breadth = railMovers?.breadth ?? null;
 
@@ -356,7 +400,7 @@ export default function Browse({ userName, welcome, board }: {
   const listLoading = category === "Watchlist"
     ? false
     : openSection
-      ? sections[openSection] == null && displayRows.length === 0
+      ? sections[openSection] == null && roomRows.length === 0
       : loading;
   const stamp = asOf
     ? new Date(asOf).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
@@ -429,6 +473,11 @@ export default function Browse({ userName, welcome, board }: {
         {/* 1 — the state of the market */}
         <PulseStrip rows={rowMap} breadth={breadth} marketOpen={marketOpen} asOf={asOf} stale={stale} />
 
+        {/* 1b — the whole desk at a glance: every venue, with real counts */}
+        {category === "Trending" && (
+          <VenueMap board={board} rows={rows} onSelect={(c) => setCategory(c)} />
+        )}
+
         {/* 2 — the featured exhibit */}
         {featured && (
           <FeaturedCard symbol={featured} name={nameOf(featured)} kind={categoryFor(featured)}
@@ -451,16 +500,53 @@ export default function Browse({ userName, welcome, board }: {
           </div>
         )}
 
+        {/* The room's operating note — what happens when you trade here. */}
+        {ROOM_NOTE[category] && (
+          <p className="mb-3 text-xs leading-relaxed text-ink-4">{ROOM_NOTE[category]}</p>
+        )}
+
         {/* 4 — the board */}
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1 basis-56 sm:max-w-xs">
+            <svg viewBox="0 0 24 24" aria-hidden
+              className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-4"
+              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Search ${category === "Trending" ? "the board" : category.toLowerCase()}…`}
+              aria-label="Search this room by ticker or name"
+              className="min-h-10 w-full rounded-full border border-hairline bg-bg1 pl-9 pr-8 text-xs text-ink-1 outline-none transition-colors placeholder:text-ink-4 focus:border-gold/50"
+            />
+            {query && (
+              <button type="button" onClick={() => setQuery("")} aria-label="Clear search"
+                className="pressable absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-ink-4 hover:text-ink-1">
+                ×
+              </button>
+            )}
+          </div>
           <p className="tnum text-[11px] text-ink-4">
             {listLoading
               ? "Loading the board…"
-              : `${displayRows.length} market${displayRows.length === 1 ? "" : "s"}`}
+              : `${displayRows.length}${query ? ` of ${roomRows.length}` : ""} market${displayRows.length === 1 ? "" : "s"}`}
             {stamp && <span className={stale ? "text-warning" : ""}> · updated {stamp}</span>}
           </p>
-          <ViewToggle view={view} onChange={writeView} />
+          <div className="ml-auto"><ViewToggle view={view} onChange={writeView} /></div>
         </div>
+
+        {/* A ticker this room doesn't hold is still one tap from its page. */}
+        {jumpSymbol && (
+          <Link href={`/app/m/${encodeURIComponent(jumpSymbol)}`}
+            className="mb-3 inline-flex min-h-10 items-center gap-2 rounded-full border border-gold/35 bg-gold/8 px-4 text-xs font-semibold text-gold no-underline transition-colors hover:bg-gold/15">
+            Open {jumpSymbol} directly
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor"
+              strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </Link>
+        )}
 
         {view === null ? (
           <div className="skeleton h-80 w-full rounded-[var(--r-l)]" />

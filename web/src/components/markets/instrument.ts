@@ -75,7 +75,7 @@ const INDEX: Instrument = {
 };
 const FUTURE: Instrument = {
   label: "Futures",
-  title: "A futures contract — an exchange-traded agreement on a future price. Quote-only here.",
+  title: "A futures contract — margin-traded: post initial margin, settle variation daily.",
 };
 
 /* Registered names are the ticker directory's own text ("… American Depositary

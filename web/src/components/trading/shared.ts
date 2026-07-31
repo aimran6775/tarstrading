@@ -187,8 +187,8 @@ export function futDisplay(symbol: string): string {
 /** The pills the browse page groups markets under. */
 /* The board's sections. Global = foreign companies (ADRs) and country/region
    funds — real US-listed securities that carry world-market exposure without a
-   foreign data feed. FX = spot currency pairs (FX: prefixed). Indices and
-   Futures are quote-only reference markets. */
+   foreign data feed. FX = spot currency pairs (FX: prefixed). Indices are
+   quote-only; futures trade on margin with daily variation settlement. */
 export type MarketCategory = "Crypto" | "ETFs" | "Stocks" | "Global" | "FX" | "Income" | "Indices" | "Futures";
 
 /** One row of the curated house board, as served to the client by the server. */

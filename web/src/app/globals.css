@@ -216,13 +216,33 @@ html, body {
   }
 }
 
-/* Ticker tape */
+/* Ticker tape. Duration is set inline from the measured copy width, so the
+   glide is a constant pixel speed regardless of how many symbols ride it.
+   will-change keeps the strip on its own compositor layer — the marquee
+   never repaints because a child's text updated. */
 @keyframes tape-scroll {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
-.tape { animation: tape-scroll 42s linear infinite; }
-.tape:hover { animation-play-state: paused; }
+.tape {
+  animation: tape-scroll 40s linear infinite;
+  will-change: transform;
+}
+.tape:hover,
+.tape:focus-within { animation-play-state: paused; }
+
+/* A tick: the price flashes once in the direction of the move, then settles.
+   Color only — no layout shift, nothing for the marquee to reflow. */
+@keyframes tick-flash-up {
+  0% { color: var(--gain); text-shadow: 0 0 12px color-mix(in oklch, var(--gain) 55%, transparent); }
+  100% { color: inherit; text-shadow: none; }
+}
+@keyframes tick-flash-down {
+  0% { color: var(--loss); text-shadow: 0 0 12px color-mix(in oklch, var(--loss) 55%, transparent); }
+  100% { color: inherit; text-shadow: none; }
+}
+.tick-up { animation: tick-flash-up 0.9s ease-out; }
+.tick-down { animation: tick-flash-down 0.9s ease-out; }
 
 @keyframes shimmer {
   from { background-position: -200% 0; }

@@ -41,6 +41,46 @@ export async function GET(req: Request) {
   if (!(await currentUser())) return NextResponse.json({ ok: false }, { status: 401 });
 
   const url = new URL(req.url);
+
+  /*
+    Tape mode: a small cross-venue sample for the footer ticker. The old tape
+    read a hardcoded symbol dictionary, so it never learned that FX, futures,
+    indices or the world sections exist. This serves the first few of EVERY
+    category from the curated board — a few hundred bytes, same 15s cache and
+    single-flight discipline as the big payload.
+  */
+  if (url.searchParams.get("tape") === "1") {
+    const hit = boardCache.get("tape");
+    if (hit && Date.now() - hit.at < TTL_MS) return NextResponse.json(hit.body);
+    const pending = inFlight.get("tape");
+    if (pending) return NextResponse.json(await pending);
+
+    const work = (async () => {
+      const board = await getHouseBoard();
+      const perCat = new Map<string, string[]>();
+      for (const b of board) {
+        const lane = perCat.get(b.category) ?? [];
+        // Featured symbols get the lane's front seats; curation order after.
+        if (lane.length < 6) { lane.push(b.symbol); perCat.set(b.category, lane); }
+      }
+      const symbols = [...perCat.values()].flat();
+      const stats = await marketStats(symbols);
+      const catOf = new Map(board.map((b) => [b.symbol, b.category] as const));
+      const rows = stats
+        .filter((s) => s.price != null)
+        .map((s) => ({
+          symbol: s.symbol, price: s.price, changePercent: s.changePercent,
+          category: catOf.get(s.symbol) ?? null, source: s.source ?? null,
+        }));
+      const body = { ok: true, rows, asOf: Date.now() };
+      boardCache.set("tape", { at: Date.now(), body });
+      return body;
+    })();
+    inFlight.set("tape", work);
+    try { return NextResponse.json(await work); }
+    finally { inFlight.delete("tape"); }
+  }
+
   const category = url.searchParams.get("category");        // stocks | etf | crypto
   /* Global alone holds 719 rows, so a 600 cap silently truncated the largest
      section (gap 18). 1200 covers every section whole with headroom. */
