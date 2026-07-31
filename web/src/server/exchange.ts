@@ -7,6 +7,7 @@ import { getPlatformConfig } from "./platform";
 import { isOptionSymbol, parseOptionSymbol, optionQuotes, CONTRACT_SIZE } from "./options";
 import { isFxSymbol, isFxOpen, fxQuotes, toUsd, usdRateMap } from "./fx";
 import { isFuturesSymbol, futuresSpec, futuresMarks, isFuturesOpen, pickLiquidations, isExpired } from "./futures";
+import { portfolioMargin, type SpanBreakdown } from "./span";
 import { notify } from "./notify";
 import { commissionFor, slippageFor } from "./costs";
 
@@ -248,25 +249,37 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
 
     // Mark each symbol: this order's symbol at the live quote, others at cost.
     const markOf = (s: string, avg: number) => (s === symbol ? quote.price : avg);
-    // Initial requirement over all positions with the target updated, plus a
-    // conservative reservation for resting orders (assume they fill).
-    // Requirements are in dollars: rate × notional for securities, the spec
-    // sheet's fixed IM per contract for futures (no principal moves there).
-    const initialReqOf = (s: string, qty: number, px: number) =>
-      isFuturesSymbol(s) ? futuresIM(s, qty)
-        : initialRate(s) * Math.abs(qty * px) * multiplierFor(s);
+    /*
+      Initial requirement over all positions with the target updated, plus a
+      conservative reservation for resting orders (assume they fill).
+
+      Securities margin rate × notional. The futures BOOK margins as a
+      PORTFOLIO (SPAN-lite): the whole hypothetical futures book — including
+      this order and resting futures orders — goes through portfolioMargin(),
+      so a calendar spread or a long-S&P/short-Nasdaq pair is charged what
+      the spread risks, not two full outrights. Hedging your book can now
+      LOWER the requirement — which is the entire point of a margin desk.
+    */
+    const securitiesReqOf = (s: string, qty: number, px: number) =>
+      initialRate(s) * Math.abs(qty * px) * multiplierFor(s);
     let requirement = 0;
+    const futuresBook: { symbol: string; qty: number }[] = [];
+    const addLeg = (s: string, qty: number, px: number) => {
+      if (isFuturesSymbol(s)) futuresBook.push({ symbol: s, qty });
+      else requirement += securitiesReqOf(s, qty, px);
+    };
     for (const p of positions) {
       const qty = p.symbol === symbol ? q1 : p.qty;
-      requirement += initialReqOf(p.symbol, qty, markOf(p.symbol, p.avgEntryPrice));
+      addLeg(p.symbol, qty, markOf(p.symbol, p.avgEntryPrice));
     }
     if (!cur && Math.abs(q1) > 1e-9) {
-      requirement += initialReqOf(symbol, q1, quote.price);
+      addLeg(symbol, q1, quote.price);
     }
     for (const o of resting) {
       const px = o.limitPrice ?? o.stopPrice ?? quote.price;
-      requirement += initialReqOf(o.symbol, o.qty, px);
+      addLeg(o.symbol, o.qty, px);
     }
+    requirement += portfolioMargin(futuresBook).im;
     // Deleveraging (shrinking the target's absolute exposure) is always allowed;
     // otherwise you must hold enough equity to meet the initial requirement.
     const reducing = Math.abs(q1) < Math.abs(q0) - 1e-9;
@@ -482,6 +495,10 @@ async function settle(tx: Tx, order: PlacedOrder, fillPrice: number, fxRates?: M
 export type AccountRisk = {
   equity: number; cash: number; longValue: number; shortValue: number;
   gross: number; net: number; maintenance: number; buyingPower: number; marginUsedPct: number;
+  /** Total initial requirement across the whole book (securities + SPAN futures). */
+  initialReq: number;
+  /** SPAN-lite portfolio view of the futures book — credits included. */
+  span: SpanBreakdown;
 };
 
 export async function accountRisk(userId: string): Promise<AccountRisk> {
@@ -508,14 +525,13 @@ export async function accountRisk(userId: string): Promise<AccountRisk> {
       ?? futMarks.get(p.symbol) ?? mark.get(p.symbol) ?? p.avgEntryPrice;
     if (isFuturesSymbol(p.symbol)) {
       // Futures: equity carries the unrealized VM, exposure carries the
-      // NOTIONAL (a real margin desk counts the whole contract), and the
-      // requirements come off the spec sheet in dollars.
+      // NOTIONAL (a real margin desk counts the whole contract). The
+      // requirements come from the SPAN pass below — the BOOK margins as a
+      // portfolio, not contract-by-contract.
       const mult = multiplierFor(p.symbol);
       futuresPnl += (px - p.avgEntryPrice) * p.qty * mult;
       futuresGross += Math.abs(p.qty * px * mult);
       futuresNet += p.qty * px * mult;
-      initialReq += futuresIM(p.symbol, p.qty);
-      maintenance += futuresMM(p.symbol, p.qty);
       continue;
     }
     const val = p.qty * px * multiplierFor(p.symbol); // signed, contract-scaled
@@ -523,6 +539,14 @@ export async function accountRisk(userId: string): Promise<AccountRisk> {
     initialReq += initialRate(p.symbol) * Math.abs(val);
     maintenance += maintRate(p.symbol) * Math.abs(val);
   }
+  // The futures book margins as a portfolio (SPAN-lite): spreads and
+  // correlated pairs earn their credits here, exactly as at order time.
+  const span = portfolioMargin(
+    positions.filter((p) => isFuturesSymbol(p.symbol))
+      .map((p) => ({ symbol: p.symbol, qty: p.qty })));
+  initialReq += span.im;
+  maintenance += span.mm;
+
   const equity = cash + longValue - shortValue + futuresPnl;
   // Gross/net exposure count futures at full notional — leverage the honest way.
   const gross = longValue + shortValue + futuresGross;
@@ -531,6 +555,7 @@ export async function accountRisk(userId: string): Promise<AccountRisk> {
   return {
     equity, cash, longValue, shortValue, gross, net: longValue - shortValue + futuresNet,
     maintenance, buyingPower, marginUsedPct: equity > 0 ? Math.min(1, initialReq / equity) : 0,
+    initialReq, span,
   };
 }
 
