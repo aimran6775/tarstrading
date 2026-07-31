@@ -35,18 +35,30 @@ export async function runHeartbeat(kind = "tick") {
   // calls, most beats zero), so they take their tokens off the top and
   // backfill spends what's genuinely left over.
   const [fRes] = await Promise.allSettled([feedsSlowTick()]);
-  const [aRes, bRes, pRes, oRes, peRes, rRes] = await Promise.allSettled([
-    tickAllRunningAgents(),
+  /*
+    Exchange-mutating sweeps run SEQUENTIALLY, never in parallel. Each of
+    them (agents, resting-order reconcile, option expiry, futures VM) opens
+    SELECT … FOR UPDATE transactions on the same account rows out of ONE
+    shared 10-connection pool — run together, blocked waiters held pool
+    connections that the lock holders needed to finish, and the whole
+    backend wedged: no heartbeats landed for hours and every DB-bound route
+    hung. Parallelism here bought milliseconds and cost the scheduler.
+  */
+  const seq = async <T,>(f: () => Promise<T>): Promise<PromiseSettledResult<T>> => {
+    try { return { status: "fulfilled", value: await f() }; }
+    catch (e) { return { status: "rejected", reason: e }; }
+  };
+  const aRes = await seq(tickAllRunningAgents);
+  const rRes = await seq(reconcileRestingOrders);
+  const oRes = await seq(settleAllExpiredOptions);
+  const futRes = await seq(settleAllFuturesVM);
+  // These three never touch account locks — they can share the beat freely.
+  const [bRes, pRes, peRes] = await Promise.allSettled([
     backfillTick(),
     purgeExpiredSessions(),
-    settleAllExpiredOptions(),
     tickAllPrivateMarkets(),
-    reconcileRestingOrders(),
-    // Futures settle variation margin once per session and the margin desk
-    // checks maintenance right after — whether or not anyone is watching.
-    settleAllFuturesVM(),
   ]);
-  void fRes; // reported via feed_status; failures must not fail the run
+  void fRes; void futRes; // reported via feed_status/journal; never fail the run
   if (aRes.status === "fulfilled") agents = aRes.value;
   if (bRes.status === "fulfilled") backfill = bRes.value;
   // Expiring options settle on the heartbeat, so a contract closes itself
