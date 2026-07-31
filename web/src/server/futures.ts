@@ -115,6 +115,38 @@ export async function futuresMarks(symbols: string[]): Promise<Map<string, numbe
 }
 
 /*
+  Contract expiry (gap 2). A held future is not a stock: it STOPS EXISTING on
+  its last trade date. Without this, a position in an expired contract marked
+  forever against a quote row the mesh stopped refreshing — a ghost with P&L.
+
+  CME month codes carry the expiry month; the exact last-trade day varies by
+  product (3rd Friday for equity index, mid-month for energy…), so we settle
+  on the last day of the contract month, which is never EARLIER than the real
+  last trade date — the position always survives its true expiry, and closes
+  within days of it rather than living on indefinitely.
+*/
+const MONTH_CODE: Record<string, number> = {
+  F: 0, G: 1, H: 2, J: 3, K: 4, M: 5, N: 6, Q: 7, U: 8, V: 9, X: 10, Z: 11,
+};
+
+/** Epoch ms after which this contract is expired, or null if unparseable. */
+export function contractExpiry(symbol: string): number | null {
+  const t = symbol.toUpperCase().replace(/^FUT:/, "");
+  const m = /^[A-Z0-9]{1,3}?([FGHJKMNQUVXZ])(\d{1,2})$/.exec(t);
+  if (!m) return null;
+  const month = MONTH_CODE[m[1]];
+  const yy = m[2].length === 2 ? Number(m[2]) : Number(`2${m[2]}`);
+  const year = 2000 + yy;
+  // Last instant of the contract month, ET-ish (21:00Z ≈ 5pm ET close).
+  return Date.UTC(year, month + 1, 0, 21, 0, 0);
+}
+
+export const isExpired = (symbol: string, at = Date.now()) => {
+  const e = contractExpiry(symbol);
+  return e != null && at > e;
+};
+
+/*
   Margin-call triage — pure and unit-tested. Given the futures book and how
   many dollars of maintenance shortfall must be freed, pick contracts to
   liquidate: biggest margin consumer first (freeing the most requirement per

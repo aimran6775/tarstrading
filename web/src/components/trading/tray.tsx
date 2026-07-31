@@ -150,7 +150,7 @@ export function Alerts({ symbol, quote }: { symbol: string; quote: Quote | undef
       if (data.ok) setAlerts(data.alerts);
     } catch { /* transient */ }
   }, []);
-  useEffect(() => { load(); const id = setInterval(load, 20_000); return () => clearInterval(id); }, [load]);
+  useEffect(() => { load(); const id = setInterval(() => { if (typeof document !== "undefined" && document.hidden) return; load(); }, 20_000); return () => clearInterval(id); }, [load]);
 
   useEffect(() => {
     if (quote) {

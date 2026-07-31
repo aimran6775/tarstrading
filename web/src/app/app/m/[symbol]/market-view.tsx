@@ -154,9 +154,9 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
     loadAccount().then(() => { loadQuotes(); loadOrders(); });
     // 4s poll: the server reads live websocket ticks from memory, so a fast
     // poll costs nothing upstream and the tape actually moves.
-    const q = setInterval(loadQuotes, 4_000);
-    const a = setInterval(loadAccount, 45_000);
-    const o = setInterval(loadOrders, 45_000);
+    const q = setInterval(() => { if (typeof document !== "undefined" && document.hidden) return; loadQuotes(); }, 4_000);
+    const a = setInterval(() => { if (typeof document !== "undefined" && document.hidden) return; loadAccount(); }, 45_000);
+    const o = setInterval(() => { if (typeof document !== "undefined" && document.hidden) return; loadOrders(); }, 45_000);
     return () => { clearInterval(q); clearInterval(a); clearInterval(o); };
   }, [loadAccount, loadQuotes, loadOrders]);
 
@@ -199,7 +199,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
     setStat(null);
     setStatState("loading");
     loadStats();
-    const t = setInterval(loadStats, 60_000);
+    const t = setInterval(() => { if (typeof document !== "undefined" && document.hidden) return; loadStats(); }, 60_000);
     return () => clearInterval(t);
   }, [loadStats]);
 

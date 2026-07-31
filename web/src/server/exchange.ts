@@ -6,7 +6,8 @@ import { getQuote, getQuotes, isUSMarketOpen, etDay } from "./market";
 import { getPlatformConfig } from "./platform";
 import { isOptionSymbol, parseOptionSymbol, optionQuotes, CONTRACT_SIZE } from "./options";
 import { isFxSymbol, isFxOpen, fxQuotes } from "./fx";
-import { isFuturesSymbol, futuresSpec, futuresMarks, isFuturesOpen, pickLiquidations } from "./futures";
+import { isFuturesSymbol, futuresSpec, futuresMarks, isFuturesOpen, pickLiquidations, isExpired } from "./futures";
+import { notify } from "./notify";
 
 /*
   The simulated exchange. Every user trades an isolated $100k account.
@@ -686,32 +687,157 @@ export async function settleFuturesVM(userId: string): Promise<number> {
     settled++;
   }
 
-  // Maintenance check AFTER settlement, on marked equity.
-  const risk = await accountRisk(userId);
-  if (risk.equity < risk.maintenance - 1e-6) {
-    const shortfall = risk.maintenance - risk.equity;
-    const toClose = pickLiquidations(
-      futs.map((p) => ({ symbol: p.symbol, qty: p.qty })), shortfall);
-    for (const c of toClose) {
-      const order = await placeOrder(userId, {
-        symbol: c.symbol,
-        side: c.qty > 0 ? "sell" : "buy",
-        type: "market",
-        qty: Math.abs(c.qty),
-      });
-      if (order.status === "filled") {
-        await db.insert(schema.journalEntries).values({
-          id: randomUUID(), userId, symbol: c.symbol,
-          side: "margin-call", qty: Math.abs(c.qty),
-          entryPrice: 0, exitPrice: order.filledPrice ?? 0, pnl: 0,
-          thesis: `Margin call: equity fell $${Math.round(shortfall).toLocaleString()} below maintenance — the desk closed this position, not you. That is what maintenance margin means.`,
-          agentId: null, createdAt: Date.now(),
-        }).catch(() => {});
-        settled++;
-      }
-    }
-  }
+  settled += await settleExpiredFutures(userId);
+  settled += await enforceMaintenance(userId);
   return settled;
+}
+
+/*
+  Futures expiry (gap 2). A contract stops existing at its last trade date;
+  a held position must cash-settle at the final mark, not mark forever
+  against a quote row the mesh has stopped refreshing. Because VM already
+  swept every session, avgEntryPrice IS the last settlement — so the final
+  P&L is (final mark − basis), the same arithmetic as any other session,
+  and the position closes with a journal entry naming the roll.
+*/
+export async function settleExpiredFutures(userId: string): Promise<number> {
+  const positions = await db.select().from(schema.positions)
+    .where(eq(schema.positions.userId, userId));
+  const expired = positions.filter((p) => isFuturesSymbol(p.symbol) && isExpired(p.symbol));
+  if (!expired.length) return 0;
+
+  const marks = await futuresMarks(expired.map((p) => p.symbol));
+  let done = 0;
+  for (const p of expired) {
+    const final = marks.get(p.symbol);
+    // No final mark? Leave it for the next pass rather than settling at a
+    // number we can't stand behind — the same rule markEquity follows.
+    if (final == null) continue;
+    const mult = multiplierFor(p.symbol);
+    const pnl = (final - p.avgEntryPrice) * p.qty * mult;
+    await db.transaction(async (tx) => {
+      const [acct] = await tx.select().from(schema.accounts)
+        .where(eq(schema.accounts.userId, userId)).for("update");
+      if (!acct) return;
+      await tx.update(schema.accounts).set({ cash: acct.cash + pnl })
+        .where(eq(schema.accounts.userId, userId));
+      await tx.insert(schema.journalEntries).values({
+        id: randomUUID(), userId, symbol: p.symbol,
+        side: "expired", qty: Math.abs(p.qty),
+        entryPrice: p.avgEntryPrice, exitPrice: final, pnl,
+        thesis: "The contract expired. Futures don't roll themselves — a desk that wants continued exposure buys the next month deliberately.",
+        agentId: null, createdAt: Date.now(),
+      });
+      await tx.delete(schema.positions).where(eq(schema.positions.id, p.id));
+    });
+    await notify(userId, "system", `${p.symbol.replace("FUT:", "")} expired`,
+      { body: `Cash-settled at ${final}. Roll to the next month yourself if you still want the exposure.`, href: "/app/floor" });
+    done++;
+  }
+  return done;
+}
+
+/*
+  The margin call — a STATE, not a guillotine.
+
+  A real desk does not liquidate the instant equity dips below maintenance:
+  it issues a call, gives you time to cure it (deposit, or close something
+  yourself), and only forces if you don't. Instant liquidation taught the
+  wrong lesson AND punished a 30-second dip. So:
+
+    breach → margin_call_at stamped, user notified, nothing sold
+    still breached after CURE_MS → forced liquidation, journaled
+    cured any time → stamp cleared, notified
+
+  Applies to the WHOLE book (gap 1): equities carry a 25% Reg-T maintenance
+  requirement that was previously computed, displayed, and then ignored.
+  Futures liquidate by spec MM; equities by Reg-T. Both come through here.
+*/
+const CURE_MS = 2 * 3600_000; // two hours of live marks to fix it yourself
+
+export async function enforceMaintenance(userId: string): Promise<number> {
+  const risk = await accountRisk(userId);
+  const [account] = await db.select().from(schema.accounts)
+    .where(eq(schema.accounts.userId, userId));
+  if (!account) return 0;
+
+  const breached = risk.equity < risk.maintenance - 1e-6;
+  if (!breached) {
+    if (account.marginCallAt != null) {
+      await db.update(schema.accounts).set({ marginCallAt: null })
+        .where(eq(schema.accounts.userId, userId));
+      await notify(userId, "margin", "Margin call cleared",
+        { body: "Your equity is back above the maintenance requirement. Nothing was liquidated.", href: "/app/floor" });
+    }
+    return 0;
+  }
+
+  const shortfall = risk.maintenance - risk.equity;
+  const since = account.marginCallAt;
+  if (since == null) {
+    await db.update(schema.accounts).set({ marginCallAt: Date.now() })
+      .where(eq(schema.accounts.userId, userId));
+    await notify(userId, "margin", "Margin call",
+      {
+        body: `Equity ${usdish(risk.equity)} is ${usdish(shortfall)} below your ${usdish(risk.maintenance)} maintenance requirement. Close positions or the desk will do it in two hours.`,
+        href: "/app/floor",
+      });
+    return 0; // the call is the action; the cure window starts now
+  }
+  if (Date.now() - since < CURE_MS) return 0; // still curable
+
+  // The window closed. Liquidate futures first (spec MM frees the most per
+  // order), then equities by position size, until the requirement is met.
+  const positions = await db.select().from(schema.positions)
+    .where(eq(schema.positions.userId, userId));
+  const futs = positions.filter((p) => isFuturesSymbol(p.symbol));
+  const toClose = pickLiquidations(futs.map((p) => ({ symbol: p.symbol, qty: p.qty })), shortfall);
+  if (!toClose.length) {
+    // No futures to sell — take the largest non-futures position instead.
+    const biggest = positions
+      .filter((p) => !isFuturesSymbol(p.symbol))
+      .sort((a, b) => Math.abs(b.qty * b.avgEntryPrice) - Math.abs(a.qty * a.avgEntryPrice))[0];
+    if (biggest) toClose.push({ symbol: biggest.symbol, qty: biggest.qty });
+  }
+
+  let closed = 0;
+  for (const c of toClose) {
+    const order = await placeOrder(userId, {
+      symbol: c.symbol, side: c.qty > 0 ? "sell" : "buy",
+      type: "market", qty: Math.abs(c.qty),
+    });
+    if (order.status !== "filled") continue;
+    await db.insert(schema.journalEntries).values({
+      id: randomUUID(), userId, symbol: c.symbol,
+      side: "margin-call", qty: Math.abs(c.qty),
+      entryPrice: 0, exitPrice: order.filledPrice ?? 0, pnl: 0,
+      thesis: `Margin call not cured within two hours: equity sat ${usdish(shortfall)} below maintenance, so the desk closed this position — not you. That is what maintenance margin means.`,
+      agentId: null, createdAt: Date.now(),
+    }).catch(() => {});
+    closed++;
+  }
+  if (closed) {
+    await db.update(schema.accounts).set({ marginCallAt: null })
+      .where(eq(schema.accounts.userId, userId));
+    await notify(userId, "margin", `Liquidated ${closed} position${closed === 1 ? "" : "s"}`,
+      { body: "The margin call went uncured for two hours. The journal explains exactly what was closed and why.", href: "/app/floor" });
+  }
+  return closed;
+}
+
+const usdish = (v: number) => `$${Math.round(v).toLocaleString()}`;
+
+/** Maintenance enforcement for every account — heartbeat entry point.
+    Separate from VM so equity-only books are checked too (gap 1). */
+export async function enforceAllMaintenance(): Promise<number> {
+  const holders = await db.selectDistinct({ userId: schema.positions.userId })
+    .from(schema.positions);
+  let total = 0;
+  for (const h of holders) {
+    try { total += await enforceMaintenance(h.userId); }
+    catch { /* one account's failure must not stop the sweep */ }
+  }
+  return total;
 }
 
 /** Settle VM for every account holding a futures position. Heartbeat entry. */

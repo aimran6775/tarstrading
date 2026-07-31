@@ -104,7 +104,7 @@ export default function Floor({ data }: { data: Data }) {
         if (alive && d?.account) setAcct({ equity: d.account.equity, dayStart: d.account.dayStartEquity });
       } catch { /* a missed poll is fine — the next one heals it */ }
     };
-    const id = setInterval(load, 12_000);
+    const id = setInterval(() => { if (typeof document !== "undefined" && document.hidden) return; load(); }, 12_000);
     return () => { alive = false; clearInterval(id); };
   }, []);
   const dayPnl = acct.equity - acct.dayStart;

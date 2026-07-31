@@ -3,7 +3,9 @@ import { randomUUID } from "crypto";
 import { tickAllRunningAgents } from "./agents";
 import { purgeExpiredSessions } from "./auth";
 import { backfillTick } from "./backfill";
-import { settleAllExpiredOptions, settleAllFuturesVM, reconcileRestingOrders } from "./exchange";
+import { settleAllExpiredOptions, settleAllFuturesVM, enforceAllMaintenance, reconcileRestingOrders } from "./exchange";
+import { purgeOldNotifications } from "./notify";
+import { runWatchdog } from "./watchdog";
 import { feedsSlowTick } from "./feeds";
 import { tickAllPrivateMarkets } from "./private-markets";
 import { maybeSyncTickers } from "./tickers";
@@ -52,13 +54,19 @@ export async function runHeartbeat(kind = "tick") {
   const rRes = await seq(reconcileRestingOrders);
   const oRes = await seq(settleAllExpiredOptions);
   const futRes = await seq(settleAllFuturesVM);
-  // These three never touch account locks — they can share the beat freely.
+  // Reg-T maintenance runs for EVERY book, not just futures holders (gap 1):
+  // an equity account below 25% was previously computed, displayed, ignored.
+  const mRes = await seq(enforceAllMaintenance);
+  // These never touch account locks — they can share the beat freely.
   const [bRes, pRes, peRes] = await Promise.allSettled([
     backfillTick(),
     purgeExpiredSessions(),
     tickAllPrivateMarkets(),
   ]);
-  void fRes; void futRes; // reported via feed_status/journal; never fail the run
+  // Vital signs last, so the report reflects the beat that just ran (gap 45).
+  const wd = await runWatchdog().catch(() => null);
+  void purgeOldNotifications();
+  void fRes; void futRes; void mRes; // reported via feed_status/journal; never fail the run
   if (aRes.status === "fulfilled") agents = aRes.value;
   if (bRes.status === "fulfilled") backfill = bRes.value;
   // Expiring options settle on the heartbeat, so a contract closes itself
@@ -95,5 +103,5 @@ export async function runHeartbeat(kind = "tick") {
     ms, ok, detail: backfill ? JSON.stringify(backfill) : null, createdAt: Date.now(),
   }).catch(() => {});
 
-  return { ok: ok === 1, ...agents, backfill, ms, at: Date.now() };
+  return { ok: ok === 1, ...agents, backfill, ms, at: Date.now(), watchdog: wd };
 }

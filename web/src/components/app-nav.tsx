@@ -65,7 +65,7 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
   useEffect(() => {
     const set = () => setOpen(usMarketOpen());
     set();
-    const id = setInterval(set, 60_000);
+    const id = setInterval(() => { if (typeof document !== "undefined" && document.hidden) return; set(); }, 60_000);
     return () => clearInterval(id);
   }, []);
   // The desk tick runs wherever you are in the app, not just on the Assistant
@@ -73,7 +73,7 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
   useEffect(() => {
     const tick = () => fetch("/api/agents/tick", { method: "POST" }).catch(() => {});
     tick();
-    const id = setInterval(tick, 30_000);
+    const id = setInterval(() => { if (typeof document !== "undefined" && document.hidden) return; tick(); }, 30_000);
     return () => clearInterval(id);
   }, []);
   async function logout() {

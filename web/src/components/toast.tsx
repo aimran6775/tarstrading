@@ -81,7 +81,12 @@ export function AgentActivityToasts() {
       } catch { /* ignore */ }
     };
     poll();
-    const id = setInterval(poll, 20_000);
+    // Hidden tabs don't poll (gap 4): a backgrounded desk used to burn ~1,600
+    // requests an hour narrating activity nobody was reading.
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      poll();
+    }, 20_000);
     return () => { alive = false; clearInterval(id); };
   }, [push]);
 

@@ -237,7 +237,7 @@ export async function fxDailyTick(): Promise<{ pairs: number } | { skipped: stri
     return { symbol, price, previousClose: pc,
       changePercent: pc > 0 ? price / pc - 1 : 0, asOf, provenance: "eod" };
   });
-  await putQuotes(quotes);
+  await putQuotes(quotes, { tickHistory: true });
 
   // The daily bar: a single reference print, o=h=l=c. onConflictDoNothing so a
   // real OHLC bar (Massive backfill) always wins over the flat ECB point.
@@ -424,7 +424,7 @@ export async function indicesDailyTick(): Promise<{ indices: number } | { skippe
       });
     }
   }
-  await putQuotes(quotes);
+  await putQuotes(quotes, { tickHistory: true });
   await db.insert(schema.platformSymbols).values(INDICES.map((def, i) => ({
     symbol: def.symbol, category: "indices", rank: 5 + i, featured: 0, enabled: 1,
     note: def.name, addedAt: Date.now(),
@@ -468,7 +468,7 @@ export async function indicesIntradayTick(): Promise<number> {
       asOf: tick?.at ?? proxy.asOf, provenance: "derived",
     });
   }
-  await putQuotes(quotes);
+  await putQuotes(quotes, { tickHistory: true });
   return quotes.length;
 }
 

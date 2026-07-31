@@ -346,7 +346,7 @@ export function MarketFooter() {
       } catch { /* transient network failure — keep the last tape */ }
     };
     void load();
-    const id = window.setInterval(load, POLL_MS);
+    const id = window.setInterval(() => { if (typeof document !== "undefined" && document.hidden) return; load(); }, POLL_MS);
     return () => { cancelled = true; window.clearInterval(id); };
   }, [loaded, symbolsKey]);
 

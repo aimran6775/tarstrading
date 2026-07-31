@@ -188,7 +188,7 @@ async function writeQuoteCache(q: Quote): Promise<void> {
  * the sweep is mostly unchanged prices (retention noise, not chart density);
  * history still grows from the websocket/getQuote path.
  */
-export async function putQuotes(quotes: Quote[]): Promise<void> {
+export async function putQuotes(quotes: Quote[], opts: { tickHistory?: boolean } = {}): Promise<void> {
   if (!quotes.length) return;
   const now = Date.now();
   for (const q of quotes) store(`q:${q.symbol}`, q);
@@ -207,6 +207,20 @@ export async function putQuotes(quotes: Quote[]): Promise<void> {
             updatedAt: dsql`excluded.updated_at`, source: dsql`excluded.source`,
           },
         });
+    }
+    /*
+      Tick history for the mesh-fed classes (gap 3). Futures, FX and indices
+      never touch the websocket or getQuote paths that grow quote_history, so
+      their intraday charts and sparklines had literally nothing to draw —
+      every 1D view was a single point. The sweep is the only observer these
+      symbols have, so it records the series.
+    */
+    if (opts.tickHistory) {
+      for (let i = 0; i < quotes.length; i += 500) {
+        await db.insert(schema.quoteHistory)
+          .values(quotes.slice(i, i + 500).map((q) => ({ symbol: q.symbol, t: now, price: q.price })))
+          .onConflictDoNothing();
+      }
     }
   } catch { /* best-effort — the sweep retries next tick */ }
 }

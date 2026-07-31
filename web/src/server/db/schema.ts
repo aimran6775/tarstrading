@@ -29,6 +29,9 @@ export const users = pgTable("users", {
   /** The user's fund name — their desk's identity on the Floor and the
       standings board ("Ivy Capital", "Momentum Partners"). Optional. */
   fundName: text("fund_name"),
+  /** Last time this user loaded the app — powers the "since you left" digest.
+      Written on the notifications poll, so it costs no extra request. */
+  lastSeenAt: epochMs("last_seen_at"),
   createdAt: epochMs("created_at").notNull(),
 });
 
@@ -55,8 +58,25 @@ export const accounts = pgTable("accounts", {
   equity: doublePrecision("equity").notNull(),
   dayStartEquity: doublePrecision("day_start_equity").notNull(),
   dayStamp: text("day_stamp").notNull(),
+  /** When a Reg-T maintenance breach began. A margin call is a STATE with a
+      cure window, not an instant liquidation — null means the book is sound. */
+  marginCallAt: epochMs("margin_call_at"),
   createdAt: epochMs("created_at").notNull(),
 }, (t) => [index("accounts_equity").on(t.equity)]);
+
+/** Everything the platform wants to tell you while you weren't looking:
+    fills, margin calls, analyst actions, halts. Read state per row. */
+export const notifications = pgTable("notifications", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  /** "fill" | "margin" | "analyst" | "alert" | "system" — drives the icon. */
+  kind: text("kind").$type<"fill" | "margin" | "analyst" | "alert" | "system">().notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  href: text("href"),
+  readAt: epochMs("read_at"),
+  createdAt: epochMs("created_at").notNull(),
+}, (t) => [index("notif_user").on(t.userId, t.createdAt)]);
 
 export const positions = pgTable("positions", {
   id: text("id").primaryKey(),

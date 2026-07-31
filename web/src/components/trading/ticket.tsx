@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import HoldButton from "@/components/hold-button";
 import { useToast } from "@/components/toast";
@@ -37,6 +37,7 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
     { kind: "idle" } | { kind: "sending" } | { kind: "done"; order: Order } | { kind: "error"; message: string }
   >({ kind: "idle" });
   const toast = useToast();
+  const resultRef = useRef<HTMLDivElement>(null);
 
   const qtyNum = Number(qty) || 0;
   const estPrice = (type === "limit" || type === "stop_limit") ? Number(limitPrice) || quote?.price || 0 : quote?.price || 0;
@@ -65,6 +66,10 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
 
   useEffect(() => { setPhase({ kind: "idle" }); }, [symbol]);
   useEffect(() => { if (presetSide) { setSide(presetSide); setPhase({ kind: "idle" }); } }, [presetSide]);
+  // Move focus to the outcome when an order resolves (gap 5).
+  useEffect(() => {
+    if (phase.kind === "done" || phase.kind === "error") resultRef.current?.focus();
+  }, [phase.kind]);
 
   async function submit() {
     if (!valid) return;
@@ -249,10 +254,22 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
           </p>
         </div>
 
+        {/*
+          Focus + announcement (gap 5, gap 36). Placing an order swapped the
+          hold button out of the DOM, which threw keyboard focus to <body> —
+          a keyboard user was silently dumped to the top of the page with no
+          statement of what happened. The result region is focusable, takes
+          focus on arrival, and is a live region so a screen reader hears the
+          fill instead of inferring it.
+        */}
         {phase.kind === "done" ? (
-          <FillResult order={phase.order} onReset={() => setPhase({ kind: "idle" })} />
+          <div ref={resultRef} tabIndex={-1} role="status" aria-live="polite"
+            className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-gold/60">
+            <FillResult order={phase.order} onReset={() => setPhase({ kind: "idle" })} />
+          </div>
         ) : phase.kind === "error" ? (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-loss/40 bg-loss/10 px-4 py-1">
+          <div ref={resultRef} tabIndex={-1} role="alert"
+            className="flex items-center justify-between gap-3 rounded-xl border border-loss/40 bg-loss/10 px-4 py-1 outline-none focus-visible:ring-2 focus-visible:ring-loss/60">
             <span className="text-xs text-loss">{phase.message}</span>
             <button onClick={() => setPhase({ kind: "idle" })}
               className="pressable min-h-11 shrink-0 px-2 text-xs text-ink-2 underline">Adjust</button>
