@@ -127,3 +127,156 @@ export async function creditDividends(): Promise<number> {
   }
   return paid;
 }
+
+/* -------------------------------------------------------------- splits ----
+
+  Stock splits — the correctness bug this file used to have.
+
+  Dividends were modeled; splits were not. That is not a missing feature, it
+  is a LATENT FAULT: the morning a held stock splits 10:1, the feed price
+  drops ~90% while the position still shows the pre-split share count. The
+  book prints a catastrophic fake loss, and — worse — the maintenance sweep
+  could fire a margin call and liquidate real positions off a price that
+  never happened.
+
+  A split is arithmetic, not a payment: multiply the share count, divide the
+  average cost, leave market value (and P&L) exactly where they were. Cash
+  in lieu of fractional shares is the only money that moves.
+*/
+
+type SplitAction = {
+  symbol: string;
+  /** e.g. 10 for a 10:1 split, 0.1 for a 1:10 reverse split. */
+  new_rate: number;
+  old_rate: number;
+  ex_date: string;
+  process_date?: string;
+};
+
+/** Forward and reverse splits with ex-dates in the window. */
+export async function fetchSplits(symbols: string[], sinceIso: string, untilIso: string) {
+  if (!KEY || !SECRET || !symbols.length) return [] as SplitAction[];
+  const out: SplitAction[] = [];
+  for (let i = 0; i < symbols.length; i += 100) {
+    const qs = new URLSearchParams({
+      symbols: symbols.slice(i, i + 100).join(","),
+      types: "forward_split,reverse_split",
+      start: sinceIso, end: untilIso, limit: "1000",
+    });
+    try {
+      const res = await fetch(`${DATA}/v1/corporate-actions?${qs}`, {
+        headers: {
+          "APCA-API-KEY-ID": KEY, "APCA-API-SECRET-KEY": SECRET,
+          accept: "application/json",
+        },
+        cache: "no-store",
+      });
+      if (!res.ok) continue;
+      const json = await res.json() as {
+        corporate_actions?: {
+          forward_splits?: SplitAction[];
+          reverse_splits?: SplitAction[];
+        };
+      };
+      out.push(
+        ...(json.corporate_actions?.forward_splits ?? []),
+        ...(json.corporate_actions?.reverse_splits ?? []),
+      );
+    } catch { /* one page's failure never sinks the sweep */ }
+  }
+  return out;
+}
+
+/** Split ratio as a multiplier on share count (10:1 → 10, 1:10 → 0.1). */
+export function splitRatio(a: { new_rate: number; old_rate: number }): number | null {
+  if (!(a.new_rate > 0) || !(a.old_rate > 0)) return null;
+  const r = a.new_rate / a.old_rate;
+  return Number.isFinite(r) && r > 0 ? r : null;
+}
+
+/**
+ * Apply splits to every holder. Position value is INVARIANT across the
+ * adjustment — that invariant is the whole test.
+ */
+export async function applySplits(): Promise<number> {
+  const held = await db.selectDistinct({ symbol: schema.positions.symbol })
+    .from(schema.positions);
+  const symbols = held.map((h) => h.symbol).filter((s) => /^[A-Z.]{1,8}$/.test(s));
+  if (!symbols.length) return 0;
+
+  const day = 86_400_000;
+  // A window wide enough to catch a split we were down for, narrow enough
+  // that the idempotency check stays cheap.
+  const since = new Date(Date.now() - 10 * day).toISOString().slice(0, 10);
+  const until = new Date(Date.now() + day).toISOString().slice(0, 10);
+  const splits = await fetchSplits(symbols, since, until);
+  if (!splits.length) return 0;
+
+  let applied = 0;
+  for (const s of splits) {
+    const ratio = splitRatio(s);
+    if (!ratio || Math.abs(ratio - 1) < 1e-9) continue;
+    const exMs = Date.parse(`${s.ex_date}T00:00:00Z`);
+    if (exMs > Date.now()) continue; // not yet effective
+
+    const holders = await db.select().from(schema.positions)
+      .where(eq(schema.positions.symbol, s.symbol));
+    for (const p of holders) {
+      if (Math.abs(p.qty) < 1e-9) continue;
+      // Idempotency: one "split" journal row per symbol per ex-date.
+      const [dupe] = await db.select({ id: schema.journalEntries.id })
+        .from(schema.journalEntries)
+        .where(and(
+          eq(schema.journalEntries.userId, p.userId),
+          eq(schema.journalEntries.symbol, s.symbol),
+          eq(schema.journalEntries.side, "split"),
+          gte(schema.journalEntries.createdAt, exMs),
+        )).limit(1);
+      if (dupe) continue;
+
+      // The adjustment. Whole shares only — the fraction pays out in cash at
+      // the post-split cost basis, exactly as a transfer agent would.
+      const rawQty = p.qty * ratio;
+      const newQty = p.qty > 0 ? Math.floor(rawQty) : -Math.floor(-rawQty);
+      const newAvg = p.avgEntryPrice / ratio;
+      const fractional = Math.abs(rawQty) - Math.abs(newQty);
+      const cashInLieu = fractional * newAvg;
+
+      await db.transaction(async (tx) => {
+        const [acct] = await tx.select().from(schema.accounts)
+          .where(eq(schema.accounts.userId, p.userId)).for("update");
+        if (!acct) return;
+        if (Math.abs(newQty) < 1e-9) {
+          // A reverse split can wipe a tiny position out entirely — pay it out.
+          await tx.delete(schema.positions).where(eq(schema.positions.id, p.id));
+        } else {
+          await tx.update(schema.positions)
+            .set({ qty: newQty, avgEntryPrice: newAvg, updatedAt: Date.now() })
+            .where(eq(schema.positions.id, p.id));
+        }
+        if (cashInLieu > 0.004) {
+          await tx.update(schema.accounts).set({ cash: acct.cash + cashInLieu })
+            .where(eq(schema.accounts.userId, p.userId));
+        }
+        const label = ratio > 1
+          ? `${ratio % 1 === 0 ? ratio : ratio.toFixed(2)}-for-1 split`
+          : `1-for-${(1 / ratio) % 1 === 0 ? 1 / ratio : (1 / ratio).toFixed(2)} reverse split`;
+        await tx.insert(schema.journalEntries).values({
+          id: randomUUID(), userId: p.userId, symbol: s.symbol,
+          side: "split", qty: newQty,
+          entryPrice: p.avgEntryPrice, exitPrice: newAvg, pnl: cashInLieu > 0.004 ? cashInLieu : 0,
+          thesis: `${label}, ex-date ${s.ex_date}. Your ${Math.abs(p.qty)} shares at `
+            + `$${p.avgEntryPrice.toFixed(2)} became ${Math.abs(newQty)} at $${newAvg.toFixed(2)}`
+            + (cashInLieu > 0.004 ? `, plus $${cashInLieu.toFixed(2)} cash for the fractional share` : "")
+            + ". Your position's VALUE did not change — a split slices the same pie thinner. "
+            + "The price on the chart drops by the ratio too; that fall is arithmetic, not a loss.",
+          agentId: null, createdAt: Date.now(),
+        });
+      });
+      await notify(p.userId, "system", `${s.symbol} split`,
+        { body: `Your position was adjusted to ${Math.abs(newQty)} shares. Value unchanged.`, href: "/app/journal" });
+      applied++;
+    }
+  }
+  return applied;
+}

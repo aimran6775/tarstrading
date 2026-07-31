@@ -56,6 +56,8 @@ export type Order = {
   id: string; symbol: string; side: "buy" | "sell"; type: string; qty: number;
   limitPrice: number | null; stopPrice: number | null; status: string;
   filledPrice: number | null; rejectReason: string | null; createdAt: number;
+  /** How much has executed — a working order sits between 0 and qty. */
+  filledQty?: number;
 };
 export type Timeframe = "1D" | "1W" | "1M" | "3M" | "1Y" | "5Y";
 

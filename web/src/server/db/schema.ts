@@ -117,6 +117,12 @@ export const orders = pgTable("orders", {
   /** Set when an agent placed this order — every agent action is tagged. */
   agentId: text("agent_id"),
   rejectReason: text("reject_reason"),
+  /** How much of this order has executed. Between 0 and qty while working. */
+  filledQty: doublePrecision("filled_qty").notNull().default(0),
+  /** Bracket: the entry order this child protects (take-profit / stop-loss). */
+  parentId: text("parent_id"),
+  /** OCO: children sharing a group cancel each other the moment one fills. */
+  ocoGroup: text("oco_group"),
   createdAt: epochMs("created_at").notNull(),
 }, (t) => [
   index("orders_user").on(t.userId),

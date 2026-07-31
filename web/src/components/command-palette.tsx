@@ -17,6 +17,7 @@ const SECTIONS: [string, string][] = [
   ["Markets — browse", "/app"],
   ["Journal — every close, with the reason", "/app/journal"],
   ["Margin Desk — your requirement, itemised", "/app/margin"],
+  ["Risk — beta, concentration, you vs the index", "/app/risk"],
   ["Academy", "/app/academy"],
   ["Placement test — skip what you know", "/app/academy/placement"],
   ["Missions — prove it with a real trade", "/app/academy/missions"],

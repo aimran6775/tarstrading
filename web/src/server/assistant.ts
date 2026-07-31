@@ -7,6 +7,8 @@ import {
   backtest, describeStrategy, sanitizeStrategy, agentPnL, type Strategy, type BacktestResult,
 } from "./agents";
 import { presetByKey } from "./presets";
+import { accountRisk } from "./exchange";
+import { financingRates } from "./rates";
 
 /*
   The assistant — your trading-desk manager, as a conversation. You tell it
@@ -91,10 +93,55 @@ async function save(userId: string, role: "user" | "analyst", text: string) {
   });
 }
 
+/*
+  The assistant's brief on the RISK book — margin, financing, credits.
+
+  Without this it could describe every analyst on the floor and still not
+  answer "why is my requirement $3,290?" about the margin desk shipped
+  alongside it. The numbers come from the same accountRisk() the Margin Desk
+  renders, so the assistant and the page can never disagree.
+*/
+async function marginState(userId: string): Promise<string> {
+  try {
+    const [risk, rates] = await Promise.all([accountRisk(userId), financingRates()]);
+    const lines = [
+      `Equity $${risk.equity.toFixed(0)}, cash $${risk.cash.toFixed(0)}`
+        + (risk.cash < 0 ? " (DEBIT — borrowing on margin)" : ""),
+      `Initial requirement $${risk.initialReq.toFixed(0)}, maintenance $${risk.maintenance.toFixed(0)}, `
+        + `buying power $${risk.buyingPower.toFixed(0)}, margin used ${(risk.marginUsedPct * 100).toFixed(0)}%`,
+      `Exposure: long $${risk.longValue.toFixed(0)}, short $${risk.shortValue.toFixed(0)}, gross $${risk.gross.toFixed(0)}`,
+    ];
+    if (risk.span.naiveIm > 0) {
+      lines.push(
+        `Futures margin as a portfolio (SPAN): $${risk.span.im.toFixed(0)} vs $${risk.span.naiveIm.toFixed(0)} `
+        + `contract-by-contract`
+        + (risk.span.intraCredit > 0.5 ? `, calendar/micro offsets −$${risk.span.intraCredit.toFixed(0)}` : "")
+        + (risk.span.interCredits.length
+          ? `, ${risk.span.interCredits.map((c) => `${c.group} credit −$${c.credit.toFixed(0)}`).join(", ")}`
+          : ""));
+    }
+    lines.push(
+      `Financing (daily, actual/360): fed funds ${(rates.fedFunds * 100).toFixed(2)}%, `
+      + `margin loan ${(rates.marginLoan * 100).toFixed(2)}%, idle cash earns ${(rates.cashSweep * 100).toFixed(2)}%, `
+      + `stock borrow ${(rates.borrowGC * 100).toFixed(2)}%`);
+    lines.push(
+      "Margin rules: equities Reg-T 50% initial / 25% maintenance, shorting allowed; crypto cash-only long-only; "
+      + "options fully paid or collateralised; futures margin in dollars per contract with portfolio credits. "
+      + "A maintenance breach opens a 2-hour cure window, then the desk liquidates (futures first).");
+    return "Risk book:\n" + lines.join("\n");
+  } catch {
+    return ""; // the brief degrades; it never breaks the turn
+  }
+}
+
 async function floorState(userId: string): Promise<{ text: string; names: string[] }> {
+  const margin = await marginState(userId);
   const analysts = await db.select().from(schema.agents)
     .where(eq(schema.agents.userId, userId)).orderBy(desc(schema.agents.createdAt));
-  if (!analysts.length) return { text: "The floor is empty — no analysts hired yet.", names: [] };
+  const withMargin = (t: string) => (margin ? `${margin}\n\n${t}` : t);
+  if (!analysts.length) {
+    return { text: withMargin("The floor is empty — no analysts hired yet."), names: [] };
+  }
   const lines = await Promise.all(analysts.map(async (a) => {
     const pnl = a.status !== "draft" && a.status !== "backtested" ? await agentPnL(userId, a.id) : 0;
     return `- "${a.name}" ${a.emoji} [${a.status}] alloc $${a.allocation} maxDD ${(a.maxDrawdown * 100).toFixed(0)}%`
@@ -102,7 +149,10 @@ async function floorState(userId: string): Promise<{ text: string; names: string
       + (pnl ? ` pnl ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(0)}` : "")
       + ` — ${describeStrategy(JSON.parse(a.strategy) as Strategy)}`;
   }));
-  return { text: "Current floor:\n" + lines.join("\n"), names: analysts.map((a) => a.name) };
+  return {
+    text: withMargin("Current floor:\n" + lines.join("\n")),
+    names: analysts.map((a) => a.name),
+  };
 }
 
 /** Pick a finance-character codename not already on the floor. */

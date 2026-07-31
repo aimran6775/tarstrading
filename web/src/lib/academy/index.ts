@@ -11,6 +11,7 @@ import { futuresStage } from "./stage8";
 import { aiStage } from "./stage9";
 import { fundStage } from "./stage10";
 import { worldStage } from "./stage11";
+import { marginStage } from "./stage12";
 
 /*
   The stages of the academy, in order — every one fully interactive: charts you
@@ -29,6 +30,7 @@ export const tracks: Track[] = [
   aiStage,          // Stage 10
   fundStage,        // Stage 11
   worldStage,       // Stage 12 — the wider universe of instruments
+  marginStage,      // Stage 13 — the margin desk: borrowing, SPAN, calls
 ];
 
 /** Map a concept → the lesson that teaches it, for contextual "Learn" links

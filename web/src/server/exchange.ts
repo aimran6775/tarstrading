@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
-import { and, eq, desc } from "drizzle-orm";
+import { and, eq, ne, desc } from "drizzle-orm";
 import { getQuote, getQuotes, isUSMarketOpen, etDay } from "./market";
 import { getPlatformConfig } from "./platform";
 import { isOptionSymbol, parseOptionSymbol, optionQuotes, CONTRACT_SIZE } from "./options";
@@ -9,6 +9,7 @@ import { isFxSymbol, isFxOpen, fxQuotes, toUsd, usdRateMap } from "./fx";
 import { isFuturesSymbol, futuresSpec, futuresMarks, isFuturesOpen, pickLiquidations, isExpired } from "./futures";
 import { portfolioMargin, type SpanBreakdown } from "./span";
 import { notify } from "./notify";
+import { checkMarginAlerts } from "./alerts";
 import { commissionFor, slippageFor } from "./costs";
 
 /*
@@ -36,6 +37,11 @@ import { commissionFor, slippageFor } from "./costs";
    (gaps 6 and 9). This constant remains only as the floor used when no
    volume profile is available. */
 const SLIPPAGE = 0.0005;
+
+/* The most of a typical session's volume one order may take in a single
+   pass. Above this the order works down across passes instead of printing
+   whole — size takes time, and time is risk. */
+const MAX_PARTICIPATION = 0.05;
 
 /*
   Margin model (Reg-T, educational). Positions are SIGNED: qty > 0 is long,
@@ -90,6 +96,16 @@ export type PlaceOrderInput = {
   /** Trailing stop: trail as a fraction, e.g. 0.05 = 5%. */
   trailPercent?: number;
   agentId?: string;
+  /*
+    Bracket: an entry with its exits attached. takeProfit and stopLoss are
+    ABSOLUTE prices; both are optional, so a one-legged bracket (just a stop)
+    is allowed — that's the most common real use.
+  */
+  takeProfit?: number;
+  stopLoss?: number;
+  /** Internal: set when the exchange itself places a bracket child. */
+  parentId?: string;
+  ocoGroup?: string;
 };
 
 /*
@@ -120,6 +136,8 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
       trailPercent: null, trailAnchor: null, triggered: 0,
       status: "rejected" as const, filledPrice: null, filledAt: null,
       agentId: input.agentId ?? null, rejectReason: reason, createdAt: now,
+      filledQty: 0,
+      parentId: input.parentId ?? null, ocoGroup: input.ocoGroup ?? null,
     };
     await db.insert(schema.orders).values(row);
     return row;
@@ -188,13 +206,15 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     status: "accepted" as const, filledPrice: null as number | null,
     filledAt: null as number | null,
     agentId: input.agentId ?? null, rejectReason: null as string | null, createdAt: now,
+    filledQty: 0,
+    parentId: input.parentId ?? null, ocoGroup: input.ocoGroup ?? null,
   };
   const venueOpen = venueOpenFor(symbol);
 
   // Atomic check → insert → (maybe) settle, serialized per user by the account
   // row lock. Accounts for capital and inventory already committed to resting
   // orders.
-  return db.transaction(async (tx): Promise<PlacedOrder> => {
+  const placed = await db.transaction(async (tx): Promise<PlacedOrder> => {
     // Lock the account row for this user — the per-user serialization point.
     const [account] = await tx.select().from(schema.accounts)
       .where(eq(schema.accounts.userId, userId)).for("update");
@@ -232,11 +252,43 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     if (isOption && q1 < -1e-9) {
       const leg = parseOptionSymbol(symbol)!;
       const short = Math.abs(q1);
-      if (leg.type === "call") {
+      /*
+        Vertical spreads (defined risk). A short call is naked ONLY if nothing
+        caps its loss. A long call on the same underlying and expiry at a
+        HIGHER strike does exactly that: the most a bull/bear call spread can
+        lose is (short strike − long strike) × 100 per contract, no matter how
+        far the underlying runs. Same logic mirrored for puts, where the
+        protective leg sits at a LOWER strike.
+
+        This is the structure that lets a learner sell volatility without
+        unbounded risk — the single most teachable options position — so the
+        desk recognises it rather than refusing every short leg that isn't
+        share-covered.
+      */
+      const coveringLong = positions.find((p) => {
+        if (p.qty <= 1e-9 || !isOptionSymbol(p.symbol)) return false;
+        const other = parseOptionSymbol(p.symbol);
+        if (!other) return false;
+        if (other.underlying !== leg.underlying || other.type !== leg.type) return false;
+        if (other.expiry !== leg.expiry) return false;
+        // The wing must cap the loss: higher strike for calls, lower for puts.
+        return leg.type === "call" ? other.strike > leg.strike : other.strike < leg.strike;
+      });
+      if (coveringLong && coveringLong.qty >= short - 1e-9) {
+        const other = parseOptionSymbol(coveringLong.symbol)!;
+        const width = Math.abs(other.strike - leg.strike) * CONTRACT_SIZE * short;
+        // The spread's maximum loss must be collateralised in cash, exactly
+        // as a real desk margins a defined-risk vertical.
+        if ((account?.cash ?? 0) < width - 1e-9) {
+          return rejectIn(
+            `That spread risks up to $${Math.round(width).toLocaleString()} (${Math.abs(other.strike - leg.strike).toFixed(2)} wide × ${short} contract${short === 1 ? "" : "s"} × 100) — more cash than you hold.`);
+        }
+        // Defined risk, collateralised: allowed.
+      } else if (leg.type === "call") {
         const shares = positions.find((p) => p.symbol === leg.underlying)?.qty ?? 0;
         if (shares < short * CONTRACT_SIZE - 1e-9) {
           return rejectIn(
-            `A covered call needs ${short * CONTRACT_SIZE} shares of ${leg.underlying} — you hold ${Math.floor(shares)}. Naked calls carry unlimited risk and aren't offered here.`);
+            `A covered call needs ${short * CONTRACT_SIZE} shares of ${leg.underlying} — you hold ${Math.floor(shares)}. Buy a higher-strike call in the same expiry to define the risk, or this stays a naked call, which isn't offered here.`);
         }
       } else {
         const collateral = leg.strike * CONTRACT_SIZE * short;
@@ -296,6 +348,60 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     }
     return row;
   });
+
+  /*
+    Bracket children (take-profit + stop-loss) are placed AFTER the entry
+    resolves, and only if it actually filled — attaching exits to an order
+    that was rejected or is still resting would leave live sell orders
+    guarding a position that doesn't exist.
+
+    They share an OCO group: whichever fills first cancels the other, which
+    is the whole point. Placed outside the entry's transaction so a child's
+    margin check can see the position the entry just created.
+  */
+  const wantsBracket = (input.takeProfit != null || input.stopLoss != null)
+    && !input.parentId; // a child can never spawn children
+  if (wantsBracket && placed.status === "filled") {
+    const group = randomUUID();
+    const exitSide = input.side === "buy" ? "sell" as const : "buy" as const;
+    const legs: PlaceOrderInput[] = [];
+    if (input.takeProfit != null && input.takeProfit > 0) {
+      legs.push({
+        symbol, side: exitSide, type: "limit", qty: input.qty,
+        limitPrice: input.takeProfit,
+        agentId: input.agentId, parentId: placed.id, ocoGroup: group,
+      });
+    }
+    if (input.stopLoss != null && input.stopLoss > 0) {
+      legs.push({
+        symbol, side: exitSide, type: "stop", qty: input.qty,
+        stopPrice: input.stopLoss,
+        agentId: input.agentId, parentId: placed.id, ocoGroup: group,
+      });
+    }
+    for (const leg of legs) {
+      // A failed child must never unwind a good entry — the position exists
+      // either way, and the user is told through the order list.
+      try { await placeOrder(userId, leg); } catch { /* surfaced as a rejected row */ }
+    }
+  }
+  return placed;
+}
+
+/**
+ * Cancel the siblings of a filled OCO order — the "one cancels other" half of
+ * a bracket. Without this, a filled take-profit leaves its stop-loss resting,
+ * and that orphan would later sell a position you no longer hold.
+ */
+async function cancelOcoSiblings(tx: Tx, order: PlacedOrder): Promise<void> {
+  if (!order.ocoGroup) return;
+  await tx.update(schema.orders)
+    .set({ status: "canceled", rejectReason: "OCO — its paired order filled first." })
+    .where(and(
+      eq(schema.orders.ocoGroup, order.ocoGroup),
+      eq(schema.orders.status, "accepted"),
+      ne(schema.orders.id, order.id),
+    ));
 }
 
 /** Attempt to fill an accepted order against a price. Returns fill patch or null. */
@@ -351,12 +457,59 @@ async function tryFill(
   }
   if (fillPrice == null) return null;
 
+  /*
+    Partial fills. Everything used to fill whole and instantly at any size, so
+    a 500,000-share order in a thin name completed in one print — teaching
+    that liquidity is infinite. A real book works size down over time.
+
+    The slice is a participation cap on a typical session's volume; with no
+    volume profile there's nothing to be thin against, so the order fills
+    whole rather than inventing a delay. The remainder stays "accepted" and
+    keeps working on later reconciles, which is exactly how a real working
+    order behaves — and why size is itself a risk.
+  */
+  const alreadyFilled = order.filledQty ?? 0;
+  const remaining = order.qty - alreadyFilled;
+  if (remaining <= 1e-9) return null;
+
+  const cap = avgVolume && avgVolume > 0 ? avgVolume * MAX_PARTICIPATION : Infinity;
+  const slice = Math.min(remaining, cap);
+  const isFinalSlice = slice >= remaining - 1e-9;
+
   // FX fills need the rate map to convert quote-currency cash into the
   // account's currency; nothing else does, so it's fetched only for pairs.
   const fxRates = isFxSymbol(order.symbol) ? await usdRateMap() : undefined;
-  await settle(tx, order, fillPrice, fxRates);
-  const patch = { status: "filled" as const, filledPrice: fillPrice, filledAt: Date.now() };
-  await tx.update(schema.orders).set(patch).where(eq(schema.orders.id, order.id));
+  // settle() prices whatever qty it is handed — the slice, not the order.
+  await settle(tx, { ...order, qty: slice }, fillPrice, fxRates);
+
+  if (!isFinalSlice) {
+    /*
+      Still working. The volume-weighted average across slices is what a real
+      fill report shows, so filledPrice carries the running VWAP rather than
+      just the latest print.
+    */
+    const doneQty = alreadyFilled + slice;
+    const vwap = ((order.filledPrice ?? fillPrice) * alreadyFilled + fillPrice * slice) / doneQty;
+    await tx.update(schema.orders)
+      .set({ filledQty: doneQty, filledPrice: vwap })
+      .where(eq(schema.orders.id, order.id));
+    return null; // not done — the caller must not treat this as a completed fill
+  }
+
+  const doneQty = order.qty;
+  const vwap = alreadyFilled > 0
+    ? ((order.filledPrice ?? fillPrice) * alreadyFilled + fillPrice * slice) / doneQty
+    : fillPrice;
+  const patch = { status: "filled" as const, filledPrice: vwap, filledAt: Date.now() };
+  await tx.update(schema.orders).set({ ...patch, filledQty: doneQty })
+    .where(eq(schema.orders.id, order.id));
+  /*
+    One cancels other. This runs INSIDE the fill transaction on purpose: if a
+    take-profit fills and its stop-loss survives even briefly, that orphan is
+    a live sell order guarding a position that no longer exists — and the next
+    reconcile could execute it, flipping the user unintentionally short.
+  */
+  await cancelOcoSiblings(tx, order);
   /*
     Tell the user (gap 28). A resting order that fills at 3am, or an analyst's
     entry while they read a lesson, used to be discoverable only by noticing a
@@ -962,7 +1115,27 @@ export async function enforceAllMaintenance(): Promise<number> {
     .from(schema.positions);
   let total = 0;
   for (const h of holders) {
-    try { total += await enforceMaintenance(h.userId); }
+    try {
+      total += await enforceMaintenance(h.userId);
+      /*
+        Margin-usage alerts ride the same sweep. A price alert warns you
+        about the market; this one warns you about YOURSELF — and that's
+        the one that matters, because the market never liquidates you,
+        your requirement does. Fire-and-forget: an alert must never be
+        able to interrupt enforcement.
+      */
+      const risk = await accountRisk(h.userId);
+      const fired = await checkMarginAlerts(h.userId, risk.marginUsedPct);
+      for (const f of fired) {
+        void notify(h.userId, "margin", "Margin usage alert",
+          {
+            body: `Your book is using ${(risk.marginUsedPct * 100).toFixed(0)}% of equity `
+              + `(alert set at ${(f.price * 100).toFixed(0)}%). Maintenance is ${usdish(risk.maintenance)} `
+              + `against ${usdish(risk.equity)} of equity.`,
+            href: "/app/margin",
+          });
+      }
+    }
     catch { /* one account's failure must not stop the sweep */ }
   }
   return total;

@@ -25,8 +25,10 @@ export async function POST(request: Request) {
   const direction = body.direction === "below" ? "below" : "above";
   /* Alerts work on every market the board lists (gap 34) — a futures
      contract or a currency pair is exactly the kind of thing you want a
-     level on, and the regex was silently refusing them. */
-  if (!/^([A-Z.]{1,8}(\/[A-Z]{3,4})?|FX:[A-Z]{6}|IDX:[A-Z]{1,6}|FUT:[A-Z0-9]{1,3}[FGHJKMNQUVXZ]\d{1,2})$/.test(symbol)) {
+     level on, and the regex was silently refusing them. $MARGIN is the
+     reserved symbol for a margin-usage alert, where "price" is the usage
+     fraction (0.8 = warn me at 80% of equity committed). */
+  if (!/^(\$MARGIN|[A-Z.]{1,8}(\/[A-Z]{3,4})?|FX:[A-Z]{6}|IDX:[A-Z]{1,6}|FUT:[A-Z0-9]{1,3}[FGHJKMNQUVXZ]\d{1,2})$/.test(symbol)) {
     return NextResponse.json({ ok: false, error: "That doesn't look like a symbol." }, { status: 400 });
   }
   if (!Number.isFinite(price) || price <= 0) {

@@ -5,7 +5,7 @@ import { purgeExpiredSessions } from "./auth";
 import { backfillTick } from "./backfill";
 import { settleAllExpiredOptions, settleAllFuturesVM, enforceAllMaintenance, reconcileRestingOrders } from "./exchange";
 import { purgeOldNotifications } from "./notify";
-import { creditDividends } from "./dividends";
+import { creditDividends, applySplits } from "./dividends";
 import { accrueFinancingAll } from "./financing";
 import { runWatchdog } from "./watchdog";
 import { feedsSlowTick } from "./feeds";
@@ -56,6 +56,14 @@ export async function runHeartbeat(kind = "tick") {
   const rRes = await seq(reconcileRestingOrders);
   const oRes = await seq(settleAllExpiredOptions);
   const futRes = await seq(settleAllFuturesVM);
+  /*
+    Splits go BEFORE the maintenance sweep, and the order is load-bearing.
+    On the morning of a 10:1 split the feed price is down ~90% while the
+    position still holds the pre-split share count. Margin-check that book
+    and it looks catastrophically underwater — the sweep would liquidate
+    real positions over arithmetic. Adjust first, then judge.
+  */
+  const splitRes = await seq(applySplits);
   // Reg-T maintenance runs for EVERY book, not just futures holders (gap 1):
   // an equity account below 25% was previously computed, displayed, ignored.
   const mRes = await seq(enforceAllMaintenance);
@@ -74,7 +82,7 @@ export async function runHeartbeat(kind = "tick") {
   // Vital signs last, so the report reflects the beat that just ran (gap 45).
   const wd = await runWatchdog().catch(() => null);
   void purgeOldNotifications();
-  void fRes; void futRes; void mRes; void divRes; void finRes; // via feed_status/journal; never fail the run
+  void fRes; void futRes; void mRes; void divRes; void finRes; void splitRes; // via feed_status/journal; never fail the run
   if (aRes.status === "fulfilled") agents = aRes.value;
   if (bRes.status === "fulfilled") backfill = bRes.value;
   // Expiring options settle on the heartbeat, so a contract closes itself

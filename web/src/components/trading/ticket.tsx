@@ -29,6 +29,10 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
   const quoteOnly = isQuoteOnly(symbol);
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [type, setType] = useState<"market" | "limit" | "stop" | "stop_limit" | "trailing_stop">("market");
+  // Bracket legs — absolute prices, both optional (gap: exits at entry).
+  const [bracket, setBracket] = useState(false);
+  const [takeProfit, setTakeProfit] = useState("");
+  const [stopLoss, setStopLoss] = useState("");
   const [trailPct, setTrailPct] = useState("");
   const [qty, setQty] = useState("1");
   const [limitPrice, setLimitPrice] = useState("");
@@ -83,6 +87,8 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
           limitPrice: (type === "limit" || type === "stop_limit") ? Number(limitPrice) : undefined,
           stopPrice: (type === "stop" || type === "stop_limit") ? Number(stopPrice) : undefined,
           trailPercent: type === "trailing_stop" ? Number(trailPct) / 100 : undefined,
+          takeProfit: bracket && Number(takeProfit) > 0 ? Number(takeProfit) : undefined,
+          stopLoss: bracket && Number(stopLoss) > 0 ? Number(stopLoss) : undefined,
         }),
       });
       const data = await res.json();
@@ -219,6 +225,50 @@ export default function Ticket({ symbol, quote, cash, buyingPower, held = 0, mar
               aria-label="Trail percent" />
             <span className="text-xs text-ink-4">%</span>
           </label>
+        )}
+
+        {/*
+          The bracket. Until now you could place a stop OR a limit, never both
+          bound to an entry — so the exit discipline the analysts run
+          internally was unavailable to the person placing the trade. Both
+          legs are optional: a stop alone is the most common real use.
+        */}
+        {!quoteOnly && (
+          <div className="rounded-xl border border-hairline bg-bg2/40 p-3">
+            <label className="flex cursor-pointer items-center gap-2.5 text-xs text-ink-2">
+              <input type="checkbox" checked={bracket}
+                onChange={(e) => setBracket(e.target.checked)}
+                className="h-3.5 w-3.5 accent-(--gold)" />
+              Attach exits (bracket)
+            </label>
+            {bracket && (
+              <>
+                <div className="mt-2.5 grid grid-cols-2 gap-2">
+                  <label className="flex min-h-11 items-center gap-2 rounded-xl border border-hairline bg-bg2 px-3 focus-within:border-gain/50">
+                    <span className="whitespace-nowrap text-[11px] text-gain">Take profit</span>
+                    <input value={takeProfit}
+                      onChange={(e) => setTakeProfit(e.target.value.replace(/[^\d.]/g, ""))}
+                      inputMode="decimal" placeholder="—"
+                      className="tnum w-full bg-transparent py-2.5 text-right text-sm text-ink-1 outline-none"
+                      aria-label="Take-profit price" />
+                  </label>
+                  <label className="flex min-h-11 items-center gap-2 rounded-xl border border-hairline bg-bg2 px-3 focus-within:border-loss/50">
+                    <span className="whitespace-nowrap text-[11px] text-loss">Stop loss</span>
+                    <input value={stopLoss}
+                      onChange={(e) => setStopLoss(e.target.value.replace(/[^\d.]/g, ""))}
+                      inputMode="decimal" placeholder="—"
+                      className="tnum w-full bg-transparent py-2.5 text-right text-sm text-ink-1 outline-none"
+                      aria-label="Stop-loss price" />
+                  </label>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-ink-4">
+                  Both exits go live only if this entry fills. Whichever one triggers
+                  first cancels the other — you can never be left holding a stray order
+                  against a position you no longer have.
+                </p>
+              </>
+            )}
+          </div>
         )}
 
         {/* Cost + capacity. For futures the number is the MARGIN the desk will

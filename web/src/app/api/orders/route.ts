@@ -44,6 +44,11 @@ export async function POST(request: Request) {
     limitPrice: body.limitPrice != null ? Number(body.limitPrice) : undefined,
     stopPrice: body.stopPrice != null ? Number(body.stopPrice) : undefined,
     trailPercent: body.trailPercent != null ? Number(body.trailPercent) : undefined,
+    /* Bracket legs — absolute prices. The exchange attaches them as OCO
+       children only if the entry actually fills; parentId/ocoGroup are
+       internal and deliberately NOT read from the request. */
+    takeProfit: body.takeProfit != null ? Number(body.takeProfit) : undefined,
+    stopLoss: body.stopLoss != null ? Number(body.stopLoss) : undefined,
   });
   await reconcile(user.id);
   const status = order.status === "rejected" ? 422 : 201;

@@ -134,6 +134,20 @@
       "when": 1785107538599,
       "tag": "0018_gaps_wave",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785193938599,
+      "tag": "0019_brackets",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785280338599,
+      "tag": "0020_partial_fills",
+      "breakpoints": true
     }
   ]
 }

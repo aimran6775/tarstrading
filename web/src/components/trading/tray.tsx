@@ -161,6 +161,11 @@ export function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: ()
               {o.type}{o.limitPrice ? ` @ ${usd(o.limitPrice)}` : ""}{o.stopPrice ? ` stop ${usd(o.stopPrice)}` : ""}
               {" · "}{new Date(o.createdAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
             </p>
+            {o.status === "accepted" && (o.filledQty ?? 0) > 0 && (
+              <p className="tnum text-[11px] text-gold">
+                {o.filledQty} of {o.qty} filled{o.filledPrice ? ` at ${usd(o.filledPrice)} avg` : ""} — still working
+              </p>
+            )}
             {o.rejectReason && <p className="text-[11px] text-loss">{o.rejectReason}</p>}
           </div>
           <div className="flex items-center gap-2">
@@ -169,7 +174,9 @@ export function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: ()
               : o.status === "accepted" ? "text-gold"
               : o.status === "rejected" ? "text-loss" : "text-ink-4"
             }`}>
-              {o.status === "accepted" ? "resting" : o.status}
+              {o.status === "accepted"
+                ? (o.filledQty && o.filledQty > 0 ? "working" : "resting")
+                : o.status}
             </span>
             {o.status === "accepted" && (
               <button onClick={() => cancel(o.id)}
