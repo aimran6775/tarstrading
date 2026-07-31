@@ -120,10 +120,21 @@ async function marginState(userId: string): Promise<string> {
           ? `, ${risk.span.interCredits.map((c) => `${c.group} credit −$${c.credit.toFixed(0)}`).join(", ")}`
           : ""));
     }
+    /*
+      Worked figures, precomputed. A small local model quoting the right rate
+      and then dividing wrong is worse than useless — it sounds precise. So
+      the brief carries the arithmetic already done, and the instruction is
+      to READ these numbers, never to recompute them.
+    */
+    const per10k = (10_000 * rates.marginLoan) / 360;
+    const sweepPer10k = (10_000 * rates.cashSweep) / 360;
     lines.push(
       `Financing (daily, actual/360): fed funds ${(rates.fedFunds * 100).toFixed(2)}%, `
       + `margin loan ${(rates.marginLoan * 100).toFixed(2)}%, idle cash earns ${(rates.cashSweep * 100).toFixed(2)}%, `
-      + `stock borrow ${(rates.borrowGC * 100).toFixed(2)}%`);
+      + `stock borrow ${(rates.borrowGC * 100).toFixed(2)}%. `
+      + `PRECOMPUTED (use these, do not recalculate): borrowing costs $${per10k.toFixed(2)}/day per $10,000 `
+      + `of debit balance; idle cash earns $${sweepPer10k.toFixed(2)}/day per $10,000. `
+      + `Scale linearly (e.g. $50,000 borrowed = 5 × $${per10k.toFixed(2)} = $${(5 * per10k).toFixed(2)}/day).`);
     lines.push(
       "Margin rules: equities Reg-T 50% initial / 25% maintenance, shorting allowed; crypto cash-only long-only; "
       + "options fully paid or collateralised; futures margin in dollars per contract with portfolio credits. "
