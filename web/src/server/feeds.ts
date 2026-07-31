@@ -366,7 +366,15 @@ export async function indicesDailyTick(): Promise<{ indices: number } | { skippe
     }
   } catch { ok = false; }
 
-  // Massive: only the entitled tickers, inside the shared 5/min budget.
+  /*
+    Massive's entitled index tickers, inside the shared 5/min budget.
+
+    Priority (gap 14): indices run BEFORE futures on the heartbeat and there
+    are at most two of them, so NDX's genuinely-entitled official close stops
+    losing every token to a 29-product futures discovery sweep and sitting on
+    derived-only for days. Two calls is a rounding error against the budget;
+    a real close beats a derived one every time.
+  */
   for (const def of INDICES) {
     if (!def.massive || cal.closes[def.symbol]) continue;
     if (!tryTakeToken()) break;
@@ -390,6 +398,22 @@ export async function indicesDailyTick(): Promise<{ indices: number } | { skippe
   for (const r of proxyRows) {
     proxyCloseByDay.set(`${r.symbol}:${new Date(r.t * 1000).toISOString().slice(0, 10)}`, r.c);
   }
+
+  /*
+    The PRIOR index close (gap 13) — the anchor a day-change needs. The FRED
+    backfill writes every official close as a daily bar, so the second-newest
+    bar per index is exactly yesterday's print.
+  */
+  const priorCloses = new Map<string, number>();
+  try {
+    const rows = await db.execute<{ symbol: string; c: number }>(dsql`
+      select symbol, c from (
+        select symbol, c, row_number() over (partition by symbol order by t desc) rn
+          from bars where symbol like 'IDX:%' and timeframe = '1Y'
+      ) x where rn = 2
+    `);
+    for (const r of Array.from(rows)) priorCloses.set(r.symbol, r.c);
+  } catch { /* a flat print is the honest fallback */ }
   for (const def of INDICES) {
     const close = cal.closes[def.symbol];
     if (!def.proxy || !close) continue;
@@ -409,9 +433,19 @@ export async function indicesDailyTick(): Promise<{ indices: number } | { skippe
   for (const def of INDICES) {
     const close = cal.closes[def.symbol];
     if (close) {
+      /*
+        A real previous close (gap 13). Setting previousClose = price made
+        every index print a permanent 0.00% change — VIX especially, which
+        is the one index whose whole job is to move. The vault holds the
+        prior daily bar; use it, and only fall back to a flat print when
+        there is genuinely no prior session stored.
+      */
+      const prior = priorCloses.get(def.symbol);
+      const pc = prior && prior > 0 ? prior : close.price;
       quotes.push({
-        symbol: def.symbol, price: close.price, previousClose: close.price,
-        changePercent: 0, asOf: Date.parse(`${close.date}T21:00:00Z`), provenance: "eod",
+        symbol: def.symbol, price: close.price, previousClose: pc,
+        changePercent: pc > 0 ? close.price / pc - 1 : 0,
+        asOf: Date.parse(`${close.date}T21:00:00Z`), provenance: "eod",
       });
       continue;
     }
@@ -658,10 +692,23 @@ export async function feedsFastTick() {
 /** The 5-minute beat (rides the platform heartbeat): the slow feeds, each of
     which no-ops until it's actually stale. */
 export async function feedsSlowTick() {
-  const [fx, idx, fut] = await Promise.allSettled([
-    fxDailyTick(), indicesDailyTick(), futuresTick(),
-  ]);
-  const val = <T,>(r: PromiseSettledResult<T>) => r.status === "fulfilled" ? r.value : { error: true };
+  /*
+    Order matters (gap 14): FX is keyless, indices need at most two Massive
+    tokens for a real official close, and futures discovery will happily
+    consume every remaining token across 35 products. Running them in
+    sequence in THIS order means the scarce, high-value calls always land
+    and futures spends the leftovers — which is what its budgeted design
+    always intended.
+  */
+  const settle = async <T,>(f: () => Promise<T>) => {
+    try { return { status: "fulfilled" as const, value: await f() }; }
+    catch { return { status: "rejected" as const }; }
+  };
+  const fx = await settle(fxDailyTick);
+  const idx = await settle(indicesDailyTick);
+  const fut = await settle(futuresTick);
+  const val = <T,>(r: { status: "fulfilled"; value: T } | { status: "rejected" }) =>
+    r.status === "fulfilled" ? r.value : { error: true };
   return { fx: val(fx), indices: val(idx), futures: val(fut) };
 }
 

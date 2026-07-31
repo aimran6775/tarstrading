@@ -1,4 +1,4 @@
-import { PROVENANCE_HELP, PROVENANCE_LABEL, type Provenance } from "@/components/trading/shared";
+import { PROVENANCE_HELP, provenanceLabel, type Provenance } from "@/components/trading/shared";
 
 /*
   The provenance badge — the PAPER-banner principle applied to data. Every
@@ -8,8 +8,10 @@ import { PROVENANCE_HELP, PROVENANCE_LABEL, type Provenance } from "@/components
   the ink ramp, with color spent only on LIVE — the one state worth signaling.
 */
 
-export function ProvenanceBadge({ source, className = "" }: {
+export function ProvenanceBadge({ source, symbol, className = "" }: {
   source: Provenance | null | undefined;
+  /** Lets a delayed equity read AFTER HOURS outside the session (gap 15). */
+  symbol?: string;
   className?: string;
 }) {
   if (!source) return null;
@@ -24,7 +26,7 @@ export function ProvenanceBadge({ source, className = "" }: {
       {live && (
         <span aria-hidden className="inline-block h-1 w-1 rounded-full bg-gain motion-safe:animate-pulse" />
       )}
-      {PROVENANCE_LABEL[source]}
+      {provenanceLabel(source, symbol)}
     </span>
   );
 }

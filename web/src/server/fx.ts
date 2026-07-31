@@ -160,7 +160,17 @@ export async function fillFxHistory(symbols = FX_PAIRS, years = 5): Promise<FxFi
   let requests = 0, barsWritten = 0;
   const errors: string[] = [];
 
-  for (const symbol of symbols) {
+  /*
+    Paced, not serial-blocking (gap 20). The old loop slept 13 seconds after
+    EVERY pair whether or not the next call needed a token, so a 17-pair
+    refresh blocked ~4 minutes of the beat. Massive's free tier is 5/min, so
+    pairs go in groups of 4 with one pause between groups: same rate
+    ceiling, a quarter of the wall-clock.
+  */
+  for (let g = 0; g < symbols.length; g += 4) {
+  const group = symbols.slice(g, g + 4);
+  if (g > 0) await new Promise((r) => setTimeout(r, 62_000));
+  for (const symbol of group) {
     try {
       const bars = await fetchFxBars(symbol, from, to);
       requests++;
@@ -199,11 +209,10 @@ export async function fillFxHistory(symbols = FX_PAIRS, years = 5): Promise<FxFi
         .values({ id: `${symbol}:1Y`, symbol, timeframe: "1Y", ...state })
         .onConflictDoUpdate({ target: schema.syncState.id, set: state });
 
-      // Pace for the 5-per-minute free tier.
-      await new Promise((r) => setTimeout(r, 13_000));
     } catch (e) {
       errors.push(`${symbol}: ${e instanceof Error ? e.message : "failed"}`);
     }
+  }
   }
   return { pairs: symbols.length, requests, barsWritten, errors };
 }

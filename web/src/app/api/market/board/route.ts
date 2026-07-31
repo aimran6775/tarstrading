@@ -29,7 +29,9 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const category = url.searchParams.get("category");        // stocks | etf | crypto
-  const limit = Math.min(600, Math.max(1, Number(url.searchParams.get("limit") ?? 250)));
+  /* Global alone holds 719 rows, so a 600 cap silently truncated the largest
+     section (gap 18). 1200 covers every section whole with headroom. */
+  const limit = Math.min(1200, Math.max(1, Number(url.searchParams.get("limit") ?? 250)));
 
   const cacheKey = `${category ?? "*"}:${limit}`;
   const hit = boardCache.get(cacheKey);

@@ -98,6 +98,31 @@ export async function runWatchdog(): Promise<WatchdogReport> {
     vitals.push({ name: "quote-freshness", ok: false, detail: `unreadable: ${msg(e)}` });
   }
 
+  /*
+    Dead listings (gap 19). AXIAPC, CPN and CPR sat on the board quoting
+    nothing until a manual audit found them; nothing was watching for the
+    next one. A listed symbol with no quote in four days is delisted, renamed
+    or invalid — the console should say so before a user clicks it.
+  */
+  try {
+    const dead = Array.from(await db.execute<{ symbol: string }>(dsql`
+      select p.symbol from platform_symbols p
+       left join quote_cache q
+         on q.symbol = p.symbol and ${now} - q.updated_at < 4 * 86400000
+       where p.enabled = 1 and q.symbol is null
+       order by p.symbol limit 20
+    `));
+    vitals.push({
+      name: "dead-listings",
+      ok: dead.length === 0,
+      detail: dead.length
+        ? `${dead.length} listed with no quote in 4 days: ${dead.map((d) => d.symbol).join(", ")}`
+        : "every enabled listing is priced",
+    });
+  } catch (e) {
+    vitals.push({ name: "dead-listings", ok: false, detail: `unreadable: ${msg(e)}` });
+  }
+
   const report: WatchdogReport = { ok: vitals.every((v) => v.ok), at: now, vitals };
 
   // Record the verdict where the console reads it. feed_status is already the

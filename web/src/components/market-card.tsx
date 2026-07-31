@@ -102,7 +102,7 @@ export default function MarketCard({ symbol, name, kind, quote, spark }: {
         {quote
           ? <span className="flex items-baseline gap-2">
               <span className="tnum text-lg font-semibold tracking-tight text-ink-1">{formatPrice(symbol, quote.price)}</span>
-              <ProvenanceBadge source={quote.provenance} />
+              <ProvenanceBadge source={quote.provenance} symbol={symbol} />
             </span>
           : <span className="skeleton h-6 w-20" />}
         <span className="flex items-center gap-1 text-[11px] font-medium text-gold opacity-0 transition-all duration-200 [transition-timing-function:var(--ease-spring)] group-hover:translate-x-0 group-hover:opacity-100 -translate-x-1 [@media(hover:none)]:translate-x-0 [@media(hover:none)]:opacity-70">

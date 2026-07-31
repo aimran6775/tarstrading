@@ -11,7 +11,7 @@ import { feedsSlowTick } from "./feeds";
 import { tickAllPrivateMarkets } from "./private-markets";
 import { maybeSyncTickers } from "./tickers";
 import { db, schema } from "./db";
-import { lt } from "drizzle-orm";
+import { lt, sql as dsql } from "drizzle-orm";
 
 /*
   The platform heartbeat — agents tick, the bar store heals, sessions sweep,
@@ -95,6 +95,26 @@ export async function runHeartbeat(kind = "tick") {
   // quote_history backs intraday chart density; a week is more than any
   // intraday view reads and keeps the table from growing without bound.
   db.delete(schema.quoteHistory).where(lt(schema.quoteHistory.t, Date.now() - 7 * 86_400_000)).catch(() => {});
+  /*
+    equity_history retention (gap 16). One row per user per minute, forever,
+    with no policy at all — quote_history got a week when it was added and
+    this table was simply missed. A year of daily-resolution history is more
+    than any chart draws, so anything older than a year goes, and rows older
+    than 30 days thin to one per hour: the equity curve keeps its shape
+    while the table stops growing without bound.
+  */
+  const yearAgo = Date.now() - 365 * 86_400_000;
+  db.delete(schema.equityHistory).where(lt(schema.equityHistory.time, yearAgo)).catch(() => {});
+  db.execute(dsql`
+    delete from equity_history e
+     where e.time < ${Date.now() - 30 * 86_400_000}
+       and e.id not in (
+         select distinct on (user_id, date_trunc('hour', to_timestamp(time / 1000))) id
+           from equity_history
+          where time < ${Date.now() - 30 * 86_400_000}
+          order by user_id, date_trunc('hour', to_timestamp(time / 1000)), time desc
+       )
+  `).catch(() => { /* thinning is housekeeping, never load-bearing */ });
 
   // Keep the tradable-universe directory fresh (no-op when recent; runs in
   // the background paced by the market token bucket).

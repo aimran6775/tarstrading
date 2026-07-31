@@ -183,7 +183,7 @@ export default function BoardTable({ rows, loading, emptyNote, names, onRemove }
                           className="truncate font-mono text-[9px] uppercase tracking-[0.16em] text-ink-4">
                           {kind.label}
                         </span>
-                        <ProvenanceBadge source={r.source} />
+                        <ProvenanceBadge source={r.source} symbol={r.symbol} />
                       </span>
                     </Link>
                   </td>

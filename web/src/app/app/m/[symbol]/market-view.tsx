@@ -294,7 +294,7 @@ export default function MarketView({ symbol, initialTray, initialSide }: {
                     </span>
                   ) : quote.provenance ? (
                     <span className="flex items-baseline gap-2">
-                      <ProvenanceBadge source={quote.provenance} className="!text-[10px]" />
+                      <ProvenanceBadge source={quote.provenance} symbol={symbol} className="!text-[10px]" />
                       <span className="text-[11px] text-ink-4">
                         as of {new Date(quote.asOf).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                       </span>

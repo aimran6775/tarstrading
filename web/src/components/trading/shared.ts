@@ -18,6 +18,30 @@ export const PROVENANCE_LABEL: Record<Provenance, string> = {
   indicative: "INDICATIVE",
 };
 
+/*
+  After-hours (gap 15). A delayed-SIP print at 2am and one at 2pm wore the
+  same DELAYED badge, so an overnight price looked as current as a live
+  session quote. The distinction is the SESSION, not the feed, so it's
+  computed here from the clock rather than stored on the row.
+*/
+export function isRegularSession(at = new Date()): boolean {
+  const et = new Date(at.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const d = et.getDay();
+  if (d === 0 || d === 6) return false;
+  const m = et.getHours() * 60 + et.getMinutes();
+  return m >= 9 * 60 + 30 && m < 16 * 60;
+}
+
+/** The label a delayed equity quote deserves right now — DELAYED 15M during
+    the session, AFTER HOURS outside it. Other provenances are unaffected. */
+export function provenanceLabel(source: Provenance, symbol?: string): string {
+  if (source === "delayed" && !isRegularSession()
+    && !(symbol && (symbol.includes("/") || symbol.startsWith("FX:")))) {
+    return "AFTER HOURS";
+  }
+  return PROVENANCE_LABEL[source];
+}
+
 /** One-line explanations for tooltips/legends. */
 export const PROVENANCE_HELP: Record<Provenance, string> = {
   live: "Real-time trade ticks.",
