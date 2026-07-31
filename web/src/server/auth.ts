@@ -286,3 +286,24 @@ export function clientIp(h: Headers): string {
   }
   return h.get("x-real-ip")?.trim() || "unknown";
 }
+
+/*
+  Step-up confirmation for destructive operator actions (gap 48).
+
+  A 12-hour console session is convenient for browsing but too generous for
+  the handful of actions that reach every user at once — halting trading,
+  pausing every analyst, rewriting the house board. A borrowed laptop or an
+  unlocked screen shouldn't be able to do those. This asks for the console
+  password again at the moment of the action; it never creates or extends a
+  session, so it can't be used as a login side-door.
+*/
+export async function confirmConsolePassword(password: unknown): Promise<boolean> {
+  const expected = process.env.CONSOLE_PASS;
+  if (!expected) return false;
+  if (typeof password !== "string" || !password) return false;
+  // Constant-time compare, same discipline as the login path.
+  const a = Buffer.from(password);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}

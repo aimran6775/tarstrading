@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
+import { rateLimit, clientIp } from "@/server/auth";
 import { runHeartbeat } from "@/server/heartbeat";
 
 /*
@@ -21,6 +23,14 @@ async function run(request: Request) {
     return NextResponse.json({ ok: false, error: "CRON_SECRET not configured." }, { status: 503 });
   }
   if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+    /*
+      Throttle failed attempts (gap 49). The secret compare is correct, but
+      an unlimited endpoint invites offline-speed guessing; 20 failures per
+      IP per 10 minutes leaves the scheduler (12 calls/hour, always
+      authorised) untouched while making a brute force pointless.
+    */
+    const h = await headers();
+    await rateLimit(`cron:${clientIp(h)}`, 20, 10 * 60_000);
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
   return NextResponse.json(await runHeartbeat("tick"));

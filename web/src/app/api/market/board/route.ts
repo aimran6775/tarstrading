@@ -21,8 +21,21 @@ export const dynamic = "force-dynamic";
   identical JSON. 15 seconds is far fresher than the data behind it (15-min
   delayed SIP + 60s sweep) so nobody sees older prices, just cheaper ones.
 */
+/*
+  In-process cache, shared across requests on this instance (gap 42).
+
+  A cross-instance cache (Postgres/Redis) was considered and rejected: the
+  payload is ~1MB of JSON, so storing it would cost a round trip roughly as
+  expensive as the query it replaces, and the underlying data is already
+  refreshed by one shared 60-second sweep. With N replicas the worst case is
+  N recomputations per 15 seconds instead of one — bounded, small, and far
+  cheaper than serialising a megabyte through the database on every miss.
+  The single-flight guard below matters more: it stops a cold cache under
+  concurrent load from starting N identical queries on the SAME instance.
+*/
 const TTL_MS = 15_000;
 const boardCache = new Map<string, { at: number; body: unknown }>();
+const inFlight = new Map<string, Promise<unknown>>();
 
 export async function GET(req: Request) {
   if (!(await currentUser())) return NextResponse.json({ ok: false }, { status: 401 });
@@ -37,6 +50,12 @@ export async function GET(req: Request) {
   const hit = boardCache.get(cacheKey);
   if (hit && Date.now() - hit.at < TTL_MS) return NextResponse.json(hit.body);
 
+  // Single flight: on a cold cache, twenty concurrent tabs used to start
+  // twenty identical ~165ms queries. They now share one.
+  const pending = inFlight.get(cacheKey);
+  if (pending) return NextResponse.json(await pending);
+
+  const work = (async () => {
   const board = await getHouseBoard();
   const scoped = category
     ? board.filter((b) => b.category.toLowerCase().startsWith(category.toLowerCase().slice(0, 3)))
@@ -62,5 +81,9 @@ export async function GET(req: Request) {
     asOf: Date.now(),
   };
   boardCache.set(cacheKey, { at: Date.now(), body });
-  return NextResponse.json(body);
+  return body;
+  })();
+  inFlight.set(cacheKey, work);
+  try { return NextResponse.json(await work); }
+  finally { inFlight.delete(cacheKey); }
 }

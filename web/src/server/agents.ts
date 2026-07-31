@@ -272,17 +272,41 @@ function series(ref: IndicatorRef | { kind: "constant"; value: number }, closes:
   }
 }
 
-/* Series memo: ruleFires runs once per BAR in a backtest, and recomputing a
-   full indicator series per bar made the whole thing O(n²). Keyed by the
-   closes array's identity, so a fresh array (every backtest, every tick)
-   gets a fresh cache and nothing leaks across runs. */
+/*
+  Series memo: ruleFires runs once per BAR in a backtest, and recomputing a
+  full indicator series per bar made the whole thing O(n²).
+
+  Keyed by array IDENTITY plus a cheap content fingerprint (gap 43). Identity
+  alone worked for backtests — one array, many bars — but every live tick
+  builds a FRESH closes array, so the cache missed every single time and the
+  live desk paid full recomputation per indicator per symbol per analyst.
+  The fingerprint (length + first + last) lets a repeated tick on unchanged
+  data hit, while any real change misses and recomputes, which is the only
+  direction that must never be wrong.
+*/
 const seriesMemo = new WeakMap<number[], Map<string, number[]>>();
+const tickMemo = new Map<string, number[]>();
+const TICK_MEMO_MAX = 400;
+
 function memoSeries(ref: IndicatorRef | { kind: "constant"; value: number }, closes: number[]): number[] {
   let byRef = seriesMemo.get(closes);
   if (!byRef) { byRef = new Map(); seriesMemo.set(closes, byRef); }
   const key = JSON.stringify(ref);
-  let s = byRef.get(key);
-  if (!s) { s = series(ref, closes); byRef.set(key, s); }
+  const hit = byRef.get(key);
+  if (hit) return hit;
+
+  // Cross-array cache for the live path, fingerprinted on the data itself.
+  const n = closes.length;
+  const fp = `${key}|${n}|${closes[0]}|${closes[n - 1]}|${closes[n >> 1]}`;
+  const shared = tickMemo.get(fp);
+  if (shared) { byRef.set(key, shared); return shared; }
+
+  const s = series(ref, closes);
+  byRef.set(key, s);
+  // Bounded: an unbounded map across a long-lived process is a leak, and
+  // these arrays are large.
+  if (tickMemo.size >= TICK_MEMO_MAX) tickMemo.clear();
+  tickMemo.set(fp, s);
   return s;
 }
 

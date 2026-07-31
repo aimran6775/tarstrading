@@ -33,14 +33,34 @@ export async function register() {
   globalThis.__tarsHeartbeat = true;
 
   const port = process.env.PORT ?? "3000";
-  const hit = (path: string) => () => {
+  /*
+    Overrun guard + timeout (gaps 44, 46).
+
+    The loopback fetch had no timeout, so a hung route leaked a socket every
+    beat forever; and nothing stopped a slow beat from overlapping the next
+    one, which is exactly how the sweeps piled onto the same account locks
+    and wedged the pool. Each beat now skips if its predecessor is still
+    running, and aborts at a deadline shorter than its own interval.
+  */
+  const running = new Set<string>();
+  const hit = (path: string, timeoutMs: number) => () => {
+    if (running.has(path)) {
+      console.warn(`[tars] skipping ${path} — previous beat still running`);
+      return;
+    }
+    running.add(path);
+    const ctl = new AbortController();
+    const kill = setTimeout(() => ctl.abort(), timeoutMs);
     fetch(`http://127.0.0.1:${port}${path}`, {
       method: "POST",
       headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
-    }).catch(() => { /* logged when it lands; next beat retries */ });
+      signal: ctl.signal,
+    })
+      .catch(() => { /* logged when it lands; next beat retries */ })
+      .finally(() => { clearTimeout(kill); running.delete(path); });
   };
-  const beat = hit("/api/cron/tick");
-  const feeds = hit("/api/cron/feeds");
+  const beat = hit("/api/cron/tick", EVERY_MS - 15_000);
+  const feeds = hit("/api/cron/feeds", FEEDS_EVERY_MS - 5_000);
 
   setTimeout(beat, FIRST_MS);
   setInterval(beat, EVERY_MS);

@@ -20,10 +20,23 @@ export default function ControlPanel({ initial }: { initial: Cfg }) {
 
   async function setKey(key: string, value: boolean | string) {
     setBusy(key); setNote("");
+    /*
+      The two platform-wide switches ask for the console password again at
+      the moment of the act (gap 48). A 12-hour session is convenient for
+      browsing; halting trading for every user is not something a borrowed
+      laptop should be able to do.
+    */
+    let confirm: string | undefined;
+    if (key === "trading_halted" || key === "agents_paused") {
+      const entered = window.prompt(
+        "This reaches every user on the platform. Re-enter the console password to confirm.");
+      if (!entered) { setBusy(null); setNote("Cancelled."); return; }
+      confirm = entered;
+    }
     try {
       const res = await fetch("/api/admin/config", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key, value }),
+        body: JSON.stringify({ key, value, confirm }),
       });
       const d = await res.json();
       if (d.ok) {
