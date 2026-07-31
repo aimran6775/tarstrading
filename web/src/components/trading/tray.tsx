@@ -97,10 +97,26 @@ export function Positions({ positions, quotes, onSelect, onClosed }: {
 }
 
 export function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: () => void }) {
+  /*
+    Search and status filter (gap 29). The order list was an
+    unsearchable, unfilterable 60-row wall — the moment a desk has any
+    history, finding "that AAPL stop from Tuesday" meant scrolling and
+    hoping. Both filters are client-side over the polled snapshot, so they
+    cost nothing and feel instant.
+  */
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<"all" | "filled" | "accepted" | "rejected">("all");
+
   async function cancel(id: string) {
     try { await fetch(`/api/orders/${id}`, { method: "DELETE" }); }
     finally { onCanceled(); }
   }
+
+  const shown = orders.filter((o) => {
+    if (status !== "all" && o.status !== status) return false;
+    const q = query.trim().toUpperCase();
+    return !q || displaySymbol(o.symbol).includes(q) || o.type.toUpperCase().includes(q);
+  });
 
   if (!orders.length) {
     return (
@@ -111,13 +127,35 @@ export function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: ()
   }
 
   return (
+    <>
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 md:px-5">
+        <input value={query} onChange={(e) => setQuery(e.target.value)}
+          placeholder="Filter by symbol or type…"
+          aria-label="Filter orders"
+          className="min-h-9 min-w-[160px] flex-1 rounded-lg border border-hairline bg-bg2 px-3 text-xs text-ink-1 outline-none focus:border-gold" />
+        <div className="flex gap-1">
+          {(["all", "filled", "accepted", "rejected"] as const).map((s) => (
+            <button key={s} onClick={() => setStatus(s)}
+              aria-pressed={status === s}
+              className={`pressable min-h-9 rounded-full px-3 text-[11px] capitalize transition-colors ${
+                status === s ? "bg-gold/15 text-gold" : "text-ink-4 hover:text-ink-2"
+              }`}>
+              {s === "accepted" ? "resting" : s}
+            </button>
+          ))}
+        </div>
+        <span className="tnum ml-auto text-[10px] text-ink-4">{shown.length} of {orders.length}</span>
+      </div>
+      {shown.length === 0 && (
+        <p className="px-6 py-8 text-center text-xs text-ink-4">Nothing matches that filter.</p>
+      )}
     <ul className="max-h-[380px] divide-y divide-[var(--hairline)] overflow-y-auto">
-      {orders.slice(0, 60).map((o) => (
+      {shown.slice(0, 200).map((o) => (
         <li key={o.id} className="flex items-center justify-between px-4 py-2.5 md:px-5">
           <div>
             <p className="text-sm text-ink-1">
               <span className={o.side === "buy" ? "text-gain" : "text-loss"}>{o.side}</span>{" "}
-              <span className="tnum">{o.qty}</span> {o.symbol}
+              <span className="tnum">{o.qty}</span> {displaySymbol(o.symbol)}
             </p>
             <p className="tnum text-[11px] text-ink-4">
               {o.type}{o.limitPrice ? ` @ ${usd(o.limitPrice)}` : ""}{o.stopPrice ? ` stop ${usd(o.stopPrice)}` : ""}
@@ -136,7 +174,7 @@ export function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: ()
             {o.status === "accepted" && (
               <button onClick={() => cancel(o.id)}
                 className="pressable min-h-11 rounded-full border border-hairline px-3.5 text-[11px] text-ink-3 hover:text-loss"
-                aria-label={`Cancel ${o.side} order for ${o.symbol}`}>
+                aria-label={`Cancel ${o.side} order for ${displaySymbol(o.symbol)}`}>
                 Cancel
               </button>
             )}
@@ -144,6 +182,7 @@ export function Orders({ orders, onCanceled }: { orders: Order[]; onCanceled: ()
         </li>
       ))}
     </ul>
+    </>
   );
 }
 

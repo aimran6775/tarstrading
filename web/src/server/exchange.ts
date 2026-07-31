@@ -344,6 +344,18 @@ async function tryFill(
   await settle(tx, order, fillPrice, fxRates);
   const patch = { status: "filled" as const, filledPrice: fillPrice, filledAt: Date.now() };
   await tx.update(schema.orders).set(patch).where(eq(schema.orders.id, order.id));
+  /*
+    Tell the user (gap 28). A resting order that fills at 3am, or an analyst's
+    entry while they read a lesson, used to be discoverable only by noticing a
+    number had changed. Fire-and-forget so a notice can never roll back a
+    settled trade.
+  */
+  void notify(order.userId, "fill",
+    `${order.side === "buy" ? "Bought" : "Sold"} ${order.qty} ${order.symbol.replace(/^(FX|FUT|IDX):/, "")}`,
+    {
+      body: `Filled at ${fillPrice.toFixed(2)}${order.agentId ? " by one of your analysts" : ""}.`,
+      href: `/app/m/${encodeURIComponent(order.symbol)}`,
+    });
   return patch;
 }
 

@@ -7,9 +7,12 @@ import { desc, eq } from "drizzle-orm";
 export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
+  /* 100 rows was a hard ceiling with no way past it (gap 29) — a week of
+     active trading buried everything older. 500 covers a real history and
+     the tray filters client-side over it. */
   const orders = await db.select().from(schema.orders)
     .where(eq(schema.orders.userId, user.id))
-    .orderBy(desc(schema.orders.createdAt)).limit(100);
+    .orderBy(desc(schema.orders.createdAt)).limit(500);
   return NextResponse.json({ ok: true, orders });
 }
 

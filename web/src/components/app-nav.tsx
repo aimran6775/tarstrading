@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ThemeToggle from "./theme-toggle";
 import CommandPalette from "./command-palette";
+import NotificationBell from "./notification-bell";
 import TarsWordmark from "./tars-wordmark";
 import { Icon } from "./icons";
 
@@ -150,6 +151,7 @@ export default function AppNav({ active, right }: { active: Section; right?: Rea
                 <circle cx="11" cy="11" r="7" /><path d="m20 20-3.8-3.8" />
               </svg>
             </button>
+            <NotificationBell />
             {xp != null && xp > 0 && (
               <span className="tnum hidden items-center gap-1.5 rounded-full bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold lg:flex"
                 title="Gold blocks earned in the academy">

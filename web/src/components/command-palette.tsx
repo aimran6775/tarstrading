@@ -15,6 +15,7 @@ type Item = { id: string; label: string; sub: string; run: () => void };
 const SECTIONS: [string, string][] = [
   ["Trading Floor — your dashboard", "/app/floor"],
   ["Markets — browse", "/app"],
+  ["Journal — every close, with the reason", "/app/journal"],
   ["Academy", "/app/academy"],
   ["Placement test — skip what you know", "/app/academy/placement"],
   ["Missions — prove it with a real trade", "/app/academy/missions"],
@@ -28,6 +29,25 @@ const SECTIONS: [string, string][] = [
 
 // Popular defaults shown before the user types anything.
 const DEFAULT_SYMBOLS = ["AAPL", "NVDA", "TSLA", "SPY", "BTC/USD", "ETH/USD"];
+
+/* Recently opened markets (gap 32) — a preference, so localStorage, and every
+   access is guarded because private mode throws on both read and write. */
+const RECENTS_KEY = "tars.palette.recents";
+
+function readRecents(): string[] {
+  try {
+    const raw = window.localStorage.getItem(RECENTS_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.filter((s) => typeof s === "string").slice(0, 6) : [];
+  } catch { return []; }
+}
+
+function rememberSymbol(symbol: string) {
+  try {
+    const next = [symbol, ...readRecents().filter((s) => s !== symbol)].slice(0, 6);
+    window.localStorage.setItem(RECENTS_KEY, JSON.stringify(next));
+  } catch { /* private mode — recents are a nicety, never required */ }
+}
 
 export default function CommandPalette() {
   const router = useRouter();
@@ -74,15 +94,29 @@ export default function CommandPalette() {
 
   const items = useMemo<Item[]>(() => {
     const q = query.trim().toUpperCase();
-    const go = (href: string) => () => { setOpen(false); router.push(href); };
+    /*
+      Recents (gap 32). The palette opened to the same static default list
+      every time, so the symbols a person actually lives in were always
+      three keystrokes away. Visiting a market records it; an empty query
+      offers those first. localStorage, because this is a preference, not
+      an account fact worth a table.
+    */
+    const go = (href: string) => () => {
+      setOpen(false);
+      const m = /^\/app\/m\/(.+)$/.exec(href);
+      if (m) rememberSymbol(decodeURIComponent(m[1]));
+      router.push(href);
+    };
 
     const sections: Item[] = SECTIONS
       .filter(([label]) => !q || label.toUpperCase().includes(q))
       .map(([label, href]) => ({ id: `s:${href}`, label, sub: "Go to section", run: go(href) }));
 
+    const recents = readRecents();
     const matches = q
       ? (serverHits.length ? serverHits.slice(0, 6) : searchSymbols(q, 6))
-      : DEFAULT_SYMBOLS.map((s) => ({ symbol: s, name: "" }));
+      : [...recents, ...DEFAULT_SYMBOLS.filter((s) => !recents.includes(s))]
+          .slice(0, 8).map((s) => ({ symbol: s, name: recents.includes(s) ? "Recent" : "" }));
     const symMatches = matches.map((m) => ({
       id: `sym:${m.symbol}`, label: m.symbol,
       sub: m.name || "Open market", run: go(`/app/m/${encodeURIComponent(m.symbol)}`),

@@ -23,7 +23,10 @@ export async function POST(request: Request) {
   const symbol = String(body.symbol ?? "").toUpperCase().trim();
   const price = Number(body.price);
   const direction = body.direction === "below" ? "below" : "above";
-  if (!/^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/.test(symbol)) {
+  /* Alerts work on every market the board lists (gap 34) — a futures
+     contract or a currency pair is exactly the kind of thing you want a
+     level on, and the regex was silently refusing them. */
+  if (!/^([A-Z.]{1,8}(\/[A-Z]{3,4})?|FX:[A-Z]{6}|IDX:[A-Z]{1,6}|FUT:[A-Z0-9]{1,3}[FGHJKMNQUVXZ]\d{1,2})$/.test(symbol)) {
     return NextResponse.json({ ok: false, error: "That doesn't look like a symbol." }, { status: 400 });
   }
   if (!Number.isFinite(price) || price <= 0) {
