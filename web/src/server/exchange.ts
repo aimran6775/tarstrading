@@ -384,8 +384,36 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
       // either way, and the user is told through the order list.
       try { await placeOrder(userId, leg); } catch { /* surfaced as a rejected row */ }
     }
+    /*
+      Sweep the group once both legs exist.
+
+      cancelOcoSiblings runs inside each fill, but a leg that is marketable
+      the instant it is placed fills BEFORE its sibling has been inserted —
+      so there is nothing to cancel yet, and the later leg rests as an orphan.
+      A live sell order guarding a position that was just closed is exactly
+      the bug the OCO rule exists to prevent (it would open an unintended
+      short). Found by placing a real bracket against production, not by
+      reading the code.
+    */
+    await settleOcoGroup(userId, group);
   }
   return placed;
+}
+
+/**
+ * Group-level OCO settle: if ANY member of the group has filled, cancel every
+ * sibling still resting. Idempotent, and safe to call once both legs exist.
+ */
+async function settleOcoGroup(userId: string, group: string): Promise<void> {
+  const legs = await db.select().from(schema.orders)
+    .where(and(eq(schema.orders.userId, userId), eq(schema.orders.ocoGroup, group)));
+  if (!legs.some((l) => l.status === "filled")) return;
+  await db.update(schema.orders)
+    .set({ status: "canceled", rejectReason: "OCO — its paired order filled first." })
+    .where(and(
+      eq(schema.orders.ocoGroup, group),
+      eq(schema.orders.status, "accepted"),
+    ));
 }
 
 /**
