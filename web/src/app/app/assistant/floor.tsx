@@ -126,12 +126,22 @@ export default function AnalystFloor() {
 
   const floor = useMemo(() => {
     const active = agents.filter((a) => a.status === "running");
-    const deployed = agents.filter((a) => ["running", "paused", "killed"].includes(a.status));
+    /*
+      Floor P&L counts the LIVE book (gap 27). Folding retired analysts in
+      forever mixed a closed history into a running number: a floor that was
+      up today could read down because something killed last month is still
+      in the total. Retired P&L is real and worth seeing — it belongs in a
+      lifetime figure, shown separately, not blended into "the floor".
+    */
+    const live = agents.filter((a) => a.status === "running" || a.status === "paused");
+    const retired = agents.filter((a) => a.status === "killed");
     return {
       running: active.length,
       paused: agents.filter((a) => a.status === "paused").length,
       allocated: active.reduce((s, a) => s + a.allocation, 0),
-      pnl: deployed.reduce((s, a) => s + a.pnl, 0),
+      pnl: live.reduce((s, a) => s + a.pnl, 0),
+      retiredPnl: retired.reduce((s, a) => s + a.pnl, 0),
+      retiredCount: retired.length,
     };
   }, [agents]);
 
@@ -182,6 +192,11 @@ export default function AnalystFloor() {
               <p className={`tnum mt-0.5 text-xl font-semibold ${floor.pnl > 0 ? "text-gain" : floor.pnl < 0 ? "text-loss" : "text-ink-2"}`}>
                 {floor.pnl >= 0 ? "+" : ""}{usd(floor.pnl)}
               </p>
+              {floor.retiredCount > 0 && (
+                <p className="tnum text-[10px] text-ink-4">
+                  {floor.retiredPnl >= 0 ? "+" : ""}{usd(floor.retiredPnl)} from {floor.retiredCount} retired
+                </p>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
@@ -293,7 +308,14 @@ export default function AnalystFloor() {
         )}
       </section>
 
-      <p className="mt-8 text-center text-xs text-ink-4">
+      <p className="mx-auto mt-8 max-w-2xl text-center text-xs leading-relaxed text-ink-4">
+        Analysts trade stocks, ETFs and crypto. FX and futures are deliberately
+        out of reach — the rule engine can&apos;t roll a contract or reason about a
+        currency pair&apos;s quote currency, and an analyst that mis-sizes those is
+        worse than one that declines them. Trade those yourself from their
+        market pages.
+      </p>
+      <p className="mt-3 text-center text-xs text-ink-4">
         Your analysts trade simulated capital only. Every order is tagged and
         auditable, backtests are honest by construction, and nothing on this
         floor promises a profit — it shows you its work instead.

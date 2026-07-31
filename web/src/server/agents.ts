@@ -64,6 +64,13 @@ export type Strategy = {
   risk?: RiskBlock;
 };
 
+/** Stated once, used by the floor UI and the assistant (gap 21). */
+export const ANALYST_VENUE_NOTE =
+  "Analysts trade stocks, ETFs and crypto. FX and futures are deliberately out "
+  + "of reach: the rule engine can't roll a contract or reason about a pair's "
+  + "quote currency, and an analyst that mis-sizes those is worse than one that "
+  + "declines them. Trade those yourself from their market pages.";
+
 export function describeIndicator(ref: IndicatorRef | { kind: "constant"; value: number }): string {
   switch (ref.kind) {
     case "price": return "price";
@@ -97,6 +104,14 @@ const VALID_COMPARATORS = new Set(["crossesAbove", "crossesBelow", "greaterThan"
 export function sanitizeStrategy(raw: unknown): Strategy | null {
   const s = raw as Strategy;
   if (!s || !Array.isArray(s.universe) || !Array.isArray(s.entry) || !Array.isArray(s.exit)) return null;
+  /*
+    Analysts trade equities, ETFs and crypto (gap 21). FX and futures are
+    excluded on purpose — the rule engine has no notion of rolling a contract
+    or of a pair's quote currency, and an analyst that silently mis-sizes
+    those is worse than one that declines them. The UI and the assistant now
+    say so out loud instead of letting a symbol vanish from the universe
+    without explanation (see ANALYST_VENUE_NOTE).
+  */
   const universe = s.universe.map((x) => String(x).toUpperCase().trim())
     .filter((x) => /^[A-Z.]{1,8}(\/[A-Z]{3,4})?$/.test(x)).slice(0, 6);
   if (!universe.length) return null;
@@ -347,7 +362,19 @@ export async function backtest(strategy: Strategy): Promise<BacktestResult | nul
         const tpHit = risk?.takeProfit != null && px >= entryPx * (1 + risk.takeProfit);
         const ruleExit = strategy.exit.some((r) => ruleFires(r, closes, gi));
         if (stopHit || tpHit || ruleExit) {
-          const exitPx = px * (1 - BT_SLIPPAGE);
+          /*
+            Gap-through fills (gap 22). A stop used to fill at exactly the
+            stop price, so an 8% stop on a day that gapped down 15% still
+            "lost 8%" — the backtest quietly promised protection the market
+            can't deliver. When the bar's close is already through the stop,
+            the fill happens THERE: gaps are the single biggest reason live
+            results underperform a backtest, and a teaching platform must
+            not hide that.
+          */
+          const stopLevel = entryPx * (1 - (risk?.stopLoss ?? 0));
+          const gapped = stopHit && px < stopLevel;
+          const basis = gapped ? px : (stopHit ? stopLevel : px);
+          const exitPx = basis * (1 - BT_SLIPPAGE);
           const tradeReturn = exitPx / entryPx - 1;
           sleeve *= 1 + tradeReturn;
           const win = tradeReturn > 0;
@@ -407,6 +434,26 @@ async function narrate(userId: string, agent: AgentRow, text: string) {
     id: randomUUID(), userId, agentId: agent.id, agentName: agent.name,
     text, createdAt: Date.now(),
   });
+}
+
+/**
+ * Weekday sessions elapsed since a timestamp — the unit a "bar" means in the
+ * backtest (gap 24). Holidays aren't modelled; a handful a year is a far
+ * smaller error than counting weekends as trading days.
+ */
+export function tradingDaysSince(fromMs: number, now = Date.now()): number {
+  if (!(fromMs > 0) || now <= fromMs) return 0;
+  let count = 0;
+  const d = new Date(fromMs);
+  d.setUTCHours(0, 0, 0, 0);
+  const end = new Date(now);
+  end.setUTCHours(0, 0, 0, 0);
+  while (d < end) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const day = d.getUTCDay();
+    if (day !== 0 && day !== 6) count++;
+  }
+  return count;
 }
 
 type Holding = {
@@ -531,7 +578,22 @@ async function runTick(userId: string): Promise<number> {
     }
 
     const holdings = await agentHoldings(userId, agent.id);
-    const perSymbolBudget = agent.allocation / strategy.universe.length;
+    /*
+      Allocation scales with the account (gap 25). A fixed dollar sleeve meant
+      an analyst hired at $5,000 still risked $5,000 after the account halved
+      — 5% of equity became 10% without anyone deciding that. The allocation
+      is now read as a SHARE of the account it was hired against: the sleeve
+      grows and shrinks with the desk, which is what position sizing means.
+      Capped at the original dollar figure so an analyst can never quietly
+      grow beyond the mandate it was given.
+    */
+    const [acct] = await db.select().from(schema.accounts)
+      .where(eq(schema.accounts.userId, userId));
+    const equity = acct?.equity ?? acct?.cash ?? 0;
+    const baseline = agent.peakValue ?? agent.allocation;
+    const share = baseline > 0 ? agent.allocation / Math.max(baseline, agent.allocation) : 1;
+    const sleeve = Math.min(agent.allocation, Math.max(0, equity * share));
+    const perSymbolBudget = sleeve / strategy.universe.length;
 
     for (const symbol of strategy.universe) {
       const isCrypto = symbol.includes("/");
@@ -551,10 +613,15 @@ async function runTick(userId: string): Promise<number> {
       const risk = strategy.risk;
 
       if (held <= 1e-9) {
-        // Loss cooldown: after a losing exit, the desk sits out. A bar is a
-        // day here — the same unit the backtest counted.
+        /*
+          Loss cooldown in TRADING days (gap 24). The backtest counts bars —
+          sessions — while this counted calendar days, so a 5-bar cooldown
+          set on Thursday ran through the weekend and cost ~40% more
+          sit-out time live than the resume promised. tradingDaysSince
+          counts weekdays, the same unit a bar represents.
+        */
         if (risk?.cooldownBars && holding?.lastExit?.wasLoss
-          && Date.now() - holding.lastExit.at < risk.cooldownBars * 86_400_000) continue;
+          && tradingDaysSince(holding.lastExit.at) < risk.cooldownBars) continue;
         if (strategy.entry.length && strategy.entry.every((r) => ruleFires(r, closes, i))) {
           const qty = isCrypto
             ? Number((perSymbolBudget / quote.price).toFixed(6))
@@ -588,6 +655,36 @@ async function runTick(userId: string): Promise<number> {
     }
   }
   return actions;
+}
+
+/*
+  Backtest freshness (gap 23). A deployed analyst's resume was frozen at
+  whatever the market looked like the day it was hired: the strategy kept
+  trading while its evidence rotted, and a card could show a glowing
+  out-of-sample number from six months ago. Running analysts re-test weekly
+  on the heartbeat, so the resume tracks the job.
+*/
+const RETEST_MS = 7 * 86_400_000;
+
+export async function refreshStaleBacktests(): Promise<number> {
+  const running = await db.select().from(schema.agents)
+    .where(eq(schema.agents.status, "running"));
+  let done = 0;
+  for (const a of running) {
+    let bt: BacktestResult | null = null;
+    try { bt = a.backtest ? JSON.parse(a.backtest) as BacktestResult : null; } catch { bt = null; }
+    const testedAt = (bt as (BacktestResult & { testedAt?: number }) | null)?.testedAt ?? 0;
+    if (testedAt && Date.now() - testedAt < RETEST_MS) continue;
+    try {
+      const fresh = await backtest(JSON.parse(a.strategy) as Strategy);
+      if (!fresh) continue;
+      await db.update(schema.agents)
+        .set({ backtest: JSON.stringify({ ...fresh, testedAt: Date.now() }) })
+        .where(eq(schema.agents.id, a.id));
+      done++;
+    } catch { /* one analyst's retest never stops the sweep */ }
+  }
+  return done;
 }
 
 export async function recentActivity(userId: string, limit = 40) {

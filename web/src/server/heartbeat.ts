@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "crypto";
-import { tickAllRunningAgents } from "./agents";
+import { tickAllRunningAgents, refreshStaleBacktests } from "./agents";
 import { purgeExpiredSessions } from "./auth";
 import { backfillTick } from "./backfill";
 import { settleAllExpiredOptions, settleAllFuturesVM, enforceAllMaintenance, reconcileRestingOrders } from "./exchange";
@@ -66,6 +66,8 @@ export async function runHeartbeat(kind = "tick") {
     purgeExpiredSessions(),
     tickAllPrivateMarkets(),
   ]);
+  // Running analysts re-test weekly so the resume tracks the job (gap 23).
+  void refreshStaleBacktests().catch(() => {});
   // Vital signs last, so the report reflects the beat that just ran (gap 45).
   const wd = await runWatchdog().catch(() => null);
   void purgeOldNotifications();
