@@ -5,6 +5,7 @@ import { purgeExpiredSessions } from "./auth";
 import { backfillTick } from "./backfill";
 import { settleAllExpiredOptions, settleAllFuturesVM, enforceAllMaintenance, reconcileRestingOrders } from "./exchange";
 import { purgeOldNotifications } from "./notify";
+import { creditDividends } from "./dividends";
 import { runWatchdog } from "./watchdog";
 import { feedsSlowTick } from "./feeds";
 import { tickAllPrivateMarkets } from "./private-markets";
@@ -57,6 +58,8 @@ export async function runHeartbeat(kind = "tick") {
   // Reg-T maintenance runs for EVERY book, not just futures holders (gap 1):
   // an equity account below 25% was previously computed, displayed, ignored.
   const mRes = await seq(enforceAllMaintenance);
+  // Income instruments actually pay now (gap 8) — cash to holders of record.
+  const divRes = await seq(creditDividends);
   // These never touch account locks — they can share the beat freely.
   const [bRes, pRes, peRes] = await Promise.allSettled([
     backfillTick(),
@@ -66,7 +69,7 @@ export async function runHeartbeat(kind = "tick") {
   // Vital signs last, so the report reflects the beat that just ran (gap 45).
   const wd = await runWatchdog().catch(() => null);
   void purgeOldNotifications();
-  void fRes; void futRes; void mRes; // reported via feed_status/journal; never fail the run
+  void fRes; void futRes; void mRes; void divRes; // via feed_status/journal; never fail the run
   if (aRes.status === "fulfilled") agents = aRes.value;
   if (bRes.status === "fulfilled") backfill = bRes.value;
   // Expiring options settle on the heartbeat, so a contract closes itself

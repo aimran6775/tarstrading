@@ -5,9 +5,10 @@ import { and, eq, desc } from "drizzle-orm";
 import { getQuote, getQuotes, isUSMarketOpen, etDay } from "./market";
 import { getPlatformConfig } from "./platform";
 import { isOptionSymbol, parseOptionSymbol, optionQuotes, CONTRACT_SIZE } from "./options";
-import { isFxSymbol, isFxOpen, fxQuotes } from "./fx";
+import { isFxSymbol, isFxOpen, fxQuotes, toUsd, usdRateMap } from "./fx";
 import { isFuturesSymbol, futuresSpec, futuresMarks, isFuturesOpen, pickLiquidations, isExpired } from "./futures";
 import { notify } from "./notify";
+import { commissionFor, slippageFor } from "./costs";
 
 /*
   The simulated exchange. Every user trades an isolated $100k account.
@@ -30,6 +31,9 @@ import { notify } from "./notify";
   never hold a row lock across I/O.
 */
 
+/* Slippage and commissions live in ./costs — size-aware, per asset class
+   (gaps 6 and 9). This constant remains only as the floor used when no
+   volume profile is available. */
 const SLIPPAGE = 0.0005;
 
 /*
@@ -47,6 +51,10 @@ const isCryptoSym = (s: string) => s.includes("/");
    requirement like crypto — you pay the premium, full stop. */
 const initialRate = (s: string) => (isCryptoSym(s) || isOptionSymbol(s) ? 1 : 0.5);
 const maintRate = (s: string) => (isCryptoSym(s) || isOptionSymbol(s) ? 1 : 0.25);
+/* A SHORT option's requirement is its collateral, not its premium: the
+   covered call is collateralised by the shares (already margined as a
+   position) and the cash-secured put by cash. Both are checked at order
+   time, so the ongoing requirement here stays the premium's mark. */
 /*
   Futures are the exception to rate-based margin entirely: their requirement is
   a fixed DOLLAR amount per contract from the spec sheet (IM to open, MM to
@@ -212,10 +220,30 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
     if (isCrypto && q1 < -1e-9) {
       return rejectIn("Crypto can't be shorted here — it trades cash and long-only.");
     }
-    // Options are long-only: writing them carries open-ended risk whose margin
-    // model this simulator doesn't teach yet. Buy to open, sell to close.
+    /*
+      Options writing (gap 7). Naked short options carry genuinely unbounded
+      risk, so this desk allows exactly the two COVERED structures that a
+      teaching platform should: a covered call (you own 100 shares per
+      contract sold) and a cash-secured put (you hold strike × 100 in cash
+      per contract). Both have defined, collateralised risk — and they are
+      the two strategies most people actually want to learn.
+    */
     if (isOption && q1 < -1e-9) {
-      return rejectIn("Options are long-only here — you can buy to open and sell to close, but not write contracts.");
+      const leg = parseOptionSymbol(symbol)!;
+      const short = Math.abs(q1);
+      if (leg.type === "call") {
+        const shares = positions.find((p) => p.symbol === leg.underlying)?.qty ?? 0;
+        if (shares < short * CONTRACT_SIZE - 1e-9) {
+          return rejectIn(
+            `A covered call needs ${short * CONTRACT_SIZE} shares of ${leg.underlying} — you hold ${Math.floor(shares)}. Naked calls carry unlimited risk and aren't offered here.`);
+        }
+      } else {
+        const collateral = leg.strike * CONTRACT_SIZE * short;
+        if ((account?.cash ?? 0) < collateral - 1e-9) {
+          return rejectIn(
+            `A cash-secured put needs $${Math.round(collateral).toLocaleString()} set aside to buy the shares if assigned — you hold $${Math.round(account?.cash ?? 0).toLocaleString()}.`);
+        }
+      }
     }
 
     // Mark each symbol: this order's symbol at the live quote, others at cost.
@@ -258,9 +286,19 @@ export async function placeOrder(userId: string, input: PlaceOrderInput): Promis
 }
 
 /** Attempt to fill an accepted order against a price. Returns fill patch or null. */
-async function tryFill(tx: Tx, order: PlacedOrder, price: number): Promise<{ status: "filled"; filledPrice: number; filledAt: number } | null> {
+async function tryFill(
+  tx: Tx, order: PlacedOrder, price: number, avgVolume?: number | null,
+): Promise<{ status: "filled"; filledPrice: number; filledAt: number } | null> {
   let fillPrice: number | null = null;
-  const slip = order.side === "buy" ? 1 + SLIPPAGE : 1 - SLIPPAGE;
+  /*
+    Size-aware slippage (gap 9): a flat 5 bps filled 1 share and 50,000
+    shares at the same price, which quietly taught that size is free. The
+    cost now carries an impact term scaling with participation in a typical
+    session's volume; with no volume profile it falls back to the base
+    spread rather than inventing a penalty.
+  */
+  const slipPct = slippageFor(order.symbol, order.qty, price, avgVolume);
+  const slip = order.side === "buy" ? 1 + slipPct : 1 - slipPct;
 
   switch (order.type) {
     case "market":
@@ -300,7 +338,10 @@ async function tryFill(tx: Tx, order: PlacedOrder, price: number): Promise<{ sta
   }
   if (fillPrice == null) return null;
 
-  await settle(tx, order, fillPrice);
+  // FX fills need the rate map to convert quote-currency cash into the
+  // account's currency; nothing else does, so it's fetched only for pairs.
+  const fxRates = isFxSymbol(order.symbol) ? await usdRateMap() : undefined;
+  await settle(tx, order, fillPrice, fxRates);
   const patch = { status: "filled" as const, filledPrice: fillPrice, filledAt: Date.now() };
   await tx.update(schema.orders).set(patch).where(eq(schema.orders.id, order.id));
   return patch;
@@ -351,7 +392,7 @@ export function applyFill(
   return { q1, avg, cashFlow, realized, closedQty, flat };
 }
 
-async function settle(tx: Tx, order: PlacedOrder, fillPrice: number) {
+async function settle(tx: Tx, order: PlacedOrder, fillPrice: number, fxRates?: Map<string, number>) {
   const { userId, symbol } = order;
   const [account] = await tx.select().from(schema.accounts).where(eq(schema.accounts.userId, userId));
   if (!account) return;
@@ -370,19 +411,41 @@ async function settle(tx: Tx, order: PlacedOrder, fillPrice: number) {
     fill closed — variation margin at the moment of trade. Everything else
     keeps the buy-debits/sell-credits flow.
   */
-  const cashDelta = isFuturesSymbol(symbol) ? r.realized * mult : r.cashFlow * mult;
+  let cashDelta = isFuturesSymbol(symbol) ? r.realized * mult : r.cashFlow * mult;
+  /*
+    FX cash moves in the pair's QUOTE currency (gap 10) — buying USD/JPY
+    spends yen-denominated notional, not dollars. Convert into the account's
+    currency so cash and markEquity agree; a missing rate leaves the raw
+    number rather than inventing one, and markEquity will decline to persist
+    equity until the rate returns.
+  */
+  if (isFxSymbol(symbol) && fxRates) {
+    const converted = toUsd(symbol, cashDelta, fxRates);
+    if (converted != null) cashDelta = converted;
+  }
+
+  /*
+    Commission (gap 6). Every fill used to be free — accidentally right for
+    US equities, badly wrong for options ($0.65/contract), futures
+    ($2.25/side) and crypto (25 bps). A free futures round-trip teaches that
+    scalping ES costs nothing, which is the most expensive lesson a new
+    trader can learn wrong. It debits cash and reduces realized P&L, because
+    that is what a statement shows.
+  */
+  const commission = commissionFor(symbol, order.qty, fillPrice * mult);
 
   await tx.update(schema.accounts)
-    .set({ cash: account.cash + cashDelta })
+    .set({ cash: account.cash + cashDelta - commission })
     .where(eq(schema.accounts.userId, userId));
 
   if (r.closedQty > 0) {
     // Realized P&L → journal, every close/cover is a learning artifact.
+    // Net of the commission that closing it actually cost.
     await tx.insert(schema.journalEntries).values({
       id: randomUUID(), userId, symbol,
       side: (pos?.qty ?? 0) > 0 ? "sell" : "cover", qty: r.closedQty,
       entryPrice: pos?.avgEntryPrice ?? 0, exitPrice: fillPrice,
-      pnl: r.realized * mult,
+      pnl: r.realized * mult - commission,
       thesis: null, agentId: order.agentId, createdAt: now,
     });
   }
@@ -517,11 +580,12 @@ export async function markEquity(userId: string) {
     const plain = positions
       .filter((p) => !isOptionSymbol(p.symbol) && !isFxSymbol(p.symbol) && !isFuturesSymbol(p.symbol))
       .map((p) => p.symbol);
-    const [quotes, optMarks, fxMarks, futMarks] = await Promise.all([
+    const [quotes, optMarks, fxMarks, futMarks, rates] = await Promise.all([
       plain.length ? getQuotes(plain) : Promise.resolve([]),
       opts.length ? optionQuotes(opts) : Promise.resolve(new Map<string, number>()),
       fx.length ? fxQuotes(fx) : Promise.resolve(new Map<string, { price: number; prevClose: number }>()),
       futs.length ? futuresMarks(futs) : Promise.resolve(new Map<string, number>()),
+      fx.length ? usdRateMap() : Promise.resolve(new Map<string, number>([["USD", 1]])),
     ]);
     const bySymbol = new Map(quotes.map((q) => [q.symbol, q.price]));
     for (const p of positions) {
@@ -539,11 +603,26 @@ export async function markEquity(userId: string) {
         */
         return;
       }
-      // A futures position is worth its UNREALIZED move against the VM basis —
-      // the notional never belonged to the account.
-      value += isFuturesSymbol(p.symbol)
-        ? (mark - p.avgEntryPrice) * p.qty * multiplierFor(p.symbol)
-        : mark * p.qty * multiplierFor(p.symbol);
+      if (isFuturesSymbol(p.symbol)) {
+        // A futures position is worth its UNREALIZED move against the VM
+        // basis — the notional never belonged to the account.
+        value += (mark - p.avgEntryPrice) * p.qty * multiplierFor(p.symbol);
+      } else if (isFxSymbol(p.symbol)) {
+        /*
+          A currency pair is priced in its QUOTE currency (gap 10): USD/JPY
+          at 157 means 157 YEN per dollar, so a 1,000-unit position is worth
+          157,000 yen — about $1,000, not $157,000. Summing the raw number
+          into a dollar equity overstated 12 of our 17 pairs by the exchange
+          rate. settle() converts the cash side identically, so the two stay
+          consistent; an unknown rate abandons the pass rather than
+          persisting a fiction, exactly as a missing mark does.
+        */
+        const usd = toUsd(p.symbol, mark * p.qty, rates);
+        if (usd == null) return;
+        value += usd;
+      } else {
+        value += mark * p.qty * multiplierFor(p.symbol);
+      }
     }
   }
   const equity = account.cash + value;
@@ -601,6 +680,13 @@ export async function settleExpiredOptions(userId: string): Promise<number> {
     const intrinsic = leg!.type === "call"
       ? Math.max(0, under - leg!.strike)
       : Math.max(0, leg!.strike - under);
+    /*
+      Signed quantities settle both directions (gap 7): a LONG contract
+      receives intrinsic value, a SHORT one pays it — the writer's side of
+      assignment, cash-settled. p.qty carries the sign, so one expression
+      covers both and the P&L for a written option is premium kept minus
+      intrinsic paid.
+    */
     const proceeds = intrinsic * p.qty * CONTRACT_SIZE;
     const pnl = (intrinsic - p.avgEntryPrice) * p.qty * CONTRACT_SIZE;
 
@@ -613,12 +699,17 @@ export async function settleExpiredOptions(userId: string): Promise<number> {
         .where(eq(schema.accounts.userId, userId));
       await tx.insert(schema.journalEntries).values({
         id: randomUUID(), userId, symbol: p.symbol,
-        side: intrinsic > 0 ? "exercised" : "expired",
+        side: p.qty < 0 ? (intrinsic > 0 ? "assigned" : "expired")
+          : (intrinsic > 0 ? "exercised" : "expired"),
         qty: Math.abs(p.qty),
         entryPrice: p.avgEntryPrice, exitPrice: intrinsic, pnl,
-        thesis: intrinsic > 0
-          ? `Expired in the money — settled at $${intrinsic.toFixed(2)} intrinsic.`
-          : "Expired worthless. The premium was the whole risk.",
+        thesis: p.qty < 0
+          ? (intrinsic > 0
+            ? `Assigned: the contract you wrote finished in the money, so you paid $${intrinsic.toFixed(2)} of intrinsic against the premium you kept. That is the writer's side of the trade.`
+            : "The contract you wrote expired worthless — you keep the whole premium. That is the outcome a covered call is built for.")
+          : (intrinsic > 0
+            ? `Expired in the money — settled at $${intrinsic.toFixed(2)} intrinsic.`
+            : "Expired worthless. The premium was the whole risk."),
         agentId: null, createdAt: now,
       });
       await tx.delete(schema.positions).where(eq(schema.positions.id, p.id));

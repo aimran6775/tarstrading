@@ -1,6 +1,6 @@
 import "server-only";
 import { db, schema } from "./db";
-import { inArray } from "drizzle-orm";
+import { and, gte, inArray } from "drizzle-orm";
 
 /*
   The futures margin desk — contract specs and marks.
@@ -109,9 +109,25 @@ export async function futuresMarks(symbols: string[]): Promise<Map<string, numbe
   const rows = await db.select().from(schema.quoteCache)
     .where(inArray(schema.quoteCache.symbol, list));
   const now = Date.now();
-  return new Map(rows
+  const marks = new Map(rows
     .filter((r) => now - r.updatedAt < 4 * 86_400_000)
     .map((r) => [r.symbol, r.price]));
+
+  /*
+    Today's partial session beats yesterday's settle (gap 11). The mesh
+    writes session bars into the vault, so when a contract has a bar dated
+    today it IS the live market — filling at yesterday's settlement while
+    the tape has moved all session is a stale-price fill, the exact thing
+    this platform criticises elsewhere.
+  */
+  try {
+    const todayStart = Math.floor(new Date().setUTCHours(0, 0, 0, 0) / 1000);
+    const fresh = await db.select({ symbol: schema.bars.symbol, c: schema.bars.c })
+      .from(schema.bars)
+      .where(and(inArray(schema.bars.symbol, list), gte(schema.bars.t, todayStart)));
+    for (const b of fresh) if (b.c > 0) marks.set(b.symbol, b.c);
+  } catch { /* the settle mark still stands */ }
+  return marks;
 }
 
 /*

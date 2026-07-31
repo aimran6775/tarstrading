@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import HoldButton from "@/components/hold-button";
 import AnalyticsBoard from "./analytics-board";
-import { usd, contractSize, type Quote, type Position, type Order } from "./shared";
+import { usd, contractSize, displaySymbol, isFutureSymbol, futuresUiSpec, type Quote, type Position, type Order } from "./shared";
 
 /*
   The portfolio tray — the persistent bottom band of every market page.
@@ -49,17 +49,33 @@ export function Positions({ positions, quotes, onSelect, onClosed }: {
         const mult = contractSize(p.symbol);
         const value = (q?.price ?? p.avgEntryPrice) * p.qty * mult;
         const pnl = q ? (q.price - p.avgEntryPrice) * p.qty * mult : 0;
+        /*
+          Futures show MARGIN, not notional (gap 12). "1 ES = $372,000"
+          beside a $100k account read as though the account held $372k of
+          stock; what it actually holds is a $23,000 requirement controlling
+          that notional. Both numbers appear, labelled, so leverage is
+          legible rather than alarming.
+        */
+        const fut = isFutureSymbol(p.symbol) ? futuresUiSpec(p.symbol) : null;
+        const margin = fut ? fut.im * Math.abs(p.qty) : 0;
         return (
           <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3 md:px-5">
             <button onClick={() => onSelect(p.symbol)} className="pressable min-h-11 min-w-[110px] text-left">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-1">
-                {p.symbol}
+                {displaySymbol(p.symbol)}
                 {p.qty < 0 && <span className="rounded bg-loss/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-loss">Short</span>}
               </p>
               <p className="tnum text-[11px] text-ink-3">{p.qty < 0 ? p.qty : `+${p.qty}`} @ {usd(p.avgEntryPrice)}</p>
             </button>
             <div className="min-w-[110px] text-right md:text-left">
-              <p className="tnum text-sm text-ink-1">{usd(value)}</p>
+              {fut ? (
+                <>
+                  <p className="tnum text-sm text-ink-1">{usd(margin)}<span className="ml-1 text-[10px] font-normal text-ink-4">margin</span></p>
+                  <p className="tnum text-[10px] text-ink-4">{usd(Math.abs(value), 0)} notional</p>
+                </>
+              ) : (
+                <p className="tnum text-sm text-ink-1">{usd(value)}</p>
+              )}
               <p className={`tnum text-[11px] ${pnl > 0 ? "text-gain" : pnl < 0 ? "text-loss" : "text-ink-3"}`}>
                 {pnl >= 0 ? "+" : ""}{usd(pnl)}
               </p>

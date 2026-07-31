@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import { placeOrder } from "@/server/exchange";
+import { commissionFor } from "@/server/costs";
 
 /*
   The safety-critical claim of the Postgres migration: a user's concurrent
@@ -59,8 +60,13 @@ describe("exchange per-user account lock", () => {
     expect(acct.cash).toBeGreaterThanOrEqual(0);
     // Exactly one order fits; the rest are rejected for buying power.
     expect(filled.length).toBe(1);
-    // Cash is exactly the start minus what actually filled — no lost/double spend.
-    const spent = filled.reduce((s, o) => s + (o.filledPrice ?? 0) * qty, 0);
+    // Cash is exactly the start minus what actually filled AND the commission
+    // that fill cost — crypto pays 25 bps of notional (see server/costs.ts),
+    // so a test that ignored fees would now be asserting a fiction.
+    const spent = filled.reduce((s, o) => {
+      const notional = (o.filledPrice ?? 0) * qty;
+      return s + notional + commissionFor("BTC/USD", qty, o.filledPrice ?? 0);
+    }, 0);
     expect(Math.round(acct.cash)).toBe(Math.round(cash - spent));
   });
 

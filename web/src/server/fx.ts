@@ -34,6 +34,35 @@ export function fxDisplay(symbol: string): string {
   return p.length === 6 ? `${p.slice(0, 3)}/${p.slice(3)}` : p;
 }
 
+/** The QUOTE currency — the units a pair's P&L is actually denominated in. */
+export function quoteCurrency(symbol: string): string {
+  const p = symbol.toUpperCase().replace(FX_PREFIX, "");
+  return p.length === 6 ? p.slice(3) : "USD";
+}
+
+/*
+  P&L conversion (gap 10). A EUR/USD position profits in dollars — fine. But
+  USD/JPY profits in YEN, USD/CHF in francs, EUR/GBP in pounds: 12 of our 17
+  pairs settle in something that isn't the account's currency, and the P&L
+  was being added to a dollar equity as if a yen were a dollar. The error is
+  ~150× on a yen cross.
+
+  Converting needs the quote currency's USD rate, which is exactly what
+  fxQuotes already returns for the USD pair. Callers pass the rate map;
+  a missing rate returns null rather than guessing — the same discipline
+  markEquity applies to a missing mark.
+*/
+export function toUsd(
+  symbol: string, amountInQuote: number, usdRates: Map<string, number>,
+): number | null {
+  const q = quoteCurrency(symbol);
+  if (q === "USD") return amountInQuote;
+  // usdRates holds "USD buys N of currency" (the ECB convention we store).
+  const rate = usdRates.get(q);
+  if (!rate || !Number.isFinite(rate) || rate <= 0) return null;
+  return amountInQuote / rate;
+}
+
 /** FX:EURUSD → C:EURUSD (Polygon's ticker form). */
 const toPolygon = (symbol: string) => `C:${symbol.toUpperCase().replace(FX_PREFIX, "")}`;
 
@@ -91,6 +120,28 @@ export async function fxQuotes(symbols: string[]): Promise<Map<string, { price: 
   for (const r of Array.from(rows)) {
     out.set(r.symbol, { price: r.c, prevClose: r.prev ?? r.c });
   }
+  return out;
+}
+
+/**
+ * USD rates for every quote currency we list — the map toUsd() needs.
+ * Reads the stored USD pairs (USDJPY, USDCHF…) plus the inverse majors, so
+ * one cheap query converts any pair's P&L into account currency.
+ */
+export async function usdRateMap(): Promise<Map<string, number>> {
+  const out = new Map<string, number>([["USD", 1]]);
+  try {
+    const rows = await db.select().from(schema.quoteCache)
+      .where(dsql`symbol like 'FX:%'`);
+    for (const r of rows) {
+      const p = r.symbol.replace(FX_PREFIX, "");
+      const base = p.slice(0, 3), quote = p.slice(3);
+      // USD/XXX gives "USD buys N of XXX" directly.
+      if (base === "USD" && r.price > 0) out.set(quote, r.price);
+      // XXX/USD gives the inverse.
+      else if (quote === "USD" && r.price > 0) out.set(base, 1 / r.price);
+    }
+  } catch { /* an empty map means callers report null, never a wrong number */ }
   return out;
 }
 
