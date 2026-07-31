@@ -647,7 +647,15 @@ function FeaturedCard({ symbol, name, kind, quote, spark }: {
             <p className="kicker" title={instrument.title}>
               Featured · {instrument.label} · biggest move
             </p>
-            <h2 className="display mt-2 break-words text-[2.25rem] text-ink-1 sm:text-5xl md:text-6xl">
+            {/*
+              The headline must never strand a letter ("MICRON TECHNOLOG / Y").
+              text-balance makes the browser split lines evenly — "MICRON /
+              TECHNOLOGY" — and the clamp scales the face down on narrow
+              screens so long names shrink instead of shattering. break-words
+              stays only as the last resort for a single unbroken token wider
+              than the column.
+            */}
+            <h2 className="display mt-2 text-balance break-words text-[clamp(1.6rem,7.5vw,2.25rem)] text-ink-1 sm:text-5xl md:text-6xl">
               {name ?? shown}
             </h2>
             <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
