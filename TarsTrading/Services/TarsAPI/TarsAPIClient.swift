@@ -203,3 +203,32 @@ extension TarsAPIClient {
     }
     func journal() async throws -> JournalResponse { try await request("GET", "/api/journal") }
 }
+
+extension TarsAPIClient {
+    /// `digest: true` also asks for the "since you left" summary — only worth
+    /// doing on a foreground, never on a poll, because it stamps last-seen.
+    func notifications(digest: Bool = false) async throws -> NotificationsResponse {
+        try await request("GET", "/api/notifications\(digest ? "?digest=1" : "")")
+    }
+
+    func markNotificationsRead() async {
+        struct Empty: Encodable {}
+        let _: NotificationsResponse? = try? await request("POST", "/api/notifications", body: Empty())
+    }
+
+    func alerts() async throws -> [APIAlert] {
+        let res: AlertsResponse = try await request("GET", "/api/alerts")
+        return res.alerts
+    }
+
+    func createAlert(symbol: String, price: Double, direction: String) async throws {
+        struct Body: Encodable { let symbol: String; let price: Double; let direction: String }
+        let _: AlertsResponse = try await request(
+            "POST", "/api/alerts", body: Body(symbol: symbol, price: price, direction: direction))
+    }
+
+    func deleteAlert(id: String) async {
+        struct Body: Encodable { let id: String }
+        let _: AlertsResponse? = try? await request("DELETE", "/api/alerts", body: Body(id: id))
+    }
+}

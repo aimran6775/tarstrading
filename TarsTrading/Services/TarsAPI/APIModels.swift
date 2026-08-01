@@ -402,3 +402,44 @@ struct JournalResponse: Decodable {
     let entries: [JournalEntryPayload]
     let summary: JournalSummary
 }
+
+// MARK: - Notifications & alerts (the living layer)
+
+struct APINotification: Decodable, Identifiable, Equatable {
+    let id: String
+    let kind: String          // fill | margin | analyst | alert | system
+    let title: String
+    let body: String?
+    let href: String?
+    let readAt: Double?
+    let createdAt: Double
+}
+
+struct SinceYouLeft: Decodable, Equatable {
+    let since: Double
+    let fills: Int
+}
+
+struct NotificationsResponse: Decodable {
+    let ok: Bool
+    let notifications: [APINotification]
+    let unread: Int
+    let digest: SinceYouLeft?
+}
+
+struct APIAlert: Decodable, Identifiable, Equatable {
+    let id: String
+    let symbol: String
+    let price: Double
+    let direction: String     // above | below
+    let triggeredAt: Double?
+    let createdAt: Double
+
+    /// The reserved symbol for a margin-usage alert; price is the fraction.
+    var isMargin: Bool { symbol.uppercased() == "$MARGIN" }
+}
+
+struct AlertsResponse: Decodable {
+    let ok: Bool
+    let alerts: [APIAlert]
+}

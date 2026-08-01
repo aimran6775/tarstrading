@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { currentUser } from "@/server/auth";
 import { db, schema } from "@/server/db";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 export async function GET() {
   const user = await currentUser();
@@ -40,4 +40,24 @@ export async function POST(request: Request) {
   };
   await db.insert(schema.priceAlerts).values(row);
   return NextResponse.json({ ok: true, alert: row }, { status: 201 });
+}
+
+/*
+  Remove an alert. Creating one was always possible; removing one was not,
+  so a level you no longer care about sat armed forever. Scoped to the
+  owner: an id from someone else's account deletes nothing.
+*/
+export async function DELETE(request: Request) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ ok: false }, { status: 401 });
+  const body = await request.json().catch(() => ({}));
+  const id = String(body?.id ?? "");
+  if (!id) return NextResponse.json({ ok: false, error: "Which alert?" }, { status: 400 });
+  await db.delete(schema.priceAlerts).where(and(
+    eq(schema.priceAlerts.id, id),
+    eq(schema.priceAlerts.userId, user.id),
+  ));
+  const alerts = await db.select().from(schema.priceAlerts)
+    .where(eq(schema.priceAlerts.userId, user.id));
+  return NextResponse.json({ ok: true, alerts });
 }

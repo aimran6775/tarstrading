@@ -16,7 +16,10 @@ struct DeskView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var pushed: String?
     @State private var deskRoute: DeskRoute?
-    enum DeskRoute: String, Identifiable { case margin, risk, journal; var id: String { rawValue } }
+    enum DeskRoute: String, Identifiable {
+        case margin, risk, journal, alerts, notifications
+        var id: String { rawValue }
+    }
 
     var body: some View {
         ScrollView {
@@ -32,12 +35,36 @@ struct DeskView: View {
         }
         .background(TarsTheme.bg0)
         .navigationTitle("Desk")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { Haptics.tap(); deskRoute = .notifications } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "bell")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(TarsTheme.inkSecondary)
+                        if session.unreadNotifications > 0 {
+                            Text(session.unreadNotifications > 9 ? "9+" : "\(session.unreadNotifications)")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(TarsTheme.onFill)
+                                .padding(.horizontal, 4).padding(.vertical, 1)
+                                .background(Capsule().fill(TarsTheme.paperBadge))
+                                .offset(x: 9, y: -6)
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(session.unreadNotifications > 0
+                    ? "Notifications, \(session.unreadNotifications) unread" : "Notifications")
+            }
+        }
         .navigationDestination(item: $pushed) { MarketSymbolView(symbol: $0) }
         .navigationDestination(item: $deskRoute) { route in
             switch route {
             case .margin: MarginDeskView()
             case .risk: RiskDeskView()
             case .journal: DeskJournalView()
+            case .alerts: DeskAlertsView()
+            case .notifications: NotificationsView()
             }
         }
         .refreshable {
@@ -73,6 +100,7 @@ struct DeskView: View {
             deskLink("Margin", "scalemass.fill", .margin)
             deskLink("Risk", "waveform.path.ecg", .risk)
             deskLink("Journal", "book.closed.fill", .journal)
+            deskLink("Alerts", "bell.fill", .alerts)
         }
     }
 

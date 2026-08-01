@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A7F04E19196D88D52E708AD4 /* DeskAlertsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E8F2F60706F9ACA2DBED56 /* DeskAlertsView.swift */; };
+		9063A477FA4930B9CA2F2FBF /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A1A2DD5B17B25B11AD3B33 /* NotificationsView.swift */; };
 		4D713FE3F3B8B8861E6F25A1 /* DeskJournalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E346FFE2646BB4C5EFBB9FE /* DeskJournalView.swift */; };
 		040AFD5F3C754715C8A5137A /* RiskDeskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83C5DB3A4595C8744E057AD7 /* RiskDeskView.swift */; };
 		4D9475ECBF45FC62E3A80DF5 /* MarginDeskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8E8DCF4A73406ACA023B41D /* MarginDeskView.swift */; };
@@ -125,6 +127,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		34E8F2F60706F9ACA2DBED56 /* DeskAlertsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskAlertsView.swift; sourceTree = "<group>"; };
+		57A1A2DD5B17B25B11AD3B33 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		0E346FFE2646BB4C5EFBB9FE /* DeskJournalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskJournalView.swift; sourceTree = "<group>"; };
 		83C5DB3A4595C8744E057AD7 /* RiskDeskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RiskDeskView.swift; sourceTree = "<group>"; };
 		E8E8DCF4A73406ACA023B41D /* MarginDeskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarginDeskView.swift; sourceTree = "<group>"; };
@@ -238,6 +242,8 @@
 		8183E1507241A3C837E47A23 /* Markets */ = {
 			isa = PBXGroup;
 			children = (
+				34E8F2F60706F9ACA2DBED56 /* DeskAlertsView.swift */,
+				57A1A2DD5B17B25B11AD3B33 /* NotificationsView.swift */,
 				0E346FFE2646BB4C5EFBB9FE /* DeskJournalView.swift */,
 				83C5DB3A4595C8744E057AD7 /* RiskDeskView.swift */,
 				E8E8DCF4A73406ACA023B41D /* MarginDeskView.swift */,
@@ -735,6 +741,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A7F04E19196D88D52E708AD4 /* DeskAlertsView.swift in Sources */,
+				9063A477FA4930B9CA2F2FBF /* NotificationsView.swift in Sources */,
 				4D713FE3F3B8B8861E6F25A1 /* DeskJournalView.swift in Sources */,
 				040AFD5F3C754715C8A5137A /* RiskDeskView.swift in Sources */,
 				4D9475ECBF45FC62E3A80DF5 /* MarginDeskView.swift in Sources */,
