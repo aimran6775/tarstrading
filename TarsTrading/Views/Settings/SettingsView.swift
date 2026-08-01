@@ -96,26 +96,23 @@ public struct SettingsView: View {
 
                 Divider().overlay(TarsTheme.hairline)
 
-                HStack(alignment: .top, spacing: TarsTheme.Space.m) {
-                    Image(systemName: "moon.fill")
-                        .font(TarsTheme.Text.body)
-                        .foregroundStyle(TarsTheme.inkSecondary)
-                        .frame(width: 22)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Appearance")
-                            .font(TarsTheme.Text.body)
-                            .foregroundStyle(TarsTheme.inkPrimary)
-                        Text("Light mode ships the day it can be shipped proudly. That day is not today.")
-                            .font(TarsTheme.Text.caption)
-                            .foregroundStyle(TarsTheme.inkTertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer()
-                    Text("Dark, by design")
+                VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
+                    Text("Theme")
                         .font(TarsTheme.Text.caption)
                         .foregroundStyle(TarsTheme.inkSecondary)
+                    SlidingCapsulePicker(options: Array(PreferencesStore.Appearance.allCases),
+                                         selection: $prefs.appearance) { mode, selected in
+                        Text(mode.rawValue)
+                            .font(TarsTheme.Text.caption)
+                            .foregroundStyle(selected ? TarsTheme.inkPrimary : TarsTheme.inkSecondary)
+                    }
+                    .accessibilityLabel("Theme")
+                    .onChange(of: prefs.appearance) { _, _ in Haptics.tick() }
+                    Text("Dark is the desk's native world. Light is for daylight and for reading — the market scene stays dark in both, because footage under a white scrim is fog.")
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(TarsTheme.inkTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .accessibilityElement(children: .combine)
 
                 SettingsToggleRow(icon: "speaker.wave.2.fill", title: "Sound",
                                   subtitle: "Short cues for fills, alerts, and achievements.",

@@ -16,7 +16,12 @@ struct AnalystFloorView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: TarsTheme.Space.l) {
                 summary
-                ForEach(model.analysts) { a in card(a) }
+                ForEach(model.working) { a in card(a) }
+                if !model.retired.isEmpty {
+                    TarsMicroLabel("Retired")
+                        .padding(.top, TarsTheme.Space.s)
+                    ForEach(model.retired) { a in card(a).opacity(0.72) }
+                }
                 if model.analysts.isEmpty && model.loaded { empty }
                 Text("Analysts trade stocks, ETFs and crypto. FX and futures are deliberately out of reach — the rule engine can't roll a contract or reason about a pair's quote currency, and an analyst that mis-sizes those is worse than one that declines them.")
                     .font(TarsTheme.Text.micro)
@@ -92,6 +97,7 @@ struct AnalystFloorView: View {
                          + " sleeve · \(Int(a.maxDrawdown * 100))% max drawdown")
                         .font(TarsTheme.Text.micro.monospacedDigit())
                         .foregroundStyle(TarsTheme.inkTertiary)
+                        .lineLimit(1).minimumScaleFactor(0.8)
                 }
                 Spacer()
                 statusChip(a.status)
@@ -177,6 +183,9 @@ final class AnalystFloorModel {
         analysts.filter { $0.status == "running" || $0.status == "paused" }
             .reduce(0) { $0 + ($1.pnl ?? 0) }
     }
+    /// The live floor, and the graveyard — separated, because a retired
+    /// analyst's record is history, not a running position.
+    var working: [APIAnalyst] { analysts.filter { $0.status != "killed" } }
     var retired: [APIAnalyst] { analysts.filter { $0.status == "killed" } }
     var retiredPnl: Double { retired.reduce(0) { $0 + ($1.pnl ?? 0) } }
     var retiredCount: Int { retired.count }

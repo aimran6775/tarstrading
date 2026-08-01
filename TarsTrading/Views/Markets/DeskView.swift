@@ -17,6 +17,8 @@ struct DeskView: View {
     @State private var pushed: String?
     @State private var deskRoute: DeskRoute?
     @State private var heroDocked = false
+    /// Set by the scroll reader so the docked number can fly you home.
+    @State private var scrollTop: (() -> Void)?
     @Environment(\.dynamicTypeSize) private var typeSize
     enum DeskRoute: String, Identifiable {
         case margin, risk, journal, alerts, notifications, floor
@@ -33,8 +35,10 @@ struct DeskView: View {
             .overlay(alignment: .bottom) {
                 if heroDocked { Divider().overlay(TarsTheme.hairline) }
             }
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(spacing: 0) {
+            Color.clear.frame(height: 0).id("top")
             /*
               The dock sentinel lives OUTSIDE the lazy container: a lazy
               stack recycles far-offscreen children, and a recycled
@@ -58,6 +62,10 @@ struct DeskView: View {
             // Clear the floating tab bar — the last card must be readable.
             .padding(.bottom, 72)
             }
+        }
+        .onAppear {
+            scrollTop = { proxy.scrollTo("top", anchor: .top) }
+        }
         }
         .coordinateSpace(name: "deskScroll")
         .onPreferenceChange(HeroOffsetKey.self) { minY in
@@ -116,11 +124,18 @@ struct DeskView: View {
             // here small — your equity is never off screen (Robinhood's
             // collapse-into-the-bar, without renting Apple's nav bar).
             if heroDocked, let risk = session.risk {
-                Text(risk.equity, format: .currency(code: "USD").precision(.fractionLength(0)))
-                    .font(TarsTheme.Text.body.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(TarsTheme.inkSecondary)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                    .padding(.leading, TarsTheme.Space.s)
+                Button {
+                    Haptics.tap()
+                    withAnimation(.snappy) { scrollTop?() }
+                } label: {
+                    Text(risk.equity, format: .currency(code: "USD").precision(.fractionLength(0)))
+                        .font(TarsTheme.Text.body.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(TarsTheme.inkSecondary)
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .padding(.leading, TarsTheme.Space.s)
+                .accessibilityLabel("Back to top")
             }
             Spacer()
             Button { Haptics.tap(); deskRoute = .notifications } label: {
@@ -149,12 +164,15 @@ struct DeskView: View {
     /// The machinery behind the number: how it's margined, what it risks,
     /// what it has already taught you.
     private var deskLinks: some View {
-        HStack(spacing: TarsTheme.Space.m) {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: TarsTheme.Space.m) {
             deskLink("Margin", "scalemass", .margin)
             deskLink("Risk", "waveform.path.ecg", .risk)
             deskLink("Journal", "book.closed", .journal)
             deskLink("Alerts", "bell", .alerts)
             deskLink("Floor", "person.3", .floor)
+            deskLink("Alerts feed", "bell.badge", .notifications)
+            }
         }
     }
 
@@ -168,7 +186,7 @@ struct DeskView: View {
                     .font(TarsTheme.Text.caption.weight(.medium))
                     .foregroundStyle(TarsTheme.inkSecondary)
             }
-            .frame(maxWidth: .infinity, minHeight: 64)
+            .frame(width: 96, height: 64)
             .background(TarsTheme.bg1)
             .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
@@ -197,13 +215,13 @@ struct DeskView: View {
                         .font(TarsTheme.Text.caption.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.72))
                     Spacer()
-                    HStack(spacing: 6) {
-                        Circle().fill(TarsTheme.gain).frame(width: 6, height: 6)
-                            .opacity(0.9)
-                        Text("SIMULATED · LIVE BOOK")
+                    HStack(spacing: 5) {
+                        Circle().fill(TarsTheme.gain).frame(width: 5, height: 5)
+                        Text("LIVE BOOK")
                             .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .kerning(1.2)
+                            .kerning(1.0)
                             .foregroundStyle(.white.opacity(0.55))
+                            .lineLimit(1)
                     }
                 }
                 .padding(.horizontal, TarsTheme.Space.l)
@@ -214,7 +232,7 @@ struct DeskView: View {
                 // The monument: ghosted EQUITY behind the count-up.
                 ZStack {
                     Text("EQUITY")
-                        .font(Font.system(size: 92, weight: .black).width(.condensed))
+                        .font(Font.system(size: 76, weight: .black).width(.condensed))
                         .kerning(4)
                         .foregroundStyle(.white.opacity(0.06))
                         .lineLimit(1).minimumScaleFactor(0.5)
@@ -279,7 +297,7 @@ struct DeskView: View {
                     }
                     if model.curve.count > 1 {
                         SparkPath(values: model.curve.map(\.equity), tone: TarsTheme.accent)
-                            .frame(height: 44)
+                            .frame(height: 32)
                     } else {
                         Text("Your equity curve draws itself as you trade.")
                             .font(TarsTheme.Text.micro)
@@ -292,10 +310,13 @@ struct DeskView: View {
                 .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
                     .strokeBorder(.white.opacity(0.10), lineWidth: 1))
-                .padding(TarsTheme.Space.l)
+                .padding(.horizontal, TarsTheme.Space.l)
+                .padding(.bottom, TarsTheme.Space.l)
             }
         }
-        .frame(minHeight: 360)
+        // The scene is the room's mood, not the whole room — capped so
+        // positions (the reason you opened this tab) clear the fold.
+        .frame(height: 300)
         .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
             .strokeBorder(TarsTheme.hairline, lineWidth: 1))
@@ -317,7 +338,7 @@ struct DeskView: View {
                 }
             }
             .font(TarsTheme.Text.micro)
-            .foregroundStyle(TarsTheme.inkQuaternary)
+            .foregroundStyle(TarsTheme.inkTertiary)
         }
     }
 
@@ -371,11 +392,20 @@ struct DeskView: View {
                         .animation(.snappy, value: value)
                 }
                 if let pnl {
-                    Text("\(pnl >= 0 ? "+" : "")\(pnl, format: .currency(code: "USD"))")
-                        .font(TarsTheme.Text.caption.monospacedDigit())
-                        .foregroundStyle(pnl > 0 ? TarsTheme.gain : pnl < 0 ? TarsTheme.loss : TarsTheme.inkTertiary)
-                        .contentTransition(.numericText())
-                        .animation(.snappy, value: pnl)
+                    HStack(spacing: 5) {
+                        Text("\(pnl >= 0 ? "+" : "")\(pnl, format: .currency(code: "USD"))")
+                            .contentTransition(.numericText())
+                            .animation(.snappy, value: pnl)
+                        // Against cost, not against yesterday — this is the
+                        // return on YOUR entry, which is what you feel.
+                        if p.avgEntryPrice > 0, let px {
+                            let ret = (px / p.avgEntryPrice - 1) * (p.qty < 0 ? -1 : 1)
+                            Text("(\(ret > 0 ? "+" : "")\(ret * 100, specifier: "%.2f")%)")
+                                .foregroundStyle(TarsTheme.inkTertiary)
+                        }
+                    }
+                    .font(TarsTheme.Text.caption.monospacedDigit())
+                    .foregroundStyle(pnl > 0 ? TarsTheme.gain : pnl < 0 ? TarsTheme.loss : TarsTheme.inkTertiary)
                 }
             }
         }
@@ -416,11 +446,9 @@ struct DeskView: View {
                 statusChip(o.status)
             }
             HStack(spacing: TarsTheme.Space.m) {
-                if let f = o.filledPrice {
-                    Text("at \(SymbolDisplay.price(o.symbol, f))")
-                        .font(TarsTheme.Text.micro.monospacedDigit())
-                        .foregroundStyle(TarsTheme.inkTertiary)
-                }
+                Text(o.filledPrice.map { "at \(SymbolDisplay.price(o.symbol, $0))" } ?? "never filled")
+                    .font(TarsTheme.Text.micro.monospacedDigit())
+                    .foregroundStyle(o.filledPrice == nil ? TarsTheme.inkQuaternary : TarsTheme.inkTertiary)
                 Text(Date(timeIntervalSince1970: o.createdAt / 1000),
                      format: .dateTime.month(.abbreviated).day().hour().minute())
                     .font(TarsTheme.Text.micro)

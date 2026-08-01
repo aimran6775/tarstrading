@@ -25,7 +25,25 @@ final class PreferencesStore {
         didSet { UserDefaults.standard.set(forceDark, forKey: "forceDark") }
     }
 
-    var colorScheme: ColorScheme? { .dark }
+    /// The app's world: follow the system, or commit to one.
+    enum Appearance: String, CaseIterable, Identifiable {
+        case system = "System", light = "Light", dark = "Dark"
+        var id: String { rawValue }
+        var scheme: ColorScheme? {
+            switch self {
+            case .system: nil
+            case .light: .light
+            case .dark: .dark
+            }
+        }
+    }
+
+    var appearance: Appearance {
+        get { Appearance(rawValue: UserDefaults.standard.string(forKey: "prefs.appearance") ?? "") ?? .dark }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "prefs.appearance") }
+    }
+
+    var colorScheme: ColorScheme? { appearance.scheme }
 
     init() {
         let d = UserDefaults.standard

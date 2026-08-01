@@ -209,6 +209,7 @@ struct MarketsHomeView: View {
         }
         .frame(maxWidth: .infinity, alignment: .top)
         .contentShape(Rectangle())
+        .onTapGesture { Haptics.tap(); open(sym) }
         .contextMenu {
             Button { open(sym) } label: {
                 Label("Open market", systemImage: "chart.xyaxis.line")
@@ -294,6 +295,13 @@ struct MarketsHomeView: View {
                                             .foregroundStyle(TarsTheme.inkSecondary)
                                     }
                                     ChangeText(r.changePercent)
+                                    Group {
+                                        if let series = model.sparks[r.symbol], series.count > 1 {
+                                            SparkPath(values: series,
+                                                      tone: (r.changePercent ?? 0) >= 0 ? TarsTheme.gain : TarsTheme.loss)
+                                        } else { Color.clear }
+                                    }
+                                    .frame(height: 12)
                                 }
                                 .frame(width: 104, alignment: .leading)
                                 .padding(TarsTheme.Space.m)
@@ -373,6 +381,12 @@ struct MarketsHomeView: View {
                                                 provenance: row.source)
                         }
                     Divider().overlay(TarsTheme.hairline)
+                }
+                if !query.isEmpty, !visibleRows.isEmpty {
+                    Text("\(visibleRows.count) of \(model.rows.count) in this room")
+                        .font(TarsTheme.Text.micro)
+                        .foregroundStyle(TarsTheme.inkQuaternary)
+                        .padding(.bottom, TarsTheme.Space.s)
                 }
                 if visibleRows.isEmpty && !query.isEmpty {
                     Text("Nothing here matches \"\(query)\".")

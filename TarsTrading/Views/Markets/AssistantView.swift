@@ -12,20 +12,57 @@ import SwiftUI
 struct AssistantView: View {
     @State private var model = AssistantModel()
     @State private var draft = ""
+    @State private var showStarters = false
+    @State private var pulse = false
     @FocusState private var writing: Bool
 
     var body: some View {
-        transcript
+        VStack(spacing: 0) {
+            header
+            transcript
+        }
             .background(TarsTheme.bg0)
             // The composer rides the safe area so the keyboard and the tab bar
             // both move it correctly, instead of a VStack fighting them.
             .safeAreaInset(edge: .bottom) { composer }
-            .navigationTitle("Assistant")
-            .navigationBarTitleDisplayMode(.inline)
-            // Without an opaque bar the transcript reads THROUGH the title.
-            .toolbarBackground(TarsTheme.bg0, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
             .task { if model.messages.isEmpty { await model.load() } }
+    }
+
+    /// The screen owns its header, like Markets and Desk — and it says
+    /// WHO you're talking to, not just what the screen is called.
+    private var header: some View {
+        HStack(alignment: .center, spacing: TarsTheme.Space.m) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Your desk manager")
+                    .font(TarsTheme.Text.screenTitle)
+                    .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Text("Reads your book · can hire and retire analysts")
+                    .font(TarsTheme.Text.micro)
+                    .foregroundStyle(TarsTheme.inkTertiary)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+            }
+            Spacer()
+            if !model.messages.isEmpty {
+                Button {
+                    Haptics.tap()
+                    showStarters = true
+                } label: {
+                    Image(systemName: "lightbulb")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(TarsTheme.inkSecondary)
+                        .frame(width: 40, height: 40)
+                        .background(Circle().fill(TarsTheme.bg1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Suggested questions")
+            }
+        }
+        .padding(.horizontal, TarsTheme.Space.l)
+        .padding(.top, TarsTheme.Space.s)
+        .padding(.bottom, TarsTheme.Space.m)
+        .background(TarsTheme.bg0)
     }
 
     private var transcript: some View {
@@ -39,12 +76,20 @@ struct AssistantView: View {
                         bubble(m).id(m.id)
                     }
                     if model.thinking {
-                        HStack(spacing: 6) {
-                            ProgressView().tint(TarsTheme.inkTertiary).scaleEffect(0.7)
+                        HStack(spacing: 5) {
+                            ForEach(0..<3, id: \.self) { i in
+                                Circle().fill(TarsTheme.inkTertiary)
+                                    .frame(width: 6, height: 6)
+                                    .opacity(pulse ? 1 : 0.25)
+                                    .animation(.easeInOut(duration: 0.6)
+                                        .repeatForever().delay(Double(i) * 0.18), value: pulse)
+                            }
                             Text("Reading your book…")
                                 .font(TarsTheme.Text.micro)
                                 .foregroundStyle(TarsTheme.inkTertiary)
+                                .padding(.leading, 4)
                         }
+                        .onAppear { pulse = true }
                         .padding(.horizontal, TarsTheme.Space.l)
                         .id("thinking")
                     }
@@ -57,6 +102,11 @@ struct AssistantView: View {
             }
             .onChange(of: model.thinking) { _, on in
                 if on { withAnimation { proxy.scrollTo("thinking", anchor: .bottom) } }
+            }
+            .sheet(isPresented: $showStarters) {
+                startersSheet
+                    .presentationDetents([.height(320)])
+                    .presentationBackground(TarsTheme.bg1)
             }
         }
     }
@@ -97,8 +147,8 @@ struct AssistantView: View {
 
     private func bubble(_ m: AssistantMessage) -> some View {
         let mine = m.role == "user"
-        return HStack {
-            if mine { Spacer(minLength: 48) }
+        return HStack(alignment: .bottom, spacing: 6) {
+            if mine { Spacer(minLength: 56) }
             Text(m.text)
                 .font(TarsTheme.Text.body)
                 .foregroundStyle(TarsTheme.inkPrimary)
@@ -109,9 +159,47 @@ struct AssistantView: View {
                 .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
                     .strokeBorder(mine ? TarsTheme.accent.opacity(0.35) : .clear, lineWidth: 1))
-            if !mine { Spacer(minLength: 48) }
+            if !mine { Spacer(minLength: 56) }
         }
         .padding(.horizontal, TarsTheme.Space.l)
+        .overlay(alignment: mine ? .bottomTrailing : .bottomLeading) {
+            if let t = m.createdAt {
+                Text(Date(timeIntervalSince1970: t / 1000), style: .time)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(TarsTheme.inkQuaternary)
+                    .padding(.horizontal, TarsTheme.Space.l)
+                    .offset(y: 11)
+            }
+        }
+        .padding(.bottom, m.createdAt != nil ? 12 : 0)
+    }
+
+    /// The starters, on demand — a beginner's way back in when the
+    /// transcript has scrolled past the point of knowing what to ask.
+    private var startersSheet: some View {
+        VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
+            Text("Ask your desk")
+                .font(TarsTheme.Text.title)
+                .foregroundStyle(TarsTheme.inkPrimary)
+            ForEach(Self.starters, id: \.self) { s in
+                Button {
+                    showStarters = false
+                    Haptics.tap()
+                    Task { await model.send(s) }
+                } label: {
+                    Text(s)
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(TarsTheme.inkPrimary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(TarsTheme.Space.m)
+                        .background(TarsTheme.bg2)
+                        .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+        .padding(TarsTheme.Space.xl)
     }
 
     private var composer: some View {

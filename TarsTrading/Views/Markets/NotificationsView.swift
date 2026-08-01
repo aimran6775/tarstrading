@@ -67,7 +67,6 @@ struct NotificationsView: View {
                 }
             }
         }
-        .tarsPanel()
     }
 
     private func row(_ n: APINotification) -> some View {
@@ -85,8 +84,8 @@ struct NotificationsView: View {
                         .foregroundStyle(TarsTheme.inkTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Text(Date(timeIntervalSince1970: n.createdAt / 1000), style: .relative)
-                    .font(TarsTheme.Text.micro)
+                Text(Self.age(n.createdAt))
+                    .font(TarsTheme.Text.micro.monospacedDigit())
                     .foregroundStyle(TarsTheme.inkQuaternary)
             }
             Spacer()
@@ -96,9 +95,18 @@ struct NotificationsView: View {
                     .accessibilityLabel("Unread")
             }
         }
-        .padding(TarsTheme.Space.l)
+        .padding(.vertical, TarsTheme.Space.m)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+
+    /// "15 hr, 48 min" is a stopwatch reading. A feed wants "15h".
+    static func age(_ epochMs: Double) -> String {
+        let secs = max(0, Date().timeIntervalSince1970 - epochMs / 1000)
+        if secs < 60 { return "now" }
+        if secs < 3600 { return "\(Int(secs / 60))m" }
+        if secs < 86_400 { return "\(Int(secs / 3600))h" }
+        return "\(Int(secs / 86_400))d"
     }
 
     private func icon(_ kind: String) -> String {

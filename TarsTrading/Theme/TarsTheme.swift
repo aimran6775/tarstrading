@@ -12,38 +12,54 @@ import SwiftUI
 /// - Wide gamut: all color is authored in Display P3.
 enum TarsTheme {
 
-    // MARK: Surfaces (dark-first, 4 elevation levels, P3, violet-tinted rise)
-    static let bg0 = Color(.displayP3, red: 0.027, green: 0.031, blue: 0.051)  // void — app background
-    static let bg1 = Color(.displayP3, red: 0.051, green: 0.059, blue: 0.092)  // panel
-    static let bg2 = Color(.displayP3, red: 0.082, green: 0.094, blue: 0.139)  // card
-    static let bg3 = Color(.displayP3, red: 0.122, green: 0.137, blue: 0.196)  // raised control
+    /// Every surface and ink token is a PAIR: the dark world we designed
+    /// first, and a light one that keeps the same relationships. Built
+    /// with UIColor's dynamic provider so a theme switch needs no view to
+    /// know it happened.
+    private static func dyn(dark: (Double, Double, Double),
+                            light: (Double, Double, Double)) -> Color {
+        Color(uiColor: UIColor { trait in
+            let c = trait.userInterfaceStyle == .light ? light : dark
+            return UIColor(displayP3Red: c.0, green: c.1, blue: c.2, alpha: 1)
+        })
+    }
+
+    private static func dynA(darkWhite: Double, lightBlack: Double) -> Color {
+        Color(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .light
+                ? UIColor(white: 0, alpha: lightBlack)
+                : UIColor(white: 1, alpha: darkWhite)
+        })
+    }
+
+    // MARK: Surfaces — 4 elevation steps. Dark rises toward light; light
+    // sinks toward gray, so "elevated" still reads as nearer in both.
+    static let bg0 = dyn(dark: (0.027, 0.031, 0.051), light: (0.988, 0.988, 0.992))
+    static let bg1 = dyn(dark: (0.051, 0.059, 0.092), light: (1.0, 1.0, 1.0))
+    static let bg2 = dyn(dark: (0.082, 0.094, 0.139), light: (0.957, 0.960, 0.972))
+    static let bg3 = dyn(dark: (0.122, 0.137, 0.196), light: (0.918, 0.925, 0.945))
 
     // MARK: Ink
-    static let inkPrimary = Color(.displayP3, red: 0.925, green: 0.937, blue: 0.965)
-    static let inkSecondary = Color(.displayP3, red: 0.60, green: 0.63, blue: 0.71)
-    static let inkTertiary = Color(.displayP3, red: 0.40, green: 0.43, blue: 0.51)
-    static let inkQuaternary = Color(.displayP3, red: 0.27, green: 0.29, blue: 0.36)
-    /// Text/glyphs sitting ON a meaning-colored fill (gain/loss/accent
-    /// buttons, badges). Defined once so on-color contrast has one source.
-    static let onFill = bg0
-    static let hairline = Color.white.opacity(0.07)
-    /// Stronger hairline for Increase Contrast contexts and focused states.
-    static let hairlineStrong = Color.white.opacity(0.16)
+    static let inkPrimary = dyn(dark: (0.925, 0.937, 0.965), light: (0.075, 0.086, 0.125))
+    static let inkSecondary = dyn(dark: (0.60, 0.63, 0.71), light: (0.32, 0.35, 0.42))
+    static let inkTertiary = dyn(dark: (0.40, 0.43, 0.51), light: (0.47, 0.50, 0.57))
+    static let inkQuaternary = dyn(dark: (0.27, 0.29, 0.36), light: (0.60, 0.63, 0.69))
+    /// Text/glyphs sitting ON a meaning-colored fill. Dark ink on gold or
+    /// green reads in both worlds; white would vanish on light gold.
+    static let onFill = Color(.displayP3, red: 0.027, green: 0.031, blue: 0.051)
+    static let hairline = dynA(darkWhite: 0.07, lightBlack: 0.09)
+    static let hairlineStrong = dynA(darkWhite: 0.16, lightBlack: 0.20)
 
     // MARK: Meaning colors — color is reserved for meaning
-    // Luminance-tuned so red/green don't vibrate against the near-black field,
-    // and differ in luminance (not just hue) for color-blind safety.
-    static let gain = Color(.displayP3, red: 0.22, green: 0.82, blue: 0.53)      // P&L up
-    static let loss = Color(.displayP3, red: 0.95, green: 0.39, blue: 0.44)      // P&L down
+    // Light variants are darker: the dark-tuned gold is illegible on white.
+    static let gain = dyn(dark: (0.22, 0.82, 0.53), light: (0.05, 0.55, 0.33))
+    static let loss = dyn(dark: (0.95, 0.39, 0.44), light: (0.78, 0.13, 0.20))
     /// THE accent. Brand = capital = action: interactive tint, selection,
-    /// and the paper mark are all this gold — Kalshi's move (their brand
-    /// green IS their profit green): one saturated voice, not a choir.
-    /// The old interactive blue is dead; blue was how the app leaked
-    /// "iOS template" from its own token file.
-    static let accent = Color(.displayP3, red: 1.0, green: 0.72, blue: 0.20)
+    /// and the paper mark are all this gold — one saturated voice.
+    static let accent = dyn(dark: (1.0, 0.72, 0.20), light: (0.70, 0.46, 0.02))
     static let paperBadge = accent // mode amber — same gold, one voice
-    static let warning = Color(.displayP3, red: 1.0, green: 0.62, blue: 0.26)
-    static let agentPurple = Color(.displayP3, red: 0.66, green: 0.50, blue: 1.0) // agent activity
+    static let warning = dyn(dark: (1.0, 0.62, 0.26), light: (0.72, 0.38, 0.02))
+    static let agentPurple = dyn(dark: (0.66, 0.50, 1.0), light: (0.42, 0.26, 0.78))
 
     /// Signed value → meaning color; zero stays neutral.
     static func pnl(_ value: Double) -> Color {
@@ -74,7 +90,7 @@ enum TarsTheme {
     /// The top-light: raised surfaces catch light on their upper edge. This is
     /// how depth reads on near-black, where shadows barely work.
     static let topLight = LinearGradient(
-        colors: [.white.opacity(0.10), .white.opacity(0.03)],
+        colors: [hairlineStrong, hairline],
         startPoint: .top, endPoint: .bottom)
 
     /// The whole-workspace mood light: a barely-there wash that leans gain or

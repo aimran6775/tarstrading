@@ -43,13 +43,13 @@ struct SceneVideoBackdrop: View {
             RadialGradient(
                 colors: [.clear, Color(.displayP3, red: 0.04, green: 0.045, blue: 0.075).opacity(0.42)],
                 center: .init(x: 0.5, y: 0.45), startRadius: 60, endRadius: 420)
-            // Boundary: fade the bottom edge into the page background.
-            VStack {
-                Spacer()
-                LinearGradient(colors: [.clear, TarsTheme.bg0],
-                               startPoint: .top, endPoint: .bottom)
-                    .frame(height: 72)
-            }
+            /*
+              The web's hero is full-bleed, so it fades into the page. Ours
+              is a CONTAINED card with its own clipped corners — a handoff
+              gradient here just hazes the footage, and in light mode it
+              washed the bottom third white. The card's edge is the
+              boundary; it needs no help.
+            */
         }
         .accessibilityHidden(true)
     }
