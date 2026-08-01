@@ -13,10 +13,36 @@ struct TradeTicketSheet: View {
     let symbol: String
     let side: String              // "buy" | "sell"
     let quote: APIQuote?
+    /// Pre-sized entry — closing a position isn't a guess about size.
+    var presetQty: Double? = nil
+    var closing: Bool = false
     @Environment(SessionStore.self) private var session
     @Environment(\.dismiss) private var dismiss
 
     @State private var qty: Double = 1
+    /// The order types the server has always supported and the phone never
+    /// offered: market takes the touch, limit names your price, stop names
+    /// your trigger.
+    @State private var orderType: OrderType = .market
+    @State private var priceField = ""
+    enum OrderType: String, CaseIterable, Identifiable {
+        case market = "Market", limit = "Limit", stop = "Stop"
+        var id: String { rawValue }
+        var wire: String {
+            switch self {
+            case .market: "market"
+            case .limit: "limit"
+            case .stop: "stop"
+            }
+        }
+        var note: String {
+            switch self {
+            case .market: "Fills now, at whatever the market is."
+            case .limit: "Fills only at your price or better. It may never fill."
+            case .stop: "Rests until the market trades through your trigger, then goes to market."
+            }
+        }
+    }
     @State private var preview: MarginPreview?
     @State private var bracket = false
     @State private var takeProfit = ""
@@ -39,8 +65,11 @@ struct TradeTicketSheet: View {
 
             ZStack {
                 VStack(spacing: 3) {
-                    TarsMicroLabel(isFutures ? "Futures market order" : "Market order")
-                    Text("\(isBuy ? "Buy" : "Sell") \(SymbolDisplay.pretty(symbol))")
+                    TarsMicroLabel(closing ? "Closing the whole position"
+                                   : isFutures ? "Futures \(orderType.rawValue.lowercased()) order"
+                                   : "\(orderType.rawValue) order")
+                    Text(closing ? "Close \(SymbolDisplay.pretty(symbol))"
+                                 : "\(isBuy ? "Buy" : "Sell") \(SymbolDisplay.pretty(symbol))")
                         .font(TarsTheme.Text.title)
                         .foregroundStyle(TarsTheme.inkPrimary)
                 }
@@ -70,7 +99,8 @@ struct TradeTicketSheet: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, TarsTheme.Space.xl)
-        .presentationDetents([.height(isFutures || bracket ? 520 : 400)])
+        .onAppear { if let q = presetQty, qty == 1 { qty = q } }
+        .presentationDetents([.height(isFutures || bracket ? 560 : 460)])
         .presentationDragIndicator(.hidden)
         .presentationBackground(TarsTheme.bg1)
     }
@@ -176,6 +206,54 @@ struct TradeTicketSheet: View {
             .background(TarsTheme.bg2)
             .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
 
+            // Closing is one fixed act; offering order types there would
+            // invite leaving half a position behind.
+            if !closing {
+                VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
+                    HStack(spacing: TarsTheme.Space.s) {
+                        ForEach(OrderType.allCases) { t in
+                            let on = orderType == t
+                            Button {
+                                Haptics.tick(); orderType = t
+                            } label: {
+                                Text(t.rawValue)
+                                    .font(TarsTheme.Text.caption.weight(on ? Font.Weight.bold : Font.Weight.medium))
+                                    .foregroundStyle(on ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
+                                    .frame(maxWidth: .infinity, minHeight: 40)
+                                    .background(on ? TarsTheme.bg3 : TarsTheme.bg1)
+                                    .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
+                                        .strokeBorder(on ? TarsTheme.hairlineStrong : TarsTheme.hairline, lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    if orderType != .market {
+                        HStack {
+                            Text(orderType == .limit ? "Limit price" : "Stop price")
+                                .font(TarsTheme.Text.caption)
+                                .foregroundStyle(TarsTheme.inkSecondary)
+                            Spacer()
+                            TextField(quote.map { SymbolDisplay.price(symbol, $0.price) } ?? "0.00",
+                                      text: $priceField)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .font(TarsTheme.Text.body.monospacedDigit())
+                                .foregroundStyle(TarsTheme.inkPrimary)
+                        }
+                        .padding(.horizontal, TarsTheme.Space.l)
+                        .frame(minHeight: 44)
+                        .background(TarsTheme.bg2)
+                        .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+                    }
+                    Text(orderType.note)
+                        .font(TarsTheme.Text.micro)
+                        .foregroundStyle(TarsTheme.inkTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, TarsTheme.Space.l)
+            }
+
             if isFutures {
                 futuresMarginBlock
             } else {
@@ -210,6 +288,7 @@ struct TradeTicketSheet: View {
                 label: "Hold to \(isBuy ? "buy" : "sell")",
                 tone: isBuy ? TarsTheme.paperBadge : TarsTheme.loss,
                 enabled: phase == .compose && quote != nil
+                    && (orderType == .market || closing || (Double(priceField) ?? 0) > 0)
             ) { submit() }
 
             Text(isFutures
@@ -280,6 +359,9 @@ struct TradeTicketSheet: View {
             do {
                 let o = try await TarsAPIClient.shared.placeOrder(
                     symbol: symbol, side: side, qty: qty,
+                    type: closing ? "market" : orderType.wire,
+                    limitPrice: orderType == .limit ? Double(priceField) : nil,
+                    stopPrice: orderType == .stop ? Double(priceField) : nil,
                     takeProfit: bracket ? Double(takeProfit) : nil,
                     stopLoss: bracket ? Double(stopLoss) : nil)
                 if o.status == "rejected" {

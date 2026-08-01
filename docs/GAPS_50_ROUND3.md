@@ -129,3 +129,15 @@ profile catalog (182). Searching "NOVO" finds nothing because Novo
 Nordisk is in the app's catalog but not the web's. Merging the two into
 one server-side source is the right fix and is NOT done — items 4, 6 and
 the catalog merge remain open, along with 7–50.
+
+## Capability wave (items 8, 16, 23, 24, 33)
+
+Shipped: watchlist (star on the symbol page, Watch in every long-press
+menu, a "Watching" room first in the venue tabs, state shared with the
+web through the same endpoint); limit and stop orders with their plain
+explanations; order CANCEL on working orders (button and swipe); CLOSE
+POSITION from both the symbol page and a Desk swipe, pre-sized to the
+whole position so it can't leave a remainder behind.
+
+All five were already supported by the server and exposed on the web —
+this was the phone catching up, not new platform capability.

@@ -51,6 +51,24 @@ final class SessionStore {
         }
     }
 
+    /// Optimistic star: flip locally, then let the server confirm. A
+    /// failed call restores the truth rather than leaving a lie on screen.
+    func toggleWatch(_ symbol: String) async {
+        let wasWatching = watchlist.contains(symbol)
+        if wasWatching { watchlist.removeAll { $0 == symbol } }
+        else { watchlist.append(symbol) }
+        do {
+            watchlist = wasWatching
+                ? try await api.removeFromWatchlist(symbol)
+                : try await api.addToWatchlist(symbol)
+        } catch {
+            if wasWatching { watchlist.append(symbol) }
+            else { watchlist.removeAll { $0 == symbol } }
+        }
+    }
+
+    func isWatching(_ symbol: String) -> Bool { watchlist.contains(symbol) }
+
     func signOut() async {
         await api.signOut()
         user = nil; risk = nil; rates = nil

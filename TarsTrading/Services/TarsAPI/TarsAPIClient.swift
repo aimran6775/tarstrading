@@ -140,6 +140,27 @@ actor TarsAPIClient {
 
 extension TarsAPIClient {
     /// The curated board — Trending by default, or one venue's own page.
+    // MARK: Watchlist — the markets you keep an eye on
+    private struct SymbolBody: Encodable { let symbol: String }
+
+    func addToWatchlist(_ symbol: String) async throws -> [String] {
+        let res: WatchlistResponse = try await request(
+            "POST", "/api/watchlist", body: SymbolBody(symbol: symbol))
+        return res.watchlist
+    }
+
+    func removeFromWatchlist(_ symbol: String) async throws -> [String] {
+        let res: WatchlistResponse = try await request(
+            "DELETE", "/api/watchlist", body: SymbolBody(symbol: symbol))
+        return res.watchlist
+    }
+
+    /// Cancel a working order. The server owns the race: an order that
+    /// filled a moment ago refuses politely rather than double-acting.
+    func cancelOrder(id: String) async throws {
+        let _: EmptyOK = try await request("DELETE", "/api/orders/\(id)")
+    }
+
     /// Search the WHOLE desk, not the screenful we happen to hold. The
     /// board caps at a few hundred rows; without this, a market at row
     /// 400 of Global reads as "doesn't exist".
@@ -186,15 +207,22 @@ extension TarsAPIClient {
     /// Place an order on the platform exchange. The SERVER is the whole truth:
     /// margin gate, costs, fills — the app just carries the intent and reads
     /// back the sentence.
+    /// The server has always accepted market, limit, stop, stop_limit and
+    /// trailing_stop; the phone only ever sent "market". Now it can say
+    /// what it means.
     func placeOrder(symbol: String, side: String, qty: Double,
+                    type: String = "market",
+                    limitPrice: Double? = nil, stopPrice: Double? = nil,
                     takeProfit: Double? = nil, stopLoss: Double? = nil) async throws -> PlacedOrderPayload {
         struct Body: Encodable {
             let symbol: String; let side: String; let type: String; let qty: Double
+            let limitPrice: Double?; let stopPrice: Double?
             let takeProfit: Double?; let stopLoss: Double?
         }
         let res: PlaceOrderResponse = try await request(
             "POST", "/api/orders",
-            body: Body(symbol: symbol, side: side, type: "market", qty: qty,
+            body: Body(symbol: symbol, side: side, type: type, qty: qty,
+                       limitPrice: limitPrice, stopPrice: stopPrice,
                        takeProfit: takeProfit, stopLoss: stopLoss))
         guard let order = res.order else { throw TarsAPIError.server(res.error ?? "Order failed.") }
         return order

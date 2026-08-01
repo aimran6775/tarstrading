@@ -22,6 +22,7 @@ struct MarketsHomeView: View {
     @State private var pushed: String?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(SessionStore.self) private var session
 
     /// GOOG and GOOGL are the same story wearing two tickers — keep the first.
     private func dedupeClasses(_ rows: [BoardRowPayload]) -> [BoardRowPayload] {
@@ -47,6 +48,11 @@ struct MarketsHomeView: View {
     /// local filter is only the instant first frame while that lands.
     private var visibleRows: [BoardRowPayload] {
         let q = query.trimmingCharacters(in: .whitespaces).uppercased()
+        // The watch room is a filter over the board, not a fetch — the
+        // symbols are already priced by whatever room you came from.
+        if q.isEmpty, model.venue == "__watch" {
+            return model.rows.filter { session.isWatching($0.symbol) }
+        }
         guard !q.isEmpty else { return model.rows }
         if !model.searchRows.isEmpty { return model.searchRows }
         return model.rows.filter {
@@ -337,6 +343,7 @@ struct MarketsHomeView: View {
     private var venueRail: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: TarsTheme.Space.s) {
+                if !session.watchlist.isEmpty { venueChip("__watch", label: "Watching") }
                 venueChip(nil, label: "Trending")
                 ForEach(model.venueNames, id: \.self) { venue in
                     venueChip(venue, label: venue)
@@ -377,6 +384,12 @@ struct MarketsHomeView: View {
                         .contextMenu {
                             Button { open(row.symbol) } label: {
                                 Label("Open market", systemImage: "chart.xyaxis.line")
+                            }
+                            Button {
+                                Task { await session.toggleWatch(row.symbol) }
+                            } label: {
+                                Label(session.isWatching(row.symbol) ? "Stop watching" : "Watch",
+                                      systemImage: session.isWatching(row.symbol) ? "star.slash" : "star")
                             }
                         } preview: {
                             InstrumentExplainer(symbol: row.symbol,
@@ -609,7 +622,10 @@ final class MarketsModel {
         do {
             // 800 covers the largest room (Global, 719) whole — at 250 the
             // app was hiding 469 markets it advertised as listed.
-            let res = try await api.board(category: venue, limit: 800)
+            // "__watch" is a client-side lens over the whole desk, not a
+            // venue the server knows — ask for everything and filter.
+            let ask = venue == "__watch" ? nil : venue
+            let res = try await api.board(category: ask, limit: 800)
             rows = res.rows
             movers = res.movers
             marketOpen = res.marketOpen

@@ -15,6 +15,7 @@ struct MarketSymbolView: View {
     @Environment(SessionStore.self) private var session
     @State private var model: SymbolModel
     @State private var ticketSide: String?
+    @State private var closing: APIPosition?
     @Environment(\.scenePhase) private var scenePhase
 
     init(symbol: String) {
@@ -69,6 +70,13 @@ struct MarketSymbolView: View {
             set: { ticketSide = $0?.side })) { route in
             TradeTicketSheet(symbol: symbol, side: route.side, quote: model.quote)
         }
+        .sheet(item: $closing) { p in
+            TradeTicketSheet(symbol: symbol,
+                             side: p.qty > 0 ? "sell" : "buy",
+                             quote: model.quote,
+                             presetQty: abs(p.qty),
+                             closing: true)
+        }
     }
     private struct TicketRoute: Identifiable { let side: String; var id: String { side } }
     private func tradeButton(_ label: String, side: String, tone: Color) -> some View {
@@ -90,6 +98,7 @@ struct MarketSymbolView: View {
 
     @ViewBuilder private var context: some View {
         VStack(alignment: .leading, spacing: TarsTheme.Space.l) {
+            actionRow
             if let p = session.positions.first(where: { $0.symbol == symbol }) {
                 positionCard(p)
             }
@@ -97,6 +106,48 @@ struct MarketSymbolView: View {
             factsRow
         }
         .padding(.top, TarsTheme.Space.s)
+    }
+
+    /// The star and the exit — two actions the phone was missing entirely
+    /// while the web had both.
+    private var actionRow: some View {
+        HStack(spacing: TarsTheme.Space.m) {
+            Button {
+                Haptics.tap()
+                Task { await session.toggleWatch(symbol) }
+            } label: {
+                Label(session.isWatching(symbol) ? "Watching" : "Watch",
+                      systemImage: session.isWatching(symbol) ? "star.fill" : "star")
+                    .font(TarsTheme.Text.caption.weight(.semibold))
+                    .foregroundStyle(session.isWatching(symbol) ? TarsTheme.accent : TarsTheme.inkSecondary)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(TarsTheme.bg1)
+                    .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
+                        .strokeBorder(session.isWatching(symbol)
+                                      ? TarsTheme.accent.opacity(0.35) : TarsTheme.hairline, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+
+            if let p = session.positions.first(where: { $0.symbol == symbol }) {
+                Button {
+                    Haptics.tap()
+                    // Closing is selling exactly what you hold (or buying
+                    // back exactly what you're short) — never a guess.
+                    closing = p
+                } label: {
+                    Label("Close position", systemImage: "xmark.circle")
+                        .font(TarsTheme.Text.caption.weight(.semibold))
+                        .foregroundStyle(TarsTheme.inkSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(TarsTheme.bg1)
+                        .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
+                            .strokeBorder(TarsTheme.hairline, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     /// Your stake in this market — the number that makes the chart personal.

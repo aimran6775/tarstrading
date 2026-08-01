@@ -19,6 +19,7 @@ struct DeskView: View {
     @State private var heroDocked = false
     /// Set by the scroll reader so the docked number can fly you home.
     @State private var scrollTop: (() -> Void)?
+    @State private var closing: APIPosition?
     @Environment(\.dynamicTypeSize) private var typeSize
     enum DeskRoute: String, Identifiable {
         case margin, risk, journal, alerts, notifications, floor
@@ -79,6 +80,13 @@ struct DeskView: View {
         // it would just be the same fact, smaller and further away.
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $pushed) { MarketSymbolView(symbol: $0) }
+        .sheet(item: $closing) { p in
+            TradeTicketSheet(symbol: p.symbol,
+                             side: p.qty > 0 ? "sell" : "buy",
+                             quote: model.quotes[p.symbol],
+                             presetQty: abs(p.qty),
+                             closing: true)
+        }
         .navigationDestination(item: $deskRoute) { route in
             switch route {
             case .margin: MarginDeskView()
@@ -355,7 +363,13 @@ struct DeskView: View {
             } else {
                 ForEach(session.positions) { p in
                     Button { pushed = p.symbol } label: { positionRow(p) }
-                        .buttonStyle(.plain)
+                        .buttonStyle(RowPressStyle())
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button {
+                                Haptics.tap(); closing = p
+                            } label: { Label("Close", systemImage: "xmark.circle") }
+                                .tint(TarsTheme.loss)
+                        }
                     Divider().overlay(TarsTheme.hairline)
                 }
             }
@@ -430,6 +444,14 @@ struct DeskView: View {
             } else {
                 ForEach(model.orders.prefix(20)) { o in
                     orderRow(o)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            if o.status == "accepted" {
+                                Button(role: .destructive) {
+                                    Haptics.warning()
+                                    Task { await model.cancel(o.id) }
+                                } label: { Label("Cancel", systemImage: "xmark") }
+                            }
+                        }
                     Divider().overlay(TarsTheme.hairline)
                 }
             }
@@ -443,7 +465,22 @@ struct DeskView: View {
                     .font(TarsTheme.Text.body)
                     .foregroundStyle(TarsTheme.inkPrimary)
                 Spacer()
-                statusChip(o.status)
+                if o.status == "accepted" {
+                    Button {
+                        Haptics.warning()
+                        Task { await model.cancel(o.id) }
+                    } label: {
+                        Text("CANCEL")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .kerning(0.6)
+                            .foregroundStyle(TarsTheme.loss)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Capsule().fill(TarsTheme.loss.opacity(0.12)))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    statusChip(o.status)
+                }
             }
             HStack(spacing: TarsTheme.Space.m) {
                 Text(o.filledPrice.map { "at \(SymbolDisplay.price(o.symbol, $0))" } ?? "never filled")
@@ -540,6 +577,12 @@ final class DeskModel {
         async let o: () = tickOrders()
         async let c: () = tickCurve()
         _ = await (q, o, c)
+    }
+
+    /// Cancelling is the server's call — it owns the race against a fill.
+    func cancel(_ id: String) async {
+        try? await api.cancelOrder(id: id)
+        await tickOrders()
     }
 
     private func tickCurve() async {

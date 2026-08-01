@@ -108,6 +108,14 @@ struct APIQuote: Decodable, Identifiable, Equatable {
     let provenance: Provenance?
 }
 
+struct WatchlistResponse: Decodable {
+    let ok: Bool
+    let watchlist: [String]
+}
+
+/// For endpoints whose only answer is "it worked".
+struct EmptyOK: Decodable { let ok: Bool? }
+
 struct SearchResponse: Decodable {
     let ok: Bool
     let rows: [BoardRowPayload]
