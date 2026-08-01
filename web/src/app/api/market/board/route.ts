@@ -112,12 +112,23 @@ export async function GET(req: Request) {
     featured: meta.get(s.symbol)?.featured ?? false,
   }));
 
+  /*
+    Venue counts, from the curated board already in hand. This is the TRUE
+    listing count per venue, not the loaded page — "Global 719" is the fact
+    that makes "1,742 markets" legible, and native clients had no way to
+    state it before.
+  */
+  const venueCounts: Record<string, number> = {};
+  for (const b of board) venueCounts[b.category] = (venueCounts[b.category] ?? 0) + 1;
+
   const body = {
     ok: true,
     marketOpen: isUSMarketOpen(),
     count: rows.length,
     rows,
     movers: moversFrom(stats),
+    venues: Object.entries(venueCounts).map(([category, count]) => ({ category, count })),
+    total: board.length,
     asOf: Date.now(),
   };
   boardCache.set(cacheKey, { at: Date.now(), body });
