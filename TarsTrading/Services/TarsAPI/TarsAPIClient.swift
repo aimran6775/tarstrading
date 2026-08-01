@@ -157,3 +157,22 @@ extension TarsAPIClient {
         return res.bars
     }
 }
+
+extension TarsAPIClient {
+    /// Place an order on the platform exchange. The SERVER is the whole truth:
+    /// margin gate, costs, fills — the app just carries the intent and reads
+    /// back the sentence.
+    func placeOrder(symbol: String, side: String, qty: Double,
+                    takeProfit: Double? = nil, stopLoss: Double? = nil) async throws -> PlacedOrderPayload {
+        struct Body: Encodable {
+            let symbol: String; let side: String; let type: String; let qty: Double
+            let takeProfit: Double?; let stopLoss: Double?
+        }
+        let res: PlaceOrderResponse = try await request(
+            "POST", "/api/orders",
+            body: Body(symbol: symbol, side: side, type: "market", qty: qty,
+                       takeProfit: takeProfit, stopLoss: stopLoss))
+        guard let order = res.order else { throw TarsAPIError.server(res.error ?? "Order failed.") }
+        return order
+    }
+}

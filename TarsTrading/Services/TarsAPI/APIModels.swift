@@ -204,3 +204,21 @@ struct BarsResponse: Decodable {
     let bars: [APIBar]
     let source: String?
 }
+
+// MARK: - Orders
+
+struct PlacedOrderPayload: Decodable {
+    let id: String
+    let symbol: String
+    let side: String
+    let qty: Double
+    let status: String        // filled | accepted | rejected
+    let filledPrice: Double?
+    let rejectReason: String?
+}
+
+struct PlaceOrderResponse: Decodable {
+    let ok: Bool
+    let order: PlacedOrderPayload?
+    let error: String?
+}

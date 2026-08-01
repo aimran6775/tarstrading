@@ -13,6 +13,7 @@ import Charts
 struct MarketSymbolView: View {
     let symbol: String
     @State private var model: SymbolModel
+    @State private var ticketSide: String?
     @Environment(\.scenePhase) private var scenePhase
 
     init(symbol: String) {
@@ -25,17 +26,55 @@ struct MarketSymbolView: View {
             VStack(alignment: .leading, spacing: TarsTheme.Space.l) {
                 header
                 chartCard
+                tradeBar
             }
             .padding(TarsTheme.Space.l)
         }
         .background(TarsTheme.bg0)
         .navigationTitle(SymbolDisplay.pretty(symbol))
         .navigationBarTitleDisplayMode(.inline)
-        .task { model.activate() }
+        .task {
+            model.activate()
+            #if DEBUG
+            if ticketSide == nil,
+               let t = UserDefaults.standard.string(forKey: "TarsOpenTicket"), !t.isEmpty {
+                try? await Task.sleep(for: .seconds(2))
+                ticketSide = t
+            }
+            #endif
+        }
         .onDisappear { model.deactivate() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { model.activate() } else { model.deactivate() }
         }
+    }
+
+    /// Buy gold, sell red — two doors into the same ticket.
+    private var tradeBar: some View {
+        HStack(spacing: TarsTheme.Space.m) {
+            tradeButton("Buy", side: "buy", tone: TarsTheme.paperBadge)
+            tradeButton("Sell", side: "sell", tone: TarsTheme.loss)
+        }
+        .sheet(item: Binding(
+            get: { ticketSide.map { TicketRoute(side: $0) } },
+            set: { ticketSide = $0?.side })) { route in
+            TradeTicketSheet(symbol: symbol, side: route.side, quote: model.quote)
+        }
+    }
+    private struct TicketRoute: Identifiable { let side: String; var id: String { side } }
+    private func tradeButton(_ label: String, side: String, tone: Color) -> some View {
+        Button {
+            Haptics.tap()
+            ticketSide = side
+        } label: {
+            Text(label)
+                .font(TarsTheme.Text.heading)
+                .foregroundStyle(tone)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(tone.opacity(0.14))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Header: the price, big enough to feel
