@@ -187,6 +187,8 @@ struct DeskView: View {
                 .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
                 .foregroundStyle(tone ?? TarsTheme.inkPrimary)
                 .lineLimit(1).minimumScaleFactor(0.6)
+                .contentTransition(.numericText())
+                .animation(.snappy, value: value)
         }
     }
 
@@ -236,11 +238,15 @@ struct DeskView: View {
                     Text(value, format: .currency(code: "USD"))
                         .font(TarsTheme.Text.body.monospacedDigit())
                         .foregroundStyle(TarsTheme.inkPrimary)
+                        .contentTransition(.numericText())
+                        .animation(.snappy, value: value)
                 }
                 if let pnl {
                     Text("\(pnl >= 0 ? "+" : "")\(pnl, format: .currency(code: "USD"))")
                         .font(TarsTheme.Text.caption.monospacedDigit())
                         .foregroundStyle(pnl > 0 ? TarsTheme.gain : pnl < 0 ? TarsTheme.loss : TarsTheme.inkTertiary)
+                        .contentTransition(.numericText())
+                        .animation(.snappy, value: pnl)
                 }
             }
         }

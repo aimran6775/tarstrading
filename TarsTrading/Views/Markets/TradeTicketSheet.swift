@@ -127,7 +127,7 @@ struct TradeTicketSheet: View {
         .padding(.horizontal, 12)
         .frame(height: 44)
         .background(TarsTheme.bg2)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
     }
 
     private func loadPreview() async {
@@ -155,7 +155,7 @@ struct TradeTicketSheet: View {
             }
             .padding(TarsTheme.Space.l)
             .background(TarsTheme.bg2)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
 
             if isFutures {
                 futuresMarginBlock
@@ -208,7 +208,7 @@ struct TradeTicketSheet: View {
                 .frame(maxWidth: .infinity, minHeight: 50)
                 .background(TarsTheme.bg3)
                 .foregroundStyle(TarsTheme.inkPrimary)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
         }
     }
 
@@ -226,7 +226,7 @@ struct TradeTicketSheet: View {
                 .frame(maxWidth: .infinity, minHeight: 50)
                 .background(TarsTheme.bg3)
                 .foregroundStyle(TarsTheme.inkPrimary)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
         }
     }
 

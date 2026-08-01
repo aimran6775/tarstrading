@@ -312,7 +312,7 @@ struct RootView: View {
     @ViewBuilder
     private var detail: some View {
         switch section {
-        case .markets: MarketsHomeView()
+        case .markets: MarketsTerminal()
         case .terminal: WorkspaceView()
         case .portfolio: DeskView()
         case .academy: AcademyHomeView()
@@ -322,6 +322,27 @@ struct RootView: View {
         case .alerts: AlertsView(engine: alertEngine)
         case .settings: SettingsView()
         }
+    }
+}
+
+/// The iPad terminal: the board docked left, the market you're working
+/// on filling the room. Selection, not navigation — a desk keeps its
+/// papers side by side instead of stacking them.
+private struct MarketsTerminal: View {
+    @State private var symbol = "SPY"
+
+    var body: some View {
+        HStack(spacing: 0) {
+            MarketsHomeView(onSelect: { symbol = $0 })
+                .frame(width: 400)
+            Divider().overlay(TarsTheme.hairline)
+            NavigationStack {
+                MarketSymbolView(symbol: symbol)
+                    .background(TarsTheme.bg0)
+            }
+            .id(symbol)
+        }
+        .background(TarsTheme.bg0)
     }
 }
 

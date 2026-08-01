@@ -162,6 +162,34 @@ enum TarsTheme {
 
 // MARK: - Reusable chrome
 
+/// The apex — the brand mark, drawn rather than shipped as an asset so it
+/// stays crisp at any size. A gold pyramid with its ridge shadowed, the
+/// same silhouette as the web's TarsMark and the app icon's rising step.
+struct TarsApexMark: View {
+    var size: CGFloat = 20
+    var body: some View {
+        Canvas { ctx, sz in
+            let w = sz.width, h = sz.height
+            var pyramid = Path()
+            pyramid.move(to: CGPoint(x: w * 0.5, y: 0))
+            pyramid.addLine(to: CGPoint(x: w, y: h))
+            pyramid.addLine(to: CGPoint(x: 0, y: h))
+            pyramid.closeSubpath()
+            ctx.fill(pyramid, with: .color(TarsTheme.accent))
+            // The lit face: the ridge falls from the apex; the right face
+            // sits a step darker so the mark reads dimensional while flat.
+            var face = Path()
+            face.move(to: CGPoint(x: w * 0.5, y: 0))
+            face.addLine(to: CGPoint(x: w, y: h))
+            face.addLine(to: CGPoint(x: w * 0.62, y: h))
+            face.closeSubpath()
+            ctx.fill(face, with: .color(TarsTheme.bg0.opacity(0.28)))
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
 /// Quiet session marker: prices look live at 3am unless we say otherwise.
 /// Shown wherever equity prices headline while the US session is closed.
 struct MarketClosedChip: View {

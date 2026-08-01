@@ -13,11 +13,23 @@ import SwiftUI
   market math beyond coloring a sign.
 */
 struct MarketsHomeView: View {
+    /// Set when this view is a COLUMN in the iPad terminal: taps select
+    /// into the neighboring pane instead of pushing a new screen.
+    var onSelect: ((String) -> Void)? = nil
     @State private var model = MarketsModel()
     @State private var query = ""
     @State private var pushed: String?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// One door for both worlds: select in place on the terminal, push on the phone.
+    private func open(_ symbol: String) {
+        if let onSelect { onSelect(symbol) } else { pushed = symbol }
+    }
+
+    static let indexName = [
+        "SPY": "S&P 500", "QQQ": "Nasdaq 100", "DIA": "Dow 30", "IWM": "Russell 2000",
+    ]
 
     /// The rows the search allows through — instant, over what's loaded.
     private var visibleRows: [BoardRowPayload] {
@@ -55,10 +67,10 @@ struct MarketsHomeView: View {
         .task {
             model.activate()
             #if DEBUG
-            // Headless drives: -TarsOpenSymbol AAPL pushes a symbol page.
+            // Headless drives: -TarsOpenSymbol AAPL opens a symbol page.
             if pushed == nil,
                let sym = UserDefaults.standard.string(forKey: "TarsOpenSymbol"), !sym.isEmpty {
-                pushed = sym
+                open(sym)
             }
             #endif
         }
@@ -72,7 +84,8 @@ struct MarketsHomeView: View {
     // MARK: - Header: the screen title works for a living
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .center, spacing: TarsTheme.Space.s) {
+            TarsApexMark(size: 18)
             Text("Markets")
                 .font(TarsTheme.Text.screenTitle)
                 .foregroundStyle(TarsTheme.inkPrimary)
@@ -127,15 +140,22 @@ struct MarketsHomeView: View {
             ForEach(["SPY", "QQQ", "DIA", "IWM"], id: \.self) { sym in
                 let row = model.row(sym)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(sym)
-                        .font(TarsTheme.Text.micro)
-                        .foregroundStyle(TarsTheme.inkTertiary)
-                        .lineLimit(1)
+                    HStack(spacing: 4) {
+                        Text(sym)
+                            .font(TarsTheme.Text.micro.weight(.semibold))
+                            .foregroundStyle(TarsTheme.inkSecondary)
+                        Text(Self.indexName[sym] ?? "")
+                            .font(TarsTheme.Text.micro)
+                            .foregroundStyle(TarsTheme.inkQuaternary)
+                    }
+                    .lineLimit(1)
                     if let price = row?.price {
-                        Text(price, format: .currency(code: "USD").precision(.fractionLength(0)))
+                        Text(price, format: .currency(code: "USD").precision(.fractionLength(2)))
                             .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
                             .foregroundStyle(TarsTheme.inkPrimary)
                             .lineLimit(1).minimumScaleFactor(0.6)
+                            .contentTransition(.numericText())
+                            .animation(.snappy, value: price)
                         ChangeText(row?.changePercent)
                     } else {
                         Text("—").font(TarsTheme.Text.caption)
@@ -265,7 +285,7 @@ struct MarketsHomeView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: TarsTheme.Space.s) {
                         ForEach((gainers.prefix(4) + (m.losers ?? []).prefix(4))) { r in
-                            Button { pushed = r.symbol } label: {
+                            Button { open(r.symbol) } label: {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(SymbolDisplay.pretty(r.symbol))
                                         .font(TarsTheme.Text.caption.weight(.semibold))
@@ -333,7 +353,7 @@ struct MarketsHomeView: View {
                 ForEach(0..<8, id: \.self) { _ in skeletonRow }
             } else {
                 ForEach(visibleRows) { row in
-                    Button { pushed = row.symbol } label: { boardRow(row) }
+                    Button { open(row.symbol) } label: { boardRow(row) }
                         .buttonStyle(.plain)
                     Divider().overlay(TarsTheme.hairline)
                 }
@@ -363,6 +383,8 @@ struct MarketsHomeView: View {
                     Text(SymbolDisplay.price(row.symbol, price))
                         .font(TarsTheme.Text.body.monospacedDigit())
                         .foregroundStyle(TarsTheme.inkPrimary)
+                        .contentTransition(.numericText())
+                        .animation(.snappy, value: price)
                 }
                 ChangeText(row.changePercent)
             }
