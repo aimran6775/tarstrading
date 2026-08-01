@@ -3,6 +3,7 @@ import { currentUser } from "@/server/auth";
 import { getHouseBoard } from "@/server/board";
 import { getQuotes } from "@/server/market";
 import { SYMBOLS } from "@/lib/symbols";
+import { INSTRUMENTS } from "@/lib/instruments";
 
 /*
   Symbol search across the WHOLE desk, not just the screenful a client
@@ -37,7 +38,15 @@ export async function GET(req: Request) {
     types NVO. The curated name catalog is the same one the web's
     autocomplete uses, so both clients answer a name query identically.
   */
-  const names = new Map(SYMBOLS.map((s) => [s.symbol.toUpperCase(), s.name.toUpperCase()]));
+  /*
+    Two catalogs used to disagree: lib/symbols.ts (137, web autocomplete)
+    and the app's bundled profiles (182). Searching "NOVO" found nothing
+    because Novo Nordisk lived in one and not the other. The richer
+    catalog wins; the older one fills any gap it still covers.
+  */
+  const names = new Map<string, string>();
+  for (const s of SYMBOLS) names.set(s.symbol.toUpperCase(), s.name.toUpperCase());
+  for (const i of INSTRUMENTS) names.set(i.symbol.toUpperCase(), i.name.toUpperCase());
 
   // Rank, then cut. Score is small-is-better so a plain sort works.
   const scored = board
@@ -78,7 +87,9 @@ export async function GET(req: Request) {
       price: quote?.price ?? null,
       changePercent: quote?.changePercent ?? null,
       source: quote?.provenance ?? null,
-      name: names.get(e.symbol.replace(/^(IDX|FX|FUT):/, "").toUpperCase()) ?? null,
+      name: INSTRUMENTS.find(
+        (i) => i.symbol.toUpperCase() === e.symbol.replace(/^(IDX|FX|FUT):/, "").toUpperCase(),
+      )?.name ?? null,
     };
   });
 

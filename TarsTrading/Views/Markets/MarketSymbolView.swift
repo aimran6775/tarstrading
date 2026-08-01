@@ -17,6 +17,7 @@ struct MarketSymbolView: View {
     @State private var ticketSide: String?
     @State private var closing: APIPosition?
     @State private var pushed: String?
+    @Environment(\.verticalSizeClass) private var vSizeClass
     @Environment(\.scenePhase) private var scenePhase
 
     init(symbol: String) {
@@ -25,6 +26,56 @@ struct MarketSymbolView: View {
     }
 
     var body: some View {
+        Group {
+            if vSizeClass == .compact { landscapeChart } else { portraitBody }
+        }
+    }
+
+    /*
+      Turn the phone and the chart takes the whole room — TradingView's
+      signature, and the one gesture that needs no button. The scrub, the
+      timeframes and the lens all still work; everything else steps out.
+    */
+    private var landscapeChart: some View {
+        VStack(spacing: TarsTheme.Space.s) {
+            HStack(alignment: .firstTextBaseline, spacing: TarsTheme.Space.m) {
+                Text(SymbolDisplay.pretty(symbol))
+                    .font(TarsTheme.Text.heading)
+                    .foregroundStyle(TarsTheme.inkPrimary)
+                if let q = model.quote {
+                    Text(SymbolDisplay.price(symbol, q.price))
+                        .font(TarsTheme.Text.heading.monospacedDigit())
+                        .foregroundStyle(TarsTheme.inkPrimary)
+                    let chg = abs(q.changePercent) < 0.00005 ? 0 : q.changePercent
+                    Text("\(chg > 0 ? "+" : "")\(chg * 100, specifier: "%.2f")%")
+                        .font(TarsTheme.Text.caption.monospacedDigit())
+                        .foregroundStyle(TarsTheme.pnl(chg))
+                }
+                Spacer()
+                Text("ROTATE BACK FOR THE FULL PAGE")
+                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                    .kerning(0.8)
+                    .foregroundStyle(TarsTheme.inkQuaternary)
+            }
+            .padding(.horizontal, TarsTheme.Space.l)
+            .padding(.top, TarsTheme.Space.s)
+
+            if model.bars.count > 1 {
+                chart
+            } else {
+                Rectangle().fill(TarsTheme.bg1)
+                    .overlay(ProgressView().tint(TarsTheme.inkTertiary))
+            }
+            timeframePicker
+                .padding(.horizontal, TarsTheme.Space.l)
+                .padding(.bottom, TarsTheme.Space.s)
+        }
+        .background(TarsTheme.bg0)
+        .toolbar(.hidden, for: .navigationBar)
+        .statusBarHidden()
+    }
+
+    private var portraitBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TarsTheme.Space.l) {
                 header
