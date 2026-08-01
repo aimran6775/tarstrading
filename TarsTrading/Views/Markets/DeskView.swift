@@ -49,6 +49,7 @@ struct DeskView: View {
             .frame(height: 0)
             LazyVStack(alignment: .leading, spacing: TarsTheme.Space.l) {
                 equityHero
+                syncLine
                 deskLinks
                 positionsCard
                 ordersCard
@@ -179,56 +180,144 @@ struct DeskView: View {
     // MARK: - Equity: the number big enough to feel
 
     private var equityHero: some View {
-        VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
-            if let risk = session.risk {
-                Text(risk.equity, format: .currency(code: "USD").precision(.fractionLength(2)))
-                    .font(TarsTheme.Text.display)
-                    .foregroundStyle(TarsTheme.inkPrimary)
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                    .contentTransition(.numericText())
-                // Three across breaks at accessibility sizes — verified at
-                // XXXL, where "BUYING POWER" hyphenated into three lines and
-                // the dollar figures wrapped mid-number.
-                let statColumns = typeSize.isAccessibilitySize
-                    ? [GridItem(.flexible(), alignment: .leading)]
-                    : Array(repeating: GridItem(.flexible(), alignment: .leading), count: 3)
-                LazyVGrid(columns: statColumns, alignment: .leading, spacing: TarsTheme.Space.m) {
-                    stat("Cash", risk.cash, tone: risk.cash < 0 ? TarsTheme.loss : nil)
-                    stat("Buying power", risk.buyingPower)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("MARGIN USED").font(TarsTheme.Text.micro)
-                            .foregroundStyle(TarsTheme.inkQuaternary)
-                        Text("\(risk.marginUsedPct * 100, specifier: "%.0f")%")
-                            .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(risk.marginUsedPct > 0.8 ? TarsTheme.loss
-                                : risk.marginUsedPct > 0.5 ? TarsTheme.warning : TarsTheme.inkPrimary)
-                    }
-                }
-            } else {
-                RoundedRectangle(cornerRadius: 8).fill(TarsTheme.bg3).frame(height: 56)
-            }
-            if let sync = session.lastSyncAt {
-                Text("Server-stated · synced \(sync.formatted(date: .omitted, time: .shortened))")
-                    .font(TarsTheme.Text.micro)
-                    .foregroundStyle(TarsTheme.inkQuaternary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        sceneHero
     }
 
-    private func stat(_ label: String, _ value: Double, tone: Color? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label.uppercased()).font(TarsTheme.Text.micro)
-                .foregroundStyle(TarsTheme.inkQuaternary)
-                .lineLimit(1).minimumScaleFactor(0.7)
-            Text(value, format: .currency(code: "USD").precision(.fractionLength(0)))
-                .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
-                .foregroundStyle(tone ?? TarsTheme.inkPrimary)
-                .lineLimit(1).minimumScaleFactor(0.6)
-                .contentTransition(.numericText())
-                .animation(.snappy, value: value)
+    /// The web floor's signature, translated: the market-footage loop under
+    /// the same scrims, a ghosted EQUITY monument, the count-up number, the
+    /// day pill, and the live curve in a scene panel. One place to be bold.
+    private var sceneHero: some View {
+        ZStack(alignment: .top) {
+            SceneVideoBackdrop()
+            VStack(spacing: 0) {
+                // Masthead: the room's state. (PAPER stays in the chrome —
+                // one honesty mark, one place.)
+                HStack {
+                    Text(session.user.map { "\($0.name)'s fund" } ?? "Your fund")
+                        .font(TarsTheme.Text.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.72))
+                    Spacer()
+                    HStack(spacing: 6) {
+                        Circle().fill(TarsTheme.gain).frame(width: 6, height: 6)
+                            .opacity(0.9)
+                        Text("SIMULATED · LIVE BOOK")
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .kerning(1.2)
+                            .foregroundStyle(.white.opacity(0.55))
+                    }
+                }
+                .padding(.horizontal, TarsTheme.Space.l)
+                .padding(.top, TarsTheme.Space.l)
+
+                Spacer(minLength: 0)
+
+                // The monument: ghosted EQUITY behind the count-up.
+                ZStack {
+                    Text("EQUITY")
+                        .font(Font.system(size: 92, weight: .black).width(.condensed))
+                        .kerning(4)
+                        .foregroundStyle(.white.opacity(0.06))
+                        .lineLimit(1).minimumScaleFactor(0.5)
+                        .accessibilityHidden(true)
+                    VStack(spacing: TarsTheme.Space.s) {
+                        Text("TOTAL EQUITY")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .kerning(2.8)
+                            .foregroundStyle(.white.opacity(0.55))
+                        if let risk = session.risk {
+                            Text(risk.equity, format: .currency(code: "USD").precision(.fractionLength(2)))
+                                .font(TarsTheme.Text.display)
+                                .foregroundStyle(.white)
+                                .lineLimit(1).minimumScaleFactor(0.5)
+                                .contentTransition(.numericText())
+                                .animation(.snappy, value: risk.equity)
+                                .shadow(color: .black.opacity(0.5), radius: 14, y: 2)
+                                .shadow(color: TarsTheme.accent.opacity(0.30), radius: 22)
+                        }
+                        if let day = model.dayPnl {
+                            HStack(spacing: 6) {
+                                Text(day > 0 ? "▲" : day < 0 ? "▼" : "—")
+                                Text("\(day > 0 ? "+" : "")\(day, format: .currency(code: "USD"))")
+                                    .contentTransition(.numericText())
+                                    .animation(.snappy, value: day)
+                                Text("today").foregroundStyle(.white.opacity(0.5))
+                            }
+                            .font(TarsTheme.Text.caption.monospacedDigit().weight(.medium))
+                            .foregroundStyle(day > 0 ? TarsTheme.gain : day < 0 ? TarsTheme.loss : .white.opacity(0.7))
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(Capsule().fill(Color.black.opacity(0.35)))
+                            .overlay(Capsule().strokeBorder(
+                                (day > 0 ? TarsTheme.gain : day < 0 ? TarsTheme.loss : Color.white)
+                                    .opacity(0.30), lineWidth: 1))
+                        }
+                        if let risk = session.risk {
+                            Text("\(risk.cash.formatted(.currency(code: "USD").precision(.fractionLength(0)))) cash · \(risk.buyingPower.formatted(.currency(code: "USD").precision(.fractionLength(0)))) buying power")
+                                .font(TarsTheme.Text.micro.monospacedDigit())
+                                .foregroundStyle(.white.opacity(0.55))
+                        }
+                    }
+                }
+                .padding(.vertical, TarsTheme.Space.l)
+
+                Spacer(minLength: 0)
+
+                // The curve, live, in a scene panel — it draws as you trade.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("EQUITY CURVE")
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .kerning(1.6)
+                            .foregroundStyle(.white.opacity(0.55))
+                        Spacer()
+                        HStack(spacing: 5) {
+                            Circle().fill(TarsTheme.accent).frame(width: 4, height: 4)
+                            Text("LIVE")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .kerning(1.4)
+                                .foregroundStyle(.white.opacity(0.55))
+                        }
+                    }
+                    if model.curve.count > 1 {
+                        SparkPath(values: model.curve.map(\.equity), tone: TarsTheme.accent)
+                            .frame(height: 44)
+                    } else {
+                        Text("Your equity curve draws itself as you trade.")
+                            .font(TarsTheme.Text.micro)
+                            .foregroundStyle(.white.opacity(0.5))
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    }
+                }
+                .padding(TarsTheme.Space.m)
+                .background(Color.black.opacity(0.30))
+                .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
+                    .strokeBorder(.white.opacity(0.10), lineWidth: 1))
+                .padding(TarsTheme.Space.l)
+            }
+        }
+        .frame(minHeight: 360)
+        .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
+            .strokeBorder(TarsTheme.hairline, lineWidth: 1))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(session.risk.map {
+            "Total equity \($0.equity.formatted(.currency(code: "USD")))"
+        } ?? "Total equity loading")
+    }
+
+    /// The honesty stamp rides under the scene — server-stated, timestamped.
+    @ViewBuilder private var syncLine: some View {
+        if let sync = session.lastSyncAt {
+            HStack(spacing: TarsTheme.Space.m) {
+                Text("Server-stated · synced \(sync.formatted(date: .omitted, time: .shortened))")
+                if let risk = session.risk, risk.marginUsedPct > 0 {
+                    Text("· margin \(risk.marginUsedPct * 100, specifier: "%.0f")% used")
+                        .foregroundStyle(risk.marginUsedPct > 0.8 ? TarsTheme.loss
+                            : risk.marginUsedPct > 0.5 ? TarsTheme.warning : TarsTheme.inkQuaternary)
+                }
+            }
+            .font(TarsTheme.Text.micro)
+            .foregroundStyle(TarsTheme.inkQuaternary)
         }
     }
 
@@ -378,6 +467,22 @@ final class DeskModel {
     private(set) var quotes: [String: APIQuote] = [:]
     private(set) var orders: [APIOrder] = []
     private(set) var loadedOrders = false
+    /// The equity curve, server-stated — the same series the web floor draws.
+    private(set) var curve: [EquityPoint] = []
+
+    /// Day P&L from the curve: latest equity minus the last print BEFORE
+    /// today (New York's today — the desk's clock, not the phone's).
+    var dayPnl: Double? {
+        guard let last = curve.last else { return nil }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/New_York") ?? .current
+        let startOfToday = cal.startOfDay(for: Date())
+        let anchor = curve.last(where: {
+            Date(timeIntervalSince1970: $0.time / 1000) < startOfToday
+        }) ?? curve.first
+        guard let anchor, anchor.time != last.time else { return 0 }
+        return last.equity - anchor.equity
+    }
 
     private var symbols: [String] = []
     private var loop: Task<Void, Never>?
@@ -405,7 +510,12 @@ final class DeskModel {
         if let positions { symbols = positions.map(\.symbol) }
         async let q: () = tickQuotes()
         async let o: () = tickOrders()
-        _ = await (q, o)
+        async let c: () = tickCurve()
+        _ = await (q, o, c)
+    }
+
+    private func tickCurve() async {
+        if let fresh = try? await api.portfolioHistory(), !fresh.isEmpty { curve = fresh }
     }
 
     private func tickQuotes() async {

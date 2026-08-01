@@ -17,6 +17,7 @@
 		0FC2F9ABF8D6EE9D959D0A33 /* DeskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FD5711AD0BFD1D2DCB1B3F /* DeskView.swift */; };
 		BEBDCB2BC479951A2069B69E /* TradeTicketSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E285074E6293C72F7AF2B48 /* TradeTicketSheet.swift */; };
 		65279B8EDB5CAE6FF57E35F5 /* MarketSymbolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C683394B76760FA1A3659EB2 /* MarketSymbolView.swift */; };
+		ABE76970AD6121FBCC4E75C4 /* SceneVideoBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B1F5E4A97763EC93E6D24E9 /* SceneVideoBackdrop.swift */; };
 		326950EE30351611C9329C6C /* MarketsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EFF82DEA0653143E5C98213 /* MarketsHomeView.swift */; };
 		D42C03C34D64DECC85AC2321 /* MarketStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968DE43C5E0FD355DDCAE2AE /* MarketStore.swift */; };
 		31B55498390BC41830EFFDA1 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CF96C60E8099D6BC69FD903 /* LoginView.swift */; };
@@ -87,6 +88,7 @@
 		965369F28FD756EFB79BEC57 /* AgentBuilderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6875EB6D3A67AF8EC5E582B /* AgentBuilderView.swift */; };
 		9880C3F1A2529E0D52D8B58D /* Tracks12.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BAAC0C04EAB22A4E253A682 /* Tracks12.swift */; };
 		9F734B1327A7A4E3368A4E19 /* AAPL.csv in Resources */ = {isa = PBXBuildFile; fileRef = 1FE6AE938CDA05590743219D /* AAPL.csv */; };
+		D8AE2B84C870B1AE593020CC /* floor-hero.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 98BCA020315634B0E6793A5B /* floor-hero.mp4 */; }; 
 		A1C5F0067A7DFF1B6EBACB98 /* ChartDrawings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE489D09C7E608C0169F12D /* ChartDrawings.swift */; };
 		A30F6835BD9C4FA7F90D359B /* RiskWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CFC558EB36E975BD60ACB0 /* RiskWidgets.swift */; };
 		A5560930451CC76C8E5142D6 /* TLT.csv in Resources */ = {isa = PBXBuildFile; fileRef = EB56DD36083F036F9BDBEFF2 /* TLT.csv */; };
@@ -139,6 +141,7 @@
 		C0FD5711AD0BFD1D2DCB1B3F /* DeskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskView.swift; sourceTree = "<group>"; };
 		1E285074E6293C72F7AF2B48 /* TradeTicketSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeTicketSheet.swift; sourceTree = "<group>"; };
 		C683394B76760FA1A3659EB2 /* MarketSymbolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketSymbolView.swift; sourceTree = "<group>"; };
+		3B1F5E4A97763EC93E6D24E9 /* SceneVideoBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneVideoBackdrop.swift; sourceTree = "<group>"; };
 		6EFF82DEA0653143E5C98213 /* MarketsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketsHomeView.swift; sourceTree = "<group>"; };
 		968DE43C5E0FD355DDCAE2AE /* MarketStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketStore.swift; sourceTree = "<group>"; };
 		8CF96C60E8099D6BC69FD903 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
@@ -158,6 +161,7 @@
 		1F624AFCFCDBC485D0003F91 /* AMZN.csv */ = {isa = PBXFileReference; path = AMZN.csv; sourceTree = "<group>"; };
 		1FD1831AB4E6B973699C9C18 /* TarsLetterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TarsLetterView.swift; sourceTree = "<group>"; };
 		1FE6AE938CDA05590743219D /* AAPL.csv */ = {isa = PBXFileReference; path = AAPL.csv; sourceTree = "<group>"; };
+		98BCA020315634B0E6793A5B /* floor-hero.mp4 */ = {isa = PBXFileReference; path = "floor-hero.mp4"; sourceTree = "<group>"; }; 
 		21E42A76F3F834F146F893DC /* Tracks56.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tracks56.swift; sourceTree = "<group>"; };
 		2370B3E281EBA32692E03DC2 /* LessonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LessonView.swift; sourceTree = "<group>"; };
 		29AFDB83E97C087147A2C582 /* DIS.csv */ = {isa = PBXFileReference; path = DIS.csv; sourceTree = "<group>"; };
@@ -256,6 +260,7 @@
 				C0FD5711AD0BFD1D2DCB1B3F /* DeskView.swift */,
 				1E285074E6293C72F7AF2B48 /* TradeTicketSheet.swift */,
 				C683394B76760FA1A3659EB2 /* MarketSymbolView.swift */,
+				3B1F5E4A97763EC93E6D24E9 /* SceneVideoBackdrop.swift */,
 				6EFF82DEA0653143E5C98213 /* MarketsHomeView.swift */,
 			);
 			path = Markets;
@@ -388,6 +393,7 @@
 			isa = PBXGroup;
 			children = (
 				D73EA0E33D8BDAE919513E72 /* HistoricalBars */,
+				98BCA020315634B0E6793A5B /* floor-hero.mp4 */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -715,6 +721,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9F734B1327A7A4E3368A4E19 /* AAPL.csv in Resources */,
+				D8AE2B84C870B1AE593020CC /* floor-hero.mp4 in Resources */,
 				8E79395FBB1E07CCBE5F1457 /* AMZN.csv in Resources */,
 				330736C15F95D1A5C5CA6A5F /* Assets.xcassets in Resources */,
 				A715236B40C7F55E1F540F3E /* BRK_B.csv in Resources */,
@@ -757,6 +764,7 @@
 				0FC2F9ABF8D6EE9D959D0A33 /* DeskView.swift in Sources */,
 				BEBDCB2BC479951A2069B69E /* TradeTicketSheet.swift in Sources */,
 				65279B8EDB5CAE6FF57E35F5 /* MarketSymbolView.swift in Sources */,
+				ABE76970AD6121FBCC4E75C4 /* SceneVideoBackdrop.swift in Sources */,
 				326950EE30351611C9329C6C /* MarketsHomeView.swift in Sources */,
 				D42C03C34D64DECC85AC2321 /* MarketStore.swift in Sources */,
 				31B55498390BC41830EFFDA1 /* LoginView.swift in Sources */,

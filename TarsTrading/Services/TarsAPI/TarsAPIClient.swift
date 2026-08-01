@@ -140,6 +140,12 @@ actor TarsAPIClient {
 
 extension TarsAPIClient {
     /// The curated board — Trending by default, or one venue's own page.
+    /// The account's own history — the same curve the web floor draws.
+    func portfolioHistory() async throws -> [EquityPoint] {
+        let res: PortfolioHistoryResponse = try await request("GET", "/api/portfolio")
+        return res.history
+    }
+
     /// Mini-series for board rows — the vault's daily closes, <=32 points,
     /// 32 symbols a call. An empty series is honest: no history stored yet.
     func sparks(symbols: [String]) async throws -> [String: [Double]] {

@@ -108,6 +108,16 @@ struct APIQuote: Decodable, Identifiable, Equatable {
     let provenance: Provenance?
 }
 
+struct EquityPoint: Decodable, Equatable {
+    let time: Double   // epoch ms
+    let equity: Double
+}
+
+struct PortfolioHistoryResponse: Decodable {
+    let ok: Bool
+    let history: [EquityPoint]
+}
+
 struct SparksResponse: Decodable {
     let ok: Bool
     let sparks: [String: [Double]]
