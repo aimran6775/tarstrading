@@ -171,7 +171,7 @@ struct RootView: View {
                 .tabItem { Label(CompactTab.trade.rawValue, systemImage: CompactTab.trade.icon) }
                 .tag(CompactTab.trade)
 
-            compactStack(.portfolio) { PortfolioView() }
+            compactStack(.portfolio) { DeskView() }
                 .tabItem { Label(CompactTab.portfolio.rawValue, systemImage: CompactTab.portfolio.icon) }
                 .tag(CompactTab.portfolio)
 
@@ -315,7 +315,7 @@ struct RootView: View {
         switch section {
         case .markets: MarketsHomeView()
         case .terminal: WorkspaceView()
-        case .portfolio: PortfolioView()
+        case .portfolio: DeskView()
         case .academy: AcademyHomeView()
         case .agents: AgentLabView()
         case .journal: JournalView()

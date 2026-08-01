@@ -176,3 +176,11 @@ extension TarsAPIClient {
         return order
     }
 }
+
+extension TarsAPIClient {
+    /// Recent orders — filled, working, canceled, rejected. The record.
+    func orders() async throws -> [APIOrder] {
+        let res: OrdersResponse = try await request("GET", "/api/orders")
+        return res.orders
+    }
+}

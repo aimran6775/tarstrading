@@ -222,3 +222,23 @@ struct PlaceOrderResponse: Decodable {
     let order: PlacedOrderPayload?
     let error: String?
 }
+
+// MARK: - Order history
+
+struct APIOrder: Decodable, Identifiable, Equatable {
+    let id: String
+    let symbol: String
+    let side: String
+    let type: String
+    let qty: Double
+    let status: String
+    let filledPrice: Double?
+    let filledQty: Double?
+    let rejectReason: String?
+    let createdAt: Double
+}
+
+struct OrdersResponse: Decodable {
+    let ok: Bool
+    let orders: [APIOrder]
+}
