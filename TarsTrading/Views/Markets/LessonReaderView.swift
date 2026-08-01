@@ -21,6 +21,7 @@ struct LessonReaderView: View {
     @State private var picked: [Int: Int] = [:]     // quiz index → choice
     @State private var revealed: Set<Int> = []
     @Environment(\.dismiss) private var dismiss
+    @State private var openSymbol: String?
 
     /// Quiz blocks in order, with their position among quizzes.
     private var quizzes: [(quizIndex: Int, block: APIBlock)] {
@@ -69,6 +70,8 @@ struct LessonReaderView: View {
         .toolbarBackground(TarsTheme.bg0, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .task { await model.load(lessonId) }
+        // A lesson that says "go look at SPY" should be able to show you SPY.
+        .navigationDestination(item: $openSymbol) { MarketSymbolView(symbol: $0) }
     }
 
     private func header(_ l: APILesson) -> some View {
@@ -121,12 +124,15 @@ struct LessonReaderView: View {
             }
 
         case "desk":
-            DossierSection(title: "Try it on the desk") {
-                Text(b.instruction ?? "")
-                    .font(TarsTheme.Text.body)
-                    .foregroundStyle(TarsTheme.inkPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
+            DeskTaskBlock(instruction: b.instruction ?? "", symbol: b.symbol) { sym in
+                openSymbol = sym
             }
+
+        case "flashcards":
+            FlashcardDeck(title: b.title, cards: b.cards ?? [])
+
+        case "calc":
+            LessonCalculator(tool: b.tool ?? "", title: b.title)
 
         case "quiz":
             quizView(b, index: quizIndex)
@@ -134,8 +140,8 @@ struct LessonReaderView: View {
         default:
             // A block this build can't draw. Say so plainly instead of
             // rendering nothing and leaving a hole in the argument.
-            DossierSection(title: "Interactive") {
-                Text("This part of the lesson is interactive and lives on the web for now — open it at tarstrading.com to try it.")
+            DossierSection(title: b.kind == "game" ? "Drill" : b.kind == "chart" ? "Diagram" : "Interactive") {
+                Text(b.caption ?? "This part of the lesson is interactive and lives on the web for now — open it at tarstrading.com to try it.")
                     .font(TarsTheme.Text.caption)
                     .foregroundStyle(TarsTheme.inkTertiary)
                     .fixedSize(horizontal: false, vertical: true)

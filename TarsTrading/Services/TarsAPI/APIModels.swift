@@ -152,6 +152,12 @@ struct CurriculumResponse: Decodable {
 /// A lesson block. The server sends a discriminated union; the phone reads
 /// the kinds it can render and skips the rest rather than failing a lesson
 /// because one widget is newer than this build.
+struct APIFlashcard: Decodable, Equatable, Identifiable {
+    var id: String { front }
+    let front: String
+    let back: String
+}
+
 struct APIBlock: Decodable, Equatable {
     let kind: String
     let text: String?
@@ -164,6 +170,14 @@ struct APIBlock: Decodable, Equatable {
     let explain: String?
     let instruction: String?
     let symbol: String?
+    /// Flashcards are the course's biggest interactive element — 49 decks —
+    /// and a phone is the right place for them.
+    let cards: [APIFlashcard]?
+    /// Which calculator ("position-size", "risk-reward", …).
+    let tool: String?
+    /// Which teaching chart or drill ("candle-anatomy", "sma-cross", …).
+    let variant: String?
+    let caption: String?
 }
 
 struct APILesson: Decodable, Equatable {
