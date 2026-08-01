@@ -12,6 +12,7 @@ import Charts
 */
 struct MarketSymbolView: View {
     let symbol: String
+    @Environment(SessionStore.self) private var session
     @State private var model: SymbolModel
     @State private var ticketSide: String?
     @Environment(\.scenePhase) private var scenePhase
@@ -31,8 +32,11 @@ struct MarketSymbolView: View {
                 chartSection
                 tradeBar
                     .padding(.horizontal, TarsTheme.Space.l)
+                context
+                    .padding(.horizontal, TarsTheme.Space.l)
             }
             .padding(.vertical, TarsTheme.Space.l)
+            .padding(.bottom, 64)
         }
         .background(TarsTheme.bg0)
         .navigationTitle(SymbolDisplay.pretty(symbol))
@@ -80,6 +84,112 @@ struct MarketSymbolView: View {
                 .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Context: what you hold, and where the price sits
+
+    @ViewBuilder private var context: some View {
+        VStack(alignment: .leading, spacing: TarsTheme.Space.l) {
+            if let p = session.positions.first(where: { $0.symbol == symbol }) {
+                positionCard(p)
+            }
+            rangeSection
+            factsRow
+        }
+        .padding(.top, TarsTheme.Space.s)
+    }
+
+    /// Your stake in this market — the number that makes the chart personal.
+    private func positionCard(_ p: APIPosition) -> some View {
+        let px = model.quote?.price
+        let value = px.map { $0 * p.qty }
+        let pnl = px.map { ($0 - p.avgEntryPrice) * p.qty }
+        return VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
+            TarsMicroLabel("Your position")
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(p.qty > 0 ? "+" : "")\(p.qty.formatted()) @ \(SymbolDisplay.price(symbol, p.avgEntryPrice))")
+                        .font(TarsTheme.Text.body.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(TarsTheme.inkPrimary)
+                    if p.qty < 0 {
+                        Text("SHORT")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundStyle(TarsTheme.loss)
+                    }
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    if let value {
+                        Text(value, format: .currency(code: "USD"))
+                            .font(TarsTheme.Text.body.monospacedDigit())
+                            .foregroundStyle(TarsTheme.inkPrimary)
+                            .contentTransition(.numericText())
+                            .animation(.snappy, value: value)
+                    }
+                    if let pnl {
+                        Text("\(pnl >= 0 ? "+" : "")\(pnl, format: .currency(code: "USD"))")
+                            .font(TarsTheme.Text.caption.monospacedDigit())
+                            .foregroundStyle(TarsTheme.pnl(pnl))
+                            .contentTransition(.numericText())
+                            .animation(.snappy, value: pnl)
+                    }
+                }
+            }
+        }
+        .padding(TarsTheme.Space.l)
+        .tarsPanel()
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Where today sits inside the window you're looking at.
+    @ViewBuilder private var rangeSection: some View {
+        if let lo = model.bars.map(\.low).min(),
+           let hi = model.bars.map(\.high).max(), hi > lo,
+           let px = model.quote?.price {
+            let t = min(max((px - lo) / (hi - lo), 0), 1)
+            VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
+                TarsMicroLabel("\(model.timeframe) range")
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(TarsTheme.bg3).frame(height: 4)
+                        Circle().fill(TarsTheme.inkPrimary)
+                            .frame(width: 9, height: 9)
+                            .offset(x: (geo.size.width - 9) * CGFloat(t))
+                    }
+                    .frame(maxHeight: .infinity)
+                }
+                .frame(height: 12)
+                HStack {
+                    Text(SymbolDisplay.price(symbol, lo))
+                    Spacer()
+                    Text(SymbolDisplay.price(symbol, hi))
+                }
+                .font(TarsTheme.Text.micro.monospacedDigit())
+                .foregroundStyle(TarsTheme.inkTertiary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Price sits \(Int(t * 100)) percent up the \(model.timeframe) range")
+        }
+    }
+
+    @ViewBuilder private var factsRow: some View {
+        if let q = model.quote {
+            HStack(spacing: TarsTheme.Space.xl) {
+                VStack(alignment: .leading, spacing: 2) {
+                    TarsMicroLabel("Prev close")
+                    Text(SymbolDisplay.price(symbol, q.previousClose))
+                        .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(TarsTheme.inkPrimary)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    TarsMicroLabel("Today")
+                    Text("\(q.changePercent >= 0 ? "+" : "")\(q.changePercent * 100, specifier: "%.2f")%")
+                        .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(TarsTheme.pnl(q.changePercent))
+                }
+                Spacer()
+            }
+        }
     }
 
     // MARK: - Header: the price, big enough to feel

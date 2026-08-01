@@ -16,6 +16,7 @@ struct DeskView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var pushed: String?
     @State private var deskRoute: DeskRoute?
+    @State private var heroDocked = false
     @Environment(\.dynamicTypeSize) private var typeSize
     enum DeskRoute: String, Identifiable {
         case margin, risk, journal, alerts, notifications, floor
@@ -23,9 +24,27 @@ struct DeskView: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+        // The header is PINNED — it cannot scroll away, because it is the
+        // landing pad for the docked equity number.
+        header
+            .padding(.horizontal, TarsTheme.Space.l)
+            .background(TarsTheme.bg0)
         ScrollView {
+            VStack(spacing: 0) {
+            /*
+              The dock sentinel lives OUTSIDE the lazy container: a lazy
+              stack recycles far-offscreen children, and a recycled
+              publisher resets the preference to its default — the docked
+              number vanished exactly when it was needed. A zero-height
+              plain-VStack child is never recycled.
+            */
+            GeometryReader { g in
+                Color.clear.preference(key: HeroOffsetKey.self,
+                                       value: g.frame(in: .named("deskScroll")).minY)
+            }
+            .frame(height: 0)
             LazyVStack(alignment: .leading, spacing: TarsTheme.Space.l) {
-                header
                 equityHero
                 deskLinks
                 positionsCard
@@ -34,6 +53,14 @@ struct DeskView: View {
             .padding(TarsTheme.Space.l)
             // Clear the floating tab bar — the last card must be readable.
             .padding(.bottom, 72)
+            }
+        }
+        .coordinateSpace(name: "deskScroll")
+        .onPreferenceChange(HeroOffsetKey.self) { minY in
+            // Scrolled past the hero's height → the big number is gone;
+            // its small self reports to the pinned header.
+            withAnimation(.snappy) { heroDocked = minY < -120 }
+        }
         }
         .background(TarsTheme.bg0)
         // The equity number is the header; a nav bar saying "Desk" above
@@ -81,6 +108,16 @@ struct DeskView: View {
             Text("Desk")
                 .font(TarsTheme.Text.screenTitle)
                 .foregroundStyle(TarsTheme.inkPrimary)
+            // The docked hero: scrolled past the big number, it reappears
+            // here small — your equity is never off screen (Robinhood's
+            // collapse-into-the-bar, without renting Apple's nav bar).
+            if heroDocked, let risk = session.risk {
+                Text(risk.equity, format: .currency(code: "USD").precision(.fractionLength(0)))
+                    .font(TarsTheme.Text.body.monospacedDigit().weight(.semibold))
+                    .foregroundStyle(TarsTheme.inkSecondary)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .padding(.leading, TarsTheme.Space.s)
+            }
             Spacer()
             Button { Haptics.tap(); deskRoute = .notifications } label: {
                 ZStack(alignment: .topTrailing) {
@@ -376,5 +413,13 @@ final class DeskModel {
     private func tickOrders() async {
         if let fresh = try? await api.orders() { orders = fresh }
         loadedOrders = true
+    }
+}
+
+/// Tracks the hero's bottom edge in the desk scroll space.
+private struct HeroOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = .greatestFiniteMagnitude
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = min(value, nextValue())
     }
 }

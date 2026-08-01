@@ -108,6 +108,11 @@ struct APIQuote: Decodable, Identifiable, Equatable {
     let provenance: Provenance?
 }
 
+struct SparksResponse: Decodable {
+    let ok: Bool
+    let sparks: [String: [Double]]
+}
+
 struct QuotesResponse: Decodable {
     let ok: Bool
     let quotes: [APIQuote]

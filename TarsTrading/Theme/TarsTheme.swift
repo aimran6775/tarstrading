@@ -162,6 +162,47 @@ enum TarsTheme {
 
 // MARK: - Reusable chrome
 
+/// Micro-label law: caps, tracked, tertiary. One helper so every section
+/// header whispers identically.
+struct TarsMicroLabel: View {
+    let text: String
+    var tone: Color
+    init(_ text: String, tone: Color = TarsTheme.inkTertiary) {
+        self.text = text; self.tone = tone
+    }
+    var body: some View {
+        Text(text.uppercased())
+            .font(TarsTheme.Text.micro)
+            .kerning(0.8)
+            .foregroundStyle(tone)
+            .lineLimit(1)
+    }
+}
+
+/// A sparkline as a pure renderer — values in, 1.5pt of history out, no
+/// axes, no chrome, no fetching. (The legacy `Sparkline` in the watchlist
+/// fetches for itself from the old direct-broker era; this one is fed by
+/// the platform's vault-served /sparks payload.)
+struct SparkPath: View {
+    let values: [Double]
+    var tone: Color = TarsTheme.inkSecondary
+    var body: some View {
+        Canvas { ctx, size in
+            guard values.count > 1,
+                  let lo = values.min(), let hi = values.max(), hi > lo else { return }
+            var path = Path()
+            for (i, v) in values.enumerated() {
+                let x = size.width * CGFloat(i) / CGFloat(values.count - 1)
+                let y = size.height * (1 - CGFloat((v - lo) / (hi - lo)))
+                if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                else { path.addLine(to: CGPoint(x: x, y: y)) }
+            }
+            ctx.stroke(path, with: .color(tone),
+                       style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+        }
+    }
+}
+
 /// The apex — the brand mark, drawn rather than shipped as an asset so it
 /// stays crisp at any size. A gold pyramid with its ridge shadowed, the
 /// same silhouette as the web's TarsMark and the app icon's rising step.

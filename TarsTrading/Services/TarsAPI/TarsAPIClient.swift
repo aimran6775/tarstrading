@@ -140,6 +140,16 @@ actor TarsAPIClient {
 
 extension TarsAPIClient {
     /// The curated board — Trending by default, or one venue's own page.
+    /// Mini-series for board rows — the vault's daily closes, <=32 points,
+    /// 32 symbols a call. An empty series is honest: no history stored yet.
+    func sparks(symbols: [String]) async throws -> [String: [Double]] {
+        guard !symbols.isEmpty else { return [:] }
+        let joined = symbols.prefix(32).joined(separator: ",")
+            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let res: SparksResponse = try await request("GET", "/api/market/sparks?symbols=\(joined)")
+        return res.sparks
+    }
+
     func board(category: String? = nil, limit: Int = 250) async throws -> BoardResponse {
         var path = "/api/market/board?limit=\(limit)"
         if let category, !category.isEmpty {

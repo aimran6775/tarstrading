@@ -378,6 +378,12 @@ struct MarketsHomeView: View {
                 }
             }
             Spacer()
+            if let series = model.sparks[row.symbol], series.count > 1 {
+                SparkPath(values: series,
+                          tone: (row.changePercent ?? 0) >= 0 ? TarsTheme.gain : TarsTheme.loss)
+                    .frame(width: 56, height: 20)
+                    .accessibilityHidden(true)
+            }
             VStack(alignment: .trailing, spacing: 2) {
                 if let price = row.price {
                     Text(SymbolDisplay.price(row.symbol, price))
@@ -464,6 +470,7 @@ final class MarketsModel {
     ]
 
     private(set) var rows: [BoardRowPayload] = []
+    private(set) var sparks: [String: [Double]] = [:]
     private(set) var venues: [VenueCount] = []
     private(set) var movers: MoversPayload?
     private(set) var totalMarkets = 0
@@ -523,6 +530,11 @@ final class MarketsModel {
             if let v = res.venues, !v.isEmpty { venues = v }
             if let t = res.total, t > 0 { totalMarkets = t }
             stale = false
+            // The first screenful gets lines; scrolling further stays cheap.
+            let want = Array(res.rows.prefix(32).map(\.symbol))
+            if let fresh = try? await api.sparks(symbols: want) {
+                sparks.merge(fresh) { _, new in new }
+            }
         } catch {
             stale = true // last-good stands; the banner tells the truth
         }
