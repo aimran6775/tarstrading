@@ -80,12 +80,12 @@ struct DeskJournalView: View {
                 Button {
                     Haptics.tick(); filter = f
                 } label: {
-                    Text(f.rawValue)
-                        .font(TarsTheme.Text.caption.weight(.semibold))
-                        .foregroundStyle(on ? TarsTheme.onFill : TarsTheme.inkSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                        .background(on ? TarsTheme.paperBadge : TarsTheme.bg2)
-                        .clipShape(Capsule())
+                    Text(f.rawValue.uppercased())
+                        .font(TarsTheme.Text.caption.weight(on ? .bold : .medium))
+                        .kerning(0.6)
+                        .foregroundStyle(on ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }

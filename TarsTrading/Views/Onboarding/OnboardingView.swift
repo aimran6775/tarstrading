@@ -381,21 +381,17 @@ fileprivate struct OrbitalMark: View {
 
     var body: some View {
         ZStack {
+            // The apex on a soft aurora — the same mark as the icon and
+            // every header; the old orbital ring was a second brand.
             Circle()
                 .fill(TarsTheme.tarsAurora)
-                .overlay(Circle().strokeBorder(TarsTheme.accent.opacity(0.4), lineWidth: 1))
-            Ellipse()
-                .strokeBorder(TarsTheme.accent.opacity(0.8), lineWidth: max(1, size / 30))
-                .frame(width: size * 1.1, height: size * 0.42)
-                .rotationEffect(.degrees(spin ? 360 : 0))
-            Circle()
-                .fill(TarsTheme.accent)
-                .frame(width: size * 0.16, height: size * 0.16)
+                .scaleEffect(spin ? 1.06 : 0.98)
+            TarsApexMark(size: size * 0.56)
         }
         .frame(width: size, height: size)
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(Motion.orbit(9).repeatForever(autoreverses: false)) {
+            withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
                 spin = true
             }
         }

@@ -30,6 +30,9 @@ struct DeskView: View {
         header
             .padding(.horizontal, TarsTheme.Space.l)
             .background(TarsTheme.bg0)
+            .overlay(alignment: .bottom) {
+                if heroDocked { Divider().overlay(TarsTheme.hairline) }
+            }
         ScrollView {
             VStack(spacing: 0) {
             /*

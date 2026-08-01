@@ -39,10 +39,9 @@ struct AnalystFloorView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("FLOOR P&L").font(TarsTheme.Text.micro)
                     .foregroundStyle(TarsTheme.inkQuaternary)
-                Text("\(model.livePnl >= 0 ? "+" : "")\(model.livePnl, format: .currency(code: "USD"))")
+                Text("\(model.livePnl > 0 ? "+" : "")\(model.livePnl, format: .currency(code: "USD"))")
                     .font(TarsTheme.Text.heading.monospacedDigit())
-                    .foregroundStyle(model.livePnl > 0 ? TarsTheme.gain
-                        : model.livePnl < 0 ? TarsTheme.loss : TarsTheme.inkPrimary)
+                    .foregroundStyle(TarsTheme.pnl(model.livePnl))
                 if model.retiredCount > 0 {
                     Text("\(model.retiredPnl >= 0 ? "+" : "")\(model.retiredPnl, format: .currency(code: "USD")) from \(model.retiredCount) retired")
                         .font(TarsTheme.Text.micro)
@@ -148,6 +147,8 @@ struct AnalystFloorView: View {
             .font(.system(size: 9, weight: .bold, design: .monospaced))
             .kerning(0.5)
             .foregroundStyle(tone)
+            .padding(.horizontal, 7).padding(.vertical, 3)
+            .background(Capsule().fill(tone.opacity(0.12)))
     }
 
     /// The bench's sigils are names, not emoji — map them to SF Symbols.

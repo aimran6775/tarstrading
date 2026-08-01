@@ -175,7 +175,7 @@ struct MarginDeskView: View {
                             Spacer()
                             Text(p.regime.uppercased())
                                 .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .foregroundStyle(TarsTheme.paperBadge)
+                                .foregroundStyle(TarsTheme.inkTertiary)
                         }
                         Text(p.detail).font(TarsTheme.Text.micro)
                             .foregroundStyle(TarsTheme.inkQuaternary)

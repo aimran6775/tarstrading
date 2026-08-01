@@ -39,11 +39,10 @@ struct RiskDeskView: View {
                     model.setDays(d)
                 } label: {
                     Text("\(d)d")
-                        .font(TarsTheme.Text.caption.weight(.semibold))
-                        .foregroundStyle(on ? TarsTheme.onFill : TarsTheme.inkSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                        .background(on ? TarsTheme.paperBadge : TarsTheme.bg2)
-                        .clipShape(Capsule())
+                        .font(TarsTheme.Text.caption.weight(on ? .bold : .medium))
+                        .foregroundStyle(on ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -101,7 +100,8 @@ struct RiskDeskView: View {
             if let eff = model.report?.effectivePositions {
                 Text(String(format: "%.1f", eff))
                     .font(TarsTheme.Text.displayMedium)
-                    .foregroundStyle(eff < 2 ? TarsTheme.warning : TarsTheme.inkPrimary)
+                    .foregroundStyle(eff < 2 && (model.report?.correlations.count ?? 0) >= 3
+                        ? TarsTheme.warning : TarsTheme.inkPrimary)
                 Text("effective positions — you hold \(model.report?.correlations.count ?? 0), but weighted by size the book behaves like this many. Diversification is about weight, not count.")
                     .font(TarsTheme.Text.micro)
                     .foregroundStyle(TarsTheme.inkTertiary)

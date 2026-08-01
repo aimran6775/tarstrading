@@ -13,6 +13,7 @@ struct TradeTicketSheet: View {
     let symbol: String
     let side: String              // "buy" | "sell"
     let quote: APIQuote?
+    @Environment(SessionStore.self) private var session
     @Environment(\.dismiss) private var dismiss
 
     @State private var qty: Double = 1
@@ -36,9 +37,27 @@ struct TradeTicketSheet: View {
         VStack(spacing: TarsTheme.Space.l) {
             Capsule().fill(TarsTheme.bg3).frame(width: 36, height: 5).padding(.top, 10)
 
-            Text("\(isBuy ? "Buy" : "Sell") \(SymbolDisplay.pretty(symbol))")
-                .font(TarsTheme.Text.title)
-                .foregroundStyle(TarsTheme.inkPrimary)
+            ZStack {
+                VStack(spacing: 3) {
+                    TarsMicroLabel(isFutures ? "Futures market order" : "Market order")
+                    Text("\(isBuy ? "Buy" : "Sell") \(SymbolDisplay.pretty(symbol))")
+                        .font(TarsTheme.Text.title)
+                        .foregroundStyle(TarsTheme.inkPrimary)
+                }
+                HStack {
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(TarsTheme.inkTertiary)
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(TarsTheme.bg2))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close")
+                }
+                .padding(.trailing, TarsTheme.Space.l)
+            }
 
             switch phase {
             case .compose, .submitting:
@@ -143,7 +162,7 @@ struct TradeTicketSheet: View {
                 Text("Quantity").font(TarsTheme.Text.body).foregroundStyle(TarsTheme.inkSecondary)
                 Spacer()
                 HStack(spacing: TarsTheme.Space.l) {
-                    stepper("minus") { if qty > 1 { qty -= 1; Haptics.tick() } }
+                    stepper("minus", disabled: qty <= 1) { if qty > 1 { qty -= 1; Haptics.tick() } }
                     Text(qty, format: .number.precision(.fractionLength(0)))
                         .font(TarsTheme.Text.heading.monospacedDigit())
                         .foregroundStyle(TarsTheme.inkPrimary)
@@ -169,11 +188,21 @@ struct TradeTicketSheet: View {
                         Text(est, format: .currency(code: "USD"))
                             .font(TarsTheme.Text.heading.monospacedDigit())
                             .foregroundStyle(TarsTheme.inkPrimary)
+                            .contentTransition(.numericText())
+                            .animation(.snappy, value: est)
                     } else {
                         Text("—").foregroundStyle(TarsTheme.inkTertiary)
                     }
                 }
                 .padding(.horizontal, TarsTheme.Space.l)
+                // The teaching line: cost against the power to pay it.
+                if isBuy, let bp = session.risk?.buyingPower {
+                    Text("of \(bp.formatted(.currency(code: "USD").precision(.fractionLength(0)))) buying power")
+                        .font(TarsTheme.Text.micro)
+                        .foregroundStyle(TarsTheme.inkTertiary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .padding(.horizontal, TarsTheme.Space.l)
+                }
                 bracketBlock
             }
 
@@ -230,16 +259,18 @@ struct TradeTicketSheet: View {
         }
     }
 
-    private func stepper(_ icon: String, action: @escaping () -> Void) -> some View {
+    private func stepper(_ icon: String, disabled: Bool = false,
+                         action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(TarsTheme.inkPrimary)
+                .foregroundStyle(disabled ? TarsTheme.disabled(TarsTheme.inkPrimary) : TarsTheme.inkPrimary)
                 .frame(width: 44, height: 44)
-                .background(TarsTheme.bg3)
+                .background(TarsTheme.bg3.opacity(disabled ? 0.5 : 1))
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
+        .disabled(disabled)
     }
 
     private func submit() {
@@ -283,18 +314,20 @@ private struct HoldRitual: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(enabled ? tone.opacity(0.16) : TarsTheme.bg3)
+            // Solid, not washed: a 16%-opacity commit button reads as a
+            // disabled one. This is the single earned solid on the sheet.
+            RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
+                .fill(enabled ? tone : TarsTheme.bg3)
             GeometryReader { geo in
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(tone.opacity(0.35))
+                RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
+                    .fill(Color.black.opacity(0.28))
                     .frame(width: geo.size.width * progress)
                     .animation(holding ? .linear(duration: duration) : .spring(duration: 0.3), value: progress)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous))
             Text(holding ? "Keep holding…" : label)
                 .font(TarsTheme.Text.heading)
-                .foregroundStyle(enabled ? tone : TarsTheme.inkTertiary)
+                .foregroundStyle(enabled ? TarsTheme.onFill : TarsTheme.inkTertiary)
         }
         .frame(height: 56)
         .opacity(enabled ? 1 : 0.6)

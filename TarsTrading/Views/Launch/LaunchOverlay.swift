@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The signature open: a starfield condenses into the Tars orbital mark, the
+/// The signature open: a starfield condenses into the apex mark, the
 /// wordmark breathes in, then the whole thing dissolves into the workspace.
 /// Runs once per cold launch; skipped entirely under Reduce Motion.
 struct LaunchOverlay: View {
@@ -31,8 +31,8 @@ struct LaunchOverlay: View {
                     VStack(spacing: TarsTheme.Space.m) {
                         Spacer()
                         Text("TARS TRADING")
-                            .font(TarsTheme.Text.title)
-                            .kerning(6)
+                            .font(Font.system(size: 24, weight: .bold).width(.condensed))
+                            .kerning(4)
                             .foregroundStyle(TarsTheme.inkPrimary)
                         Text("Learn. Practice. Then let your agents practice.")
                             .font(TarsTheme.Text.caption)
@@ -89,10 +89,21 @@ private struct StarSpec: Identifiable {
     let scatterSeed: (Double, Double)
 
     func formed(around center: CGPoint) -> CGPoint {
-        if id == 0 { return center }   // the core
-        let rx: CGFloat = 120, ry: CGFloat = 46
-        return CGPoint(x: center.x + rx * Foundation.cos(angle),
-                       y: center.y + ry * Foundation.sin(angle))
+        // Stars settle onto the APEX: the triangle perimeter of the brand
+        // mark — the same silhouette as the app icon the user just tapped.
+        if id == 0 { return CGPoint(x: center.x, y: center.y + 8) } // the ember under the peak
+        let w: CGFloat = 220, h: CGFloat = 150
+        let t = angle / (2 * Double.pi)          // 0..1 around the perimeter
+        let a = CGPoint(x: center.x, y: center.y - h / 2)            // peak
+        let b = CGPoint(x: center.x + w / 2, y: center.y + h / 2)    // right foot
+        let c = CGPoint(x: center.x - w / 2, y: center.y + h / 2)    // left foot
+        func lerp(_ p: CGPoint, _ q: CGPoint, _ f: CGFloat) -> CGPoint {
+            CGPoint(x: p.x + (q.x - p.x) * f, y: p.y + (q.y - p.y) * f)
+        }
+        let f = CGFloat(t * 3)
+        if f < 1 { return lerp(a, b, f) }
+        if f < 2 { return lerp(b, c, f - 1) }
+        return lerp(c, a, f - 2)
     }
 
     func scattered(in size: CGSize) -> CGPoint {

@@ -28,13 +28,10 @@ struct LoginView: View {
 
                 // Identity — the gold mark and the promise.
                 VStack(spacing: 14) {
-                    Image(systemName: "triangle.fill")
-                        .font(.system(size: 44, weight: .bold))
-                        .foregroundStyle(TarsTheme.paperBadge)
-                        .accessibilityHidden(true)
+                    TarsApexMark(size: 52)
                     Text("TARS TRADING")
-                        .font(.system(size: 28, weight: .heavy, design: .rounded))
-                        .kerning(3)
+                        .font(Font.system(size: 28, weight: .bold).width(.condensed))
+                        .kerning(2.5)
                         .foregroundStyle(TarsTheme.inkPrimary)
                     Text("A flight simulator for markets.")
                         .font(TarsTheme.Text.body)
@@ -83,6 +80,19 @@ struct LoginView: View {
                     .disabled(!canSubmit)
                     .animation(.easeOut(duration: 0.15), value: canSubmit)
                     .padding(.top, 6)
+
+                    // Accounts are minted on the web — say so instead of
+                    // dead-ending someone who doesn't have one yet.
+                    HStack(spacing: TarsTheme.Space.xl) {
+                        Link("Create account",
+                             destination: URL(string: "https://tarstrading.com/signup")!)
+                        Link("Forgot password?",
+                             destination: URL(string: "https://tarstrading.com/login")!)
+                    }
+                    .font(TarsTheme.Text.caption.weight(.medium))
+                    .tint(TarsTheme.accent)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, TarsTheme.Space.m)
                 }
                 .frame(maxWidth: 420) // iPad: a column, never a stretched sheet
                 .padding(.horizontal, 28)
@@ -97,6 +107,7 @@ struct LoginView: View {
                     .padding(.bottom, 28)
             }
         }
+        .tint(TarsTheme.accent) // gold caret and selection, not system blue
         .onAppear { focus = .email }
     }
 

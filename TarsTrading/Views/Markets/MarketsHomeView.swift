@@ -22,13 +22,24 @@ struct MarketsHomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var typeSize
 
+    /// GOOG and GOOGL are the same story wearing two tickers — keep the first.
+    private func dedupeClasses(_ rows: [BoardRowPayload]) -> [BoardRowPayload] {
+        var kept: [BoardRowPayload] = []
+        for r in rows {
+            let stem = r.symbol.count > 4 ? String(r.symbol.dropLast()) : r.symbol
+            if kept.contains(where: { $0.symbol == stem || $0.symbol == r.symbol }) { continue }
+            kept.append(r)
+        }
+        return kept
+    }
+
     /// One door for both worlds: select in place on the terminal, push on the phone.
     private func open(_ symbol: String) {
         if let onSelect { onSelect(symbol) } else { pushed = symbol }
     }
 
-    static let indexName = [
-        "SPY": "S&P 500", "QQQ": "Nasdaq 100", "DIA": "Dow 30", "IWM": "Russell 2000",
+    static let indexName = [ // short enough to never truncate in a quarter-column
+        "SPY": "S&P 500", "QQQ": "NASDAQ", "DIA": "DOW 30", "IWM": "RUSSELL",
     ]
 
     /// The rows the search allows through — instant, over what's loaded.
@@ -205,12 +216,13 @@ struct MarketsHomeView: View {
                     }
                 }
                 .frame(height: 6)
+                // The BAR carries the color; the counts just report.
                 HStack {
-                    Text("\(b.advancing) adv").foregroundStyle(TarsTheme.gain)
+                    Text("\(b.advancing) adv").foregroundStyle(TarsTheme.inkSecondary)
                     Spacer()
                     Text("\(b.unchanged) flat").foregroundStyle(TarsTheme.inkTertiary)
                     Spacer()
-                    Text("\(b.declining) dec").foregroundStyle(TarsTheme.loss)
+                    Text("\(b.declining) dec").foregroundStyle(TarsTheme.inkSecondary)
                 }
                 .font(TarsTheme.Text.micro.monospacedDigit())
             }
@@ -278,13 +290,15 @@ struct MarketsHomeView: View {
 
     /// What moved — the two rails that answer "anything happening?" first.
     @ViewBuilder private var moversRail: some View {
+        // Share classes tell one story once: GOOGL yields to GOOG.
         if let m = model.movers, let gainers = m.gainers, !gainers.isEmpty {
             VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
                 Text("WHAT MOVED").font(TarsTheme.Text.micro).kerning(1.5)
                     .foregroundStyle(TarsTheme.inkQuaternary)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: TarsTheme.Space.s) {
-                        ForEach((gainers.prefix(4) + (m.losers ?? []).prefix(4))) { r in
+                        let rail = Array(gainers.prefix(4)) + Array((m.losers ?? []).prefix(4))
+                        ForEach(dedupeClasses(rail)) { r in
                             Button { open(r.symbol) } label: {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(SymbolDisplay.pretty(r.symbol))
@@ -378,12 +392,18 @@ struct MarketsHomeView: View {
                 }
             }
             Spacer()
-            if let series = model.sparks[row.symbol], series.count > 1 {
-                SparkPath(values: series,
-                          tone: (row.changePercent ?? 0) >= 0 ? TarsTheme.gain : TarsTheme.loss)
-                    .frame(width: 56, height: 20)
-                    .accessibilityHidden(true)
+            // The slot is reserved either way — a ragged price column costs
+            // more than an empty sparkline cell.
+            Group {
+                if let series = model.sparks[row.symbol], series.count > 1 {
+                    SparkPath(values: series,
+                              tone: (row.changePercent ?? 0) >= 0 ? TarsTheme.gain : TarsTheme.loss)
+                } else {
+                    Color.clear
+                }
             }
+            .frame(width: 56, height: 20)
+            .accessibilityHidden(true)
             VStack(alignment: .trailing, spacing: 2) {
                 if let price = row.price {
                     Text(SymbolDisplay.price(row.symbol, price))

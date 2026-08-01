@@ -34,10 +34,10 @@ struct DeskAlertsView: View {
 
     private var composer: some View {
         VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
-            Picker("Kind", selection: $mode) {
-                ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            houseSegments(Mode.allCases.map(\.rawValue),
+                          selected: mode.rawValue) { picked in
+                if let m = Mode.allCases.first(where: { $0.rawValue == picked }) { mode = m }
             }
-            .pickerStyle(.segmented)
 
             if mode == .price {
                 field("Symbol", text: $symbol, placeholder: "AAPL, BTC/USD, FX:EURUSD",
@@ -50,11 +50,13 @@ struct DeskAlertsView: View {
                     .foregroundStyle(TarsTheme.inkQuaternary)
             }
 
-            Picker("Direction", selection: $direction) {
-                Text(mode == .price ? "Rises above" : "Rises past").tag("above")
-                Text(mode == .price ? "Falls below" : "Falls under").tag("below")
+            houseSegments([mode == .price ? "Rises above" : "Rises past",
+                           mode == .price ? "Falls below" : "Falls under"],
+                          selected: direction == "above"
+                              ? (mode == .price ? "Rises above" : "Rises past")
+                              : (mode == .price ? "Falls below" : "Falls under")) { picked in
+                direction = picked.hasPrefix("Rises") ? "above" : "below"
             }
-            .pickerStyle(.segmented)
 
             Button {
                 Task { await create() }
@@ -63,9 +65,10 @@ struct DeskAlertsView: View {
                     .font(TarsTheme.Text.heading)
                     .frame(maxWidth: .infinity, minHeight: 48)
             }
-            .background(canCreate ? TarsTheme.paperBadge : TarsTheme.bg3)
-            .foregroundStyle(canCreate ? TarsTheme.onFill : TarsTheme.inkTertiary)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(canCreate ? TarsTheme.accent : TarsTheme.bg2)
+            .foregroundStyle(canCreate ? TarsTheme.onFill : TarsTheme.disabled(TarsTheme.inkTertiary))
+            .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+            .opacity(canCreate ? 1 : 0.7)
             .disabled(!canCreate)
 
             if let err = model.error {
@@ -140,6 +143,30 @@ struct DeskAlertsView: View {
         }
         .padding(.horizontal, TarsTheme.Space.l)
         .padding(.vertical, TarsTheme.Space.s)
+    }
+
+    /// The house two-way selector: text weight and ink, no system chrome.
+    private func houseSegments(_ options: [String], selected: String,
+                               onPick: @escaping (String) -> Void) -> some View {
+        HStack(spacing: TarsTheme.Space.s) {
+            ForEach(options, id: \.self) { opt in
+                let on = opt == selected
+                Button {
+                    Haptics.tick(); onPick(opt)
+                } label: {
+                    Text(opt)
+                        .font(TarsTheme.Text.caption.weight(on ? .bold : .medium))
+                        .foregroundStyle(on ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(on ? TarsTheme.bg3 : TarsTheme.bg1)
+                        .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous)
+                            .strokeBorder(on ? TarsTheme.hairlineStrong : TarsTheme.hairline, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(on ? [.isSelected] : [])
+            }
+        }
     }
 
     private func field(_ label: String, text: Binding<String>,

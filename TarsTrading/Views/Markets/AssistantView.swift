@@ -49,7 +49,8 @@ struct AssistantView: View {
                         .id("thinking")
                     }
                 }
-                .padding(.vertical, TarsTheme.Space.l)
+                .padding(.top, TarsTheme.Space.xl)
+                .padding(.bottom, TarsTheme.Space.l)
             }
             .onChange(of: model.messages.count) { _, _ in
                 withAnimation { proxy.scrollTo(model.messages.last?.id, anchor: .bottom) }
@@ -100,12 +101,14 @@ struct AssistantView: View {
             if mine { Spacer(minLength: 48) }
             Text(m.text)
                 .font(TarsTheme.Text.body)
-                .foregroundStyle(mine ? TarsTheme.onFill : TarsTheme.inkPrimary)
+                .foregroundStyle(TarsTheme.inkPrimary)
                 .textSelection(.enabled)
                 .padding(.horizontal, TarsTheme.Space.l)
                 .padding(.vertical, TarsTheme.Space.m)
-                .background(mine ? TarsTheme.paperBadge : TarsTheme.bg2)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(mine ? TarsTheme.accent.opacity(0.16) : TarsTheme.bg2)
+                .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
+                    .strokeBorder(mine ? TarsTheme.accent.opacity(0.35) : .clear, lineWidth: 1))
             if !mine { Spacer(minLength: 48) }
         }
         .padding(.horizontal, TarsTheme.Space.l)

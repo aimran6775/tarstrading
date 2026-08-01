@@ -26,6 +26,7 @@ struct AcademyHomeView: View {
                 }
             }
             .padding(TarsTheme.Space.xl)
+            .padding(.bottom, 72) // clear the floating tab bar
             .frame(maxWidth: 1100)
             .frame(maxWidth: .infinity)
         }
@@ -235,15 +236,16 @@ fileprivate struct AudienceChooser: View {
                 }
             } label: {
                 Text(audience.rawValue)
-                    .font(TarsTheme.Text.caption)
-                    .foregroundStyle(TarsTheme.accent)
+                    .font(TarsTheme.Text.caption.weight(.semibold))
+                    .foregroundStyle(TarsTheme.inkPrimary)
                     .padding(.horizontal, TarsTheme.Space.l)
                     .padding(.vertical, TarsTheme.Space.m)
                     .frame(maxWidth: .infinity)
                     .background(
-                        Capsule().fill(TarsTheme.accent.opacity(0.12))
-                            .overlay(Capsule().strokeBorder(TarsTheme.accent.opacity(0.3),
-                                                            lineWidth: 1)))
+                        RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
+                            .fill(TarsTheme.bg2)
+                            .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
+                                .strokeBorder(TarsTheme.hairline, lineWidth: 1)))
             }
             .buttonStyle(PressableStyle())
             .accessibilityLabel("Start as \(audience.rawValue)")

@@ -243,6 +243,11 @@ enum SymbolDisplay {
             let wide = ["JPY", "HUF", "KRW"].contains(String(symbol.uppercased().suffix(3)))
             return value.formatted(.number.precision(.fractionLength(wide ? 4 : 5)))
         }
+        // Sub-dollar prints keep their information: SHIB at two decimals
+        // is "$0.00", which is a rounding error wearing a price's clothes.
+        if value != 0, abs(value) < 1 {
+            return value.formatted(.currency(code: "USD").precision(.significantDigits(4)))
+        }
         return value.formatted(.currency(code: "USD").precision(.fractionLength(2)))
     }
 }

@@ -40,22 +40,24 @@ struct RootView: View {
     }
 
     /// iPhone tab set. Everything else is one level in, inside More.
+    // Exactly FIVE tabs. A sixth makes iOS fold the overflow into a
+    // system "More" list, which is where the phantom back-chevrons on
+    // root tabs came from. Trade is gone — Markets IS trading.
     enum CompactTab: String, CaseIterable, Identifiable {
         case markets = "Markets"
-        case trade = "Trade"
+        case tars = "Tars"
         case portfolio = "Portfolio"
         case academy = "Academy"
-        case tars = "Tars"
         case more = "More"
         var id: String { rawValue }
+        var label: String { self == .tars ? "Assistant" : rawValue }
         var icon: String {
             switch self {
             case .markets: "globe"
-            case .trade: "chart.xyaxis.line"
             case .portfolio: "briefcase"
             case .academy: "graduationcap"
-            case .tars: "sparkles"
-            case .more: "ellipsis.circle.fill"
+            case .tars: "bubble.left.and.text.bubble.right"
+            case .more: "ellipsis.circle"
             }
         }
     }
@@ -97,7 +99,9 @@ struct RootView: View {
         }
         .tint(TarsTheme.accent)
         .sheet(isPresented: $showTars) {
-            TarsPanelView()
+            // The desk manager — the same assistant as the phone tab and
+            // the web, not the retired mentor panel.
+            NavigationStack { AssistantView() }
                 .presentationDetents([.large, .medium])
                 .presentationBackground(TarsTheme.bg1)
         }
@@ -164,28 +168,22 @@ struct RootView: View {
         TabView(selection: $tab) {
             // The desk's front page leads — the same IA as the web terminal.
             compactStack(.markets) { MarketsHomeView() }
-                .tabItem { Label(CompactTab.markets.rawValue, systemImage: CompactTab.markets.icon) }
+                .tabItem { Label(CompactTab.markets.label, systemImage: CompactTab.markets.icon) }
                 .tag(CompactTab.markets)
 
-            compactStack(.trade) { WorkspaceView() }
-                .tabItem { Label(CompactTab.trade.rawValue, systemImage: CompactTab.trade.icon) }
-                .tag(CompactTab.trade)
+            // The desk manager rides second — conversation is a first-class
+            // way to trade here.
+            compactStack(.tars) { AssistantView() }
+                .tabItem { Label(CompactTab.tars.label, systemImage: CompactTab.tars.icon) }
+                .tag(CompactTab.tars)
 
             compactStack(.portfolio) { DeskView() }
-                .tabItem { Label(CompactTab.portfolio.rawValue, systemImage: CompactTab.portfolio.icon) }
+                .tabItem { Label(CompactTab.portfolio.label, systemImage: CompactTab.portfolio.icon) }
                 .tag(CompactTab.portfolio)
 
             compactStack(.academy) { AcademyHomeView() }
-                .tabItem { Label(CompactTab.academy.rawValue, systemImage: CompactTab.academy.icon) }
+                .tabItem { Label(CompactTab.academy.label, systemImage: CompactTab.academy.icon) }
                 .tag(CompactTab.academy)
-
-            // Tars gets a whole tab on iPhone — the mentor is a first-class place.
-            NavigationStack {
-                AssistantView()
-                    .safeAreaInset(edge: .top) { ModeBanner(compact: true) }
-            }
-            .tabItem { Label(CompactTab.tars.rawValue, systemImage: CompactTab.tars.icon) }
-            .tag(CompactTab.tars)
 
             compactStack(.more) { MoreHomeView(alertEngine: alertEngine) }
                 .tabItem { Label(CompactTab.more.rawValue, systemImage: CompactTab.more.icon) }
@@ -224,7 +222,7 @@ struct RootView: View {
 
     private var rail: some View {
         VStack(spacing: TarsTheme.Space.s) {
-            TarsAvatar(size: 30, thinking: false)
+            TarsApexMark(size: 24)
                 .padding(.top, TarsTheme.Space.l)
                 .padding(.bottom, TarsTheme.Space.s)
                 .accessibilityHidden(true)
@@ -251,10 +249,13 @@ struct RootView: View {
                 Haptics.tap()
                 showTars = true
             } label: {
-                TarsAvatar(size: 40, thinking: tars.isStreaming)
+                Image(systemName: "bubble.left.and.text.bubble.right")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(TarsTheme.accent)
+                    .frame(width: 44, height: 44)
                     .background(
                         Circle().fill(TarsTheme.bg2)
-                            .shadow(color: TarsTheme.accent.opacity(0.30), radius: 10))
+                            .overlay(Circle().strokeBorder(TarsTheme.hairline, lineWidth: 1)))
             }
             .buttonStyle(PressableStyle())
             .accessibilityLabel("Ask Tars, your trading mentor")
@@ -272,8 +273,8 @@ struct RootView: View {
 
     private var mainSections: [Section] {
         let all: [Section] = prefs.complexity == .simple
-            ? [.terminal, .portfolio, .academy, .journal]
-            : [.terminal, .portfolio, .academy, .agents, .journal, .screener, .alerts]
+            ? [.markets, .portfolio, .academy, .journal]
+            : [.markets, .portfolio, .academy, .agents, .journal, .screener, .alerts]
         return all
     }
 
@@ -313,7 +314,7 @@ struct RootView: View {
     private var detail: some View {
         switch section {
         case .markets: MarketsTerminal()
-        case .terminal: WorkspaceView()
+        case .terminal: MarketsTerminal()
         case .portfolio: DeskView()
         case .academy: AcademyHomeView()
         case .agents: AgentLabView()
@@ -351,7 +352,7 @@ private extension RootView.CompactTab {
     init(matching section: RootView.Section) {
         switch section {
         case .markets: self = .markets
-        case .terminal: self = .trade
+        case .terminal: self = .markets
         case .portfolio: self = .portfolio
         case .academy: self = .academy
         default: self = .more
@@ -395,13 +396,12 @@ private struct MoreHomeView: View {
                     } label: {
                         HStack(spacing: TarsTheme.Space.l) {
                             Image(systemName: row.section.icon)
-                                .font(.system(size: 19, weight: .medium))
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(TarsTheme.accent)
-                                .frame(width: 32)
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(TarsTheme.inkSecondary)
+                                .frame(width: 30)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(row.section.rawValue)
-                                    .font(TarsTheme.Text.heading)
+                                    .font(TarsTheme.Text.body.weight(.semibold))
                                     .foregroundStyle(TarsTheme.inkPrimary)
                                 Text(row.subtitle)
                                     .font(TarsTheme.Text.caption)
@@ -413,19 +413,20 @@ private struct MoreHomeView: View {
                                 .font(TarsTheme.Text.caption)
                                 .foregroundStyle(TarsTheme.inkQuaternary)
                         }
-                        .padding(TarsTheme.Space.l)
+                        .padding(.vertical, TarsTheme.Space.m)
                         .frame(minHeight: TarsTheme.Metrics.rowPrimary)
-                        .tarsPanel()
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(PressableStyle())
+                    Divider().overlay(TarsTheme.hairline)
                 }
             }
             .padding(TarsTheme.Space.l)
+            .padding(.bottom, 72)
         }
         .background(TarsTheme.bg0)
         .navigationTitle("More")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     @ViewBuilder

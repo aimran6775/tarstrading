@@ -183,9 +183,10 @@ struct MarketSymbolView: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     TarsMicroLabel("Today")
-                    Text("\(q.changePercent >= 0 ? "+" : "")\(q.changePercent * 100, specifier: "%.2f")%")
+                    let chg = abs(q.changePercent) < 0.00005 ? 0 : q.changePercent
+                    Text("\(chg > 0 ? "+" : "")\(chg * 100, specifier: "%.2f")%")
                         .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(TarsTheme.pnl(q.changePercent))
+                        .foregroundStyle(TarsTheme.pnl(chg))
                 }
                 Spacer()
             }
@@ -203,8 +204,10 @@ struct MarketSymbolView: View {
                     .contentTransition(.numericText())
                     .animation(.snappy, value: q.price)
                 HStack(spacing: TarsTheme.Space.m) {
-                    let chg = q.changePercent
-                    Text("\(chg >= 0 ? "+" : "")\(chg * 100, specifier: "%.2f")%")
+                    // Below half a basis point the day is FLAT — a red
+                    // "-0.00%" is a lie told by floating point.
+                    let chg = abs(q.changePercent) < 0.00005 ? 0 : q.changePercent
+                    Text("\(chg > 0 ? "+" : "")\(chg * 100, specifier: "%.2f")%")
                         .font(TarsTheme.Text.heading.monospacedDigit())
                         .foregroundStyle(chg > 0 ? TarsTheme.gain : chg < 0 ? TarsTheme.loss : TarsTheme.inkTertiary)
                     if let p = q.provenance {
@@ -228,6 +231,9 @@ struct MarketSymbolView: View {
     // MARK: - The chart
 
     private var chartSection: some View {
+        // The plot is fixed geometry — its labels scale DOWN at
+        // accessibility sizes rather than eating the canvas (verified at
+        // XXXL, where axis labels took 40% of the plot).
         VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
             if model.bars.count > 1 {
                 chart
@@ -246,6 +252,7 @@ struct MarketSymbolView: View {
             timeframePicker
                 .padding(.horizontal, TarsTheme.Space.l)
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     private var up: Bool {
@@ -260,12 +267,16 @@ struct MarketSymbolView: View {
             // The lens: the day under your finger, or the latest close at rest.
             if let bar = lens {
                 HStack(spacing: TarsTheme.Space.m) {
+                    // Named, so at rest it can't read as a second live price.
+                    TarsMicroLabel(model.scrubbed == nil ? "Last close" : "")
                     Text(bar.date, format: .dateTime.month(.abbreviated).day().year())
                         .font(TarsTheme.Text.micro)
                         .foregroundStyle(TarsTheme.inkTertiary)
+                        .lineLimit(1)
                     Text(SymbolDisplay.price(symbol, bar.close))
                         .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
                         .foregroundStyle(TarsTheme.inkPrimary)
+                        .lineLimit(1).minimumScaleFactor(0.7)
                     Spacer()
                 }
                 .accessibilityElement(children: .combine)

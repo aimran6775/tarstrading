@@ -179,3 +179,36 @@ E. **Bottom-void screens** — Margin/Floor/Alerts/More end mid-screen with
     match the icon the user just tapped.
 100. ● No stated light-mode position on iOS while the web ships light —
      decide (dark-only is a legitimate Kalshi-style stance) and document it.
+
+---
+
+## Fix-down status (2026-08-01, same day)
+
+**Fixed (48):** 1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14, 15, 18, 19, 23, 24, 25,
+26, 28, 33, 35, 37, 38, 39, 45, 46, 47, 49, 51, 58, 60, 62, 63, 66, 69, 70,
+73, 74, 75, 79, 82, 84, 85, 87, 88, 89, 93, 99.
+Headliners: the five-tab IA (Markets · Assistant · Portfolio · Academy ·
+More) killed the broken Trade tab, the iPad rail's legacy Terminal, and
+every root-tab back chevron in one stroke; all four selector styles
+converged on text tabs / house segments; the hold ritual and login joined
+the apex brand family; the launch constellation now traces the apex.
+
+**Partial (6):** 10/11 (More void gone; Margin/Floor still end early),
+20 (onboarding mark swapped, chip/dots pending), 31 (names shortened, fit
+not re-verified at all widths), 57 (hairline yes, tap-to-top no),
+97 (marks consolidated except the Tars-panel avatar, which is scoped).
+
+**Deferred with reasons:**
+- Server/content: 29 (DERIVED explainer copy), 43/44 (day range + volume —
+  quote payload lacks them), 78 ($8.7 formatting + superseded answers are
+  model output), 61 (copy).
+- Larger features: 12 (landscape fullscreen chart), 48 (quick-size chips),
+  54 (position sparklines), 55/67 (day grouping), 71 (alert sections),
+  77 (transcript timestamps), 86 (Academy CTA), 90 (legacy sub-screen
+  sweep), 91/94 (iPad two-column desk + terminal desk dock), 95 (⌘K
+  discoverability), 98 (icon appearance variants), 100 (light-mode stance
+  to document).
+- Judgment holds: 30 (index red is consistent with ChangeText everywhere),
+  34 (prev-close reference line — wants design pass with scrub),
+  36/42 (axis/dot insets — measure first), 16/17/21/22/27/32/40/41/50/52/
+  53/56/59/64/65/68/72/76/80/81/83/96 (catalogued ● polish, next sweep).
