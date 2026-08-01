@@ -5,6 +5,7 @@ import SwiftUI
 /// `compact` is the iPhone form — smaller, never absent.
 struct ModeBanner: View {
     var compact = false
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     @Environment(TradingStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -25,7 +26,12 @@ struct ModeBanner: View {
                     .foregroundStyle(TarsTheme.inkSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
-            } else {
+            } else if !typeSize.isAccessibilitySize {
+                /*
+                  At accessibility sizes the subtitle truncated to "No real
+                  mo…" — an ellipsis on the honesty mark. PAPER alone carries
+                  the meaning; the qualifier is the part that can go.
+                */
                 Text("No real money")
                     .font(TarsTheme.Text.micro)
                     .foregroundStyle(TarsTheme.inkSecondary)

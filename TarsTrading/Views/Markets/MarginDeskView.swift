@@ -12,6 +12,7 @@ import SwiftUI
 struct MarginDeskView: View {
     @State private var model = MarginDeskModel()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         ScrollView {
@@ -43,7 +44,10 @@ struct MarginDeskView: View {
     private var headline: some View {
         VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
             if let r = model.risk {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+                // One column at accessibility sizes; three otherwise.
+                LazyVGrid(columns: typeSize.isAccessibilitySize
+                            ? [GridItem(.flexible(), alignment: .leading)]
+                            : Array(repeating: GridItem(.flexible(), alignment: .leading), count: 3),
                           alignment: .leading, spacing: TarsTheme.Space.l) {
                     stat("Equity", r.equity)
                     stat("Cash", r.cash, tone: r.cash < 0 ? TarsTheme.loss : nil,
@@ -75,7 +79,10 @@ struct MarginDeskView: View {
             let saved = span.naiveIm - span.im
             VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
                 sectionTitle("Futures — portfolio margin (SPAN)")
-                HStack(spacing: TarsTheme.Space.xl) {
+                LazyVGrid(columns: typeSize.isAccessibilitySize
+                            ? [GridItem(.flexible(), alignment: .leading)]
+                            : Array(repeating: GridItem(.flexible(), alignment: .leading), count: 3),
+                          alignment: .leading, spacing: TarsTheme.Space.m) {
                     stat("Contract-by-contract", span.naiveIm)
                     stat("As a portfolio", span.im)
                     if saved > 0.5 { stat("Credits", -saved, tone: TarsTheme.gain) }
@@ -192,10 +199,11 @@ struct MarginDeskView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased()).font(TarsTheme.Text.micro)
                 .foregroundStyle(TarsTheme.inkQuaternary)
+                .lineLimit(1).minimumScaleFactor(0.7)
             Text(value, format: .currency(code: "USD").precision(.fractionLength(0)))
                 .font(TarsTheme.Text.heading.monospacedDigit())
                 .foregroundStyle(tone ?? TarsTheme.inkPrimary)
-                .minimumScaleFactor(0.7).lineLimit(1)
+                .minimumScaleFactor(0.6).lineLimit(1)
             if let sub { Text(sub).font(TarsTheme.Text.micro).foregroundStyle(TarsTheme.inkQuaternary) }
         }
     }

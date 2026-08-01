@@ -8,6 +8,7 @@ import SwiftUI
 */
 struct RiskDeskView: View {
     @State private var model = RiskDeskModel()
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         ScrollView {
@@ -55,7 +56,10 @@ struct RiskDeskView: View {
             title("You vs. buying the index")
             if let b = model.report?.benchmark, let yours = b.yours, let bench = b.bench {
                 let beat = (b.excess ?? 0) > 0
-                HStack(spacing: TarsTheme.Space.xl) {
+                LazyVGrid(columns: typeSize.isAccessibilitySize
+                            ? [GridItem(.flexible(), alignment: .leading)]
+                            : Array(repeating: GridItem(.flexible(), alignment: .leading), count: 3),
+                          alignment: .leading, spacing: TarsTheme.Space.m) {
                     pct("Your return", yours)
                     pct("SPY, same days", bench)
                     pct("Difference", b.excess ?? 0, forceTone: beat ? TarsTheme.gain : TarsTheme.loss)
@@ -158,6 +162,7 @@ struct RiskDeskView: View {
                 .foregroundStyle(TarsTheme.inkQuaternary)
             Text("\(v >= 0 ? "+" : "")\(v * 100, specifier: "%.2f")%")
                 .font(TarsTheme.Text.title.monospacedDigit())
+                .lineLimit(1).minimumScaleFactor(0.6)
                 .foregroundStyle(forceTone ?? (v > 0 ? TarsTheme.gain : v < 0 ? TarsTheme.loss : TarsTheme.inkPrimary))
         }
     }
@@ -165,6 +170,7 @@ struct RiskDeskView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased()).font(TarsTheme.Text.micro)
                 .foregroundStyle(TarsTheme.inkQuaternary)
+                .lineLimit(1).minimumScaleFactor(0.7)
             Text(value).font(TarsTheme.Text.heading.monospacedDigit())
                 .foregroundStyle(tone ?? TarsTheme.inkPrimary)
             if let sub { Text(sub).font(TarsTheme.Text.micro).foregroundStyle(TarsTheme.inkQuaternary) }

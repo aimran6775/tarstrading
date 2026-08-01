@@ -16,6 +16,7 @@ struct DeskView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var pushed: String?
     @State private var deskRoute: DeskRoute?
+    @Environment(\.dynamicTypeSize) private var typeSize
     enum DeskRoute: String, Identifiable {
         case margin, risk, journal, alerts, notifications, floor
         var id: String { rawValue }
@@ -136,7 +137,13 @@ struct DeskView: View {
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
                     .contentTransition(.numericText())
-                HStack(spacing: TarsTheme.Space.l) {
+                // Three across breaks at accessibility sizes — verified at
+                // XXXL, where "BUYING POWER" hyphenated into three lines and
+                // the dollar figures wrapped mid-number.
+                let statColumns = typeSize.isAccessibilitySize
+                    ? [GridItem(.flexible(), alignment: .leading)]
+                    : Array(repeating: GridItem(.flexible(), alignment: .leading), count: 3)
+                LazyVGrid(columns: statColumns, alignment: .leading, spacing: TarsTheme.Space.m) {
                     stat("Cash", risk.cash, tone: risk.cash < 0 ? TarsTheme.loss : nil)
                     stat("Buying power", risk.buyingPower)
                     VStack(alignment: .leading, spacing: 2) {
@@ -167,9 +174,11 @@ struct DeskView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased()).font(TarsTheme.Text.micro)
                 .foregroundStyle(TarsTheme.inkQuaternary)
+                .lineLimit(1).minimumScaleFactor(0.7)
             Text(value, format: .currency(code: "USD").precision(.fractionLength(0)))
                 .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
                 .foregroundStyle(tone ?? TarsTheme.inkPrimary)
+                .lineLimit(1).minimumScaleFactor(0.6)
         }
     }
 

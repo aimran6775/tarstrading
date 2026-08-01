@@ -17,6 +17,7 @@ struct MarketsHomeView: View {
     @State private var query = ""
     @State private var pushed: String?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     /// The rows the search allows through — instant, over what's loaded.
     private var visibleRows: [BoardRowPayload] {
@@ -69,17 +70,28 @@ struct MarketsHomeView: View {
     // MARK: - The pulse: four index proxies, the room's weather
 
     private var pulseStrip: some View {
-        HStack(spacing: TarsTheme.Space.m) {
+        /*
+          Four proxies across is right at normal type and unreadable at
+          accessibility sizes — verified at XXXL, where "$747" wrapped to
+          "$7 / 47". A price that wraps is worse than a price that shrinks,
+          so the row reflows to two columns and every number holds one line.
+        */
+        let columns = typeSize.isAccessibilitySize
+            ? [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)]
+            : Array(repeating: GridItem(.flexible(), alignment: .leading), count: 4)
+        return LazyVGrid(columns: columns, spacing: TarsTheme.Space.m) {
             ForEach(["SPY", "QQQ", "DIA", "IWM"], id: \.self) { sym in
                 let row = model.row(sym)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(sym)
                         .font(TarsTheme.Text.micro)
                         .foregroundStyle(TarsTheme.inkTertiary)
+                        .lineLimit(1)
                     if let price = row?.price {
                         Text(price, format: .currency(code: "USD").precision(.fractionLength(0)))
                             .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
                             .foregroundStyle(TarsTheme.inkPrimary)
+                            .lineLimit(1).minimumScaleFactor(0.6)
                         ChangeText(row?.changePercent)
                     } else {
                         Text("—").font(TarsTheme.Text.caption)
@@ -354,6 +366,7 @@ private struct ChangeText: View {
                 .font(TarsTheme.Text.caption.monospacedDigit())
                 .foregroundStyle(abs(v) < 0.00005 ? TarsTheme.inkTertiary
                     : v > 0 ? TarsTheme.gain : TarsTheme.loss)
+                .lineLimit(1).minimumScaleFactor(0.6)
         } else {
             Text("· ·").font(TarsTheme.Text.caption).foregroundStyle(TarsTheme.inkQuaternary)
         }
