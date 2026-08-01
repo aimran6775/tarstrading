@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 /// backup, danger zone, disclosures.
 /// Calm and legible — the one screen where nothing should ever surprise you.
 public struct SettingsView: View {
+    @Environment(SessionStore.self) private var session
     @Environment(PreferencesStore.self) private var prefs
     @Environment(TradingStore.self) private var trading
     @Environment(TarsStore.self) private var tars
@@ -24,6 +25,7 @@ public struct SettingsView: View {
     public var body: some View {
         ScrollView {
             VStack(spacing: TarsTheme.Space.l) {
+                accountCard
                 appearanceCard
                 modeCard
                 journalCard
@@ -431,6 +433,56 @@ public struct SettingsView: View {
     }
 
     // MARK: - About
+
+    /*
+      The platform identity — one desk across web and iOS. Equity shown here
+      is the SERVER's number from the last bootstrap; this card never
+      computes money. Sign out revokes the device token server-side first.
+    */
+    private var accountCard: some View {
+        SettingsCard(title: "Account", icon: "person.crop.circle.fill") {
+            VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
+                if let user = session.user {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(user.fundName ?? user.name)
+                                .font(TarsTheme.Text.heading)
+                                .foregroundStyle(TarsTheme.inkPrimary)
+                            Text(user.email)
+                                .font(TarsTheme.Text.caption)
+                                .foregroundStyle(TarsTheme.inkTertiary)
+                        }
+                        Spacer()
+                        if let risk = session.risk {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(risk.equity, format: .currency(code: "USD").precision(.fractionLength(0)))
+                                    .font(TarsTheme.Text.heading.monospacedDigit())
+                                    .foregroundStyle(TarsTheme.inkPrimary)
+                                Text("Equity — same desk as the web")
+                                    .font(TarsTheme.Text.micro)
+                                    .foregroundStyle(TarsTheme.inkTertiary)
+                            }
+                        }
+                    }
+                    if let sync = session.lastSyncAt {
+                        Text("Synced \(sync.formatted(date: .omitted, time: .shortened))")
+                            .font(TarsTheme.Text.micro)
+                            .foregroundStyle(TarsTheme.inkQuaternary)
+                    }
+                    Button(role: .destructive) {
+                        Task { await session.signOut() }
+                    } label: {
+                        Text("Sign out")
+                            .font(TarsTheme.Text.body)
+                            .foregroundStyle(TarsTheme.loss)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .background(TarsTheme.loss.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+            }
+        }
+    }
 
     private var aboutCard: some View {
         SettingsCard(title: "About", icon: "info.circle.fill") {

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D42C03C34D64DECC85AC2321 /* MarketStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968DE43C5E0FD355DDCAE2AE /* MarketStore.swift */; };
 		31B55498390BC41830EFFDA1 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CF96C60E8099D6BC69FD903 /* LoginView.swift */; };
 		4C0C8F92451BD511032F03CB /* SessionGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB56F2F1EDD16D38B81FD2E /* SessionGate.swift */; };
 		512B5580F5875BDA8FEAF8C1 /* TarsAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEDA55F0E31F27F624652CB /* TarsAPIClient.swift */; };
@@ -117,6 +118,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		968DE43C5E0FD355DDCAE2AE /* MarketStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketStore.swift; sourceTree = "<group>"; };
 		8CF96C60E8099D6BC69FD903 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		5CB56F2F1EDD16D38B81FD2E /* SessionGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionGate.swift; sourceTree = "<group>"; };
 		2BEDA55F0E31F27F624652CB /* TarsAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TarsAPIClient.swift; sourceTree = "<group>"; };
@@ -279,6 +281,7 @@
 		3F3F2F1497908C05E7430503 /* Stores */ = {
 			isa = PBXGroup;
 			children = (
+				968DE43C5E0FD355DDCAE2AE /* MarketStore.swift */,
 				F2ABC7A7967B8BB8F02500BB /* SessionStore.swift */,
 				7F1956640918EB44AB9DC419 /* AcademyProgress.swift */,
 				CBA78E226D8F61D9089F7BE4 /* AgentLab.swift */,
@@ -703,6 +706,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D42C03C34D64DECC85AC2321 /* MarketStore.swift in Sources */,
 				31B55498390BC41830EFFDA1 /* LoginView.swift in Sources */,
 				4C0C8F92451BD511032F03CB /* SessionGate.swift in Sources */,
 				512B5580F5875BDA8FEAF8C1 /* TarsAPIClient.swift in Sources */,
