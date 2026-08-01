@@ -41,6 +41,14 @@ actor TarsAPIClient {
         config.waitsForConnectivity = false // fail fast; stores show last-good
         session = URLSession(configuration: config)
         token = Keychain.loadToken()
+        #if DEBUG
+        // Headless simulator drives: -TarsAuthToken <token> authenticates the
+        // run without typing. Never persisted, never in release builds.
+        if let injected = UserDefaults.standard.string(forKey: "TarsAuthToken"),
+           !injected.isEmpty {
+            token = injected
+        }
+        #endif
     }
 
     var isSignedIn: Bool { token != nil }
@@ -127,5 +135,16 @@ actor TarsAPIClient {
             let msg = (try? JSONDecoder().decode(ServerErrorBody.self, from: data))?.error
             throw TarsAPIError.server(msg ?? "Something went wrong (\(status)).")
         }
+    }
+}
+
+extension TarsAPIClient {
+    /// The curated board — Trending by default, or one venue's own page.
+    func board(category: String? = nil, limit: Int = 250) async throws -> BoardResponse {
+        var path = "/api/market/board?limit=\(limit)"
+        if let category, !category.isEmpty {
+            path += "&category=\(category.lowercased())"
+        }
+        return try await request("GET", path)
     }
 }

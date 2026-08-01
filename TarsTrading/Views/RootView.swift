@@ -14,6 +14,7 @@ struct RootView: View {
     @Environment(\.horizontalSizeClass) private var hSizeClass
 
     enum Section: String, CaseIterable, Identifiable {
+        case markets = "Markets"
         case terminal = "Terminal"
         case portfolio = "Portfolio"
         case academy = "Academy"
@@ -25,6 +26,7 @@ struct RootView: View {
         var id: String { rawValue }
         var icon: String {
             switch self {
+            case .markets: "globe"
             case .terminal: "chart.xyaxis.line"
             case .portfolio: "briefcase.fill"
             case .academy: "graduationcap.fill"
@@ -39,6 +41,7 @@ struct RootView: View {
 
     /// iPhone tab set. Everything else is one level in, inside More.
     enum CompactTab: String, CaseIterable, Identifiable {
+        case markets = "Markets"
         case trade = "Trade"
         case portfolio = "Portfolio"
         case academy = "Academy"
@@ -47,6 +50,7 @@ struct RootView: View {
         var id: String { rawValue }
         var icon: String {
             switch self {
+            case .markets: "globe"
             case .trade: "chart.xyaxis.line"
             case .portfolio: "briefcase.fill"
             case .academy: "graduationcap.fill"
@@ -58,9 +62,9 @@ struct RootView: View {
 
     // Relaunch resumes where the user left off, not back at the terminal.
     @State private var section: Section =
-        Section(rawValue: UserDefaults.standard.string(forKey: "root.section") ?? "") ?? .terminal
+        Section(rawValue: UserDefaults.standard.string(forKey: "root.section") ?? "") ?? .markets
     @State private var tab: CompactTab =
-        CompactTab(rawValue: UserDefaults.standard.string(forKey: "root.tab") ?? "") ?? .trade
+        CompactTab(rawValue: UserDefaults.standard.string(forKey: "root.tab") ?? "") ?? .markets
     @State private var showLaunch = true
     @State private var showTars = false
     @State private var showPalette = false
@@ -158,6 +162,11 @@ struct RootView: View {
 
     private var compactShell: some View {
         TabView(selection: $tab) {
+            // The desk's front page leads — the same IA as the web terminal.
+            compactStack(.markets) { MarketsHomeView() }
+                .tabItem { Label(CompactTab.markets.rawValue, systemImage: CompactTab.markets.icon) }
+                .tag(CompactTab.markets)
+
             compactStack(.trade) { WorkspaceView() }
                 .tabItem { Label(CompactTab.trade.rawValue, systemImage: CompactTab.trade.icon) }
                 .tag(CompactTab.trade)
@@ -304,6 +313,7 @@ struct RootView: View {
     @ViewBuilder
     private var detail: some View {
         switch section {
+        case .markets: MarketsHomeView()
         case .terminal: WorkspaceView()
         case .portfolio: PortfolioView()
         case .academy: AcademyHomeView()
@@ -320,6 +330,7 @@ private extension RootView.CompactTab {
     /// Best-effort mapping when the ⌘K palette targets an iPad section.
     init(matching section: RootView.Section) {
         switch section {
+        case .markets: self = .markets
         case .terminal: self = .trade
         case .portfolio: self = .portfolio
         case .academy: self = .academy

@@ -134,3 +134,53 @@ enum TarsAPIError: LocalizedError, Equatable {
         }
     }
 }
+
+// MARK: - The board (the curated universe, server-ranked)
+
+struct BoardRowPayload: Decodable, Identifiable, Equatable {
+    var id: String { symbol }
+    let symbol: String
+    let price: Double?
+    let changePercent: Double?
+    let category: String?
+    let featured: Bool?
+    let source: Provenance?
+    let dayHigh: Double?
+    let dayLow: Double?
+}
+
+struct BoardResponse: Decodable {
+    let ok: Bool
+    let marketOpen: Bool?
+    let count: Int?
+    let rows: [BoardRowPayload]
+    let asOf: Double?
+}
+
+// MARK: - Display helpers (the client's copy of the platform's naming rules)
+
+enum SymbolDisplay {
+    /// FX:EURUSD → EUR/USD, IDX:SPX → SPX, FUT:ESU6 → ES U6. Users never see plumbing.
+    static func pretty(_ symbol: String) -> String {
+        let u = symbol.uppercased()
+        if u.hasPrefix("FX:") {
+            let p = String(u.dropFirst(3))
+            return p.count == 6 ? "\(p.prefix(3))/\(p.suffix(3))" : p
+        }
+        if u.hasPrefix("IDX:") { return String(u.dropFirst(4)) }
+        if u.hasPrefix("FUT:") {
+            let c = String(u.dropFirst(4))
+            return c.count >= 3 ? "\(c.dropLast(2)) \(c.suffix(2))" : c
+        }
+        return symbol
+    }
+
+    /// FX pairs quote in pips; everything else in cents.
+    static func price(_ symbol: String, _ value: Double) -> String {
+        if symbol.uppercased().hasPrefix("FX:") {
+            let wide = ["JPY", "HUF", "KRW"].contains(String(symbol.uppercased().suffix(3)))
+            return value.formatted(.number.precision(.fractionLength(wide ? 4 : 5)))
+        }
+        return value.formatted(.currency(code: "USD").precision(.fractionLength(2)))
+    }
+}
