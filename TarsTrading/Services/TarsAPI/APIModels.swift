@@ -320,3 +320,85 @@ struct MarginResponse: Decodable {
     let rates: FinancingRatesPayload
     let preview: MarginPreview?
 }
+
+// MARK: - Margin desk
+
+struct MarginPositionRow: Decodable, Identifiable, Equatable {
+    var id: String { symbol }
+    let symbol: String
+    let qty: Double
+    let regime: String     // Reg-T | SPAN | Cash | Cash-secured
+    let detail: String
+}
+
+struct MarginCallState: Decodable, Equatable {
+    let at: Double
+    let cureBy: Double
+}
+
+struct MarginDeskResponse: Decodable {
+    let ok: Bool
+    let risk: AccountRiskPayload
+    let rates: FinancingRatesPayload
+    let positions: [MarginPositionRow]
+    let marginCall: MarginCallState?
+}
+
+// MARK: - Risk analytics
+
+struct RiskCorrelation: Decodable, Identifiable, Equatable {
+    var id: String { symbol }
+    let symbol: String
+    let toBench: Double?
+    let weight: Double
+}
+
+struct RiskBenchmark: Decodable, Equatable {
+    let yours: Double?
+    let bench: Double?
+    let excess: Double?
+    let days: Int
+}
+
+struct RiskReportPayload: Decodable, Equatable {
+    let beta: Double?
+    let annualVol: Double?
+    let benchVol: Double?
+    let maxDrawdown: Double?
+    let concentration: Double?
+    let effectivePositions: Double?
+    let correlations: [RiskCorrelation]
+    let benchmark: RiskBenchmark
+}
+
+struct RiskResponse: Decodable {
+    let ok: Bool
+    let report: RiskReportPayload
+}
+
+// MARK: - Journal
+
+struct JournalEntryPayload: Decodable, Identifiable, Equatable {
+    let id: String
+    let symbol: String
+    let side: String
+    let qty: Double
+    let entryPrice: Double
+    let exitPrice: Double?
+    let pnl: Double?
+    let thesis: String?
+    let createdAt: Double
+}
+
+struct JournalSummary: Decodable, Equatable {
+    let trades: Int
+    let realized: Double
+    let winRate: Double?
+    let events: Int
+}
+
+struct JournalResponse: Decodable {
+    let ok: Bool
+    let entries: [JournalEntryPayload]
+    let summary: JournalSummary
+}

@@ -194,3 +194,12 @@ extension TarsAPIClient {
         return try await request("GET", "/api/margin?symbol=\(sym)&qty=\(qty)")
     }
 }
+
+extension TarsAPIClient {
+    func marginDesk() async throws -> MarginDeskResponse { try await request("GET", "/api/margin") }
+    func risk(days: Int = 90) async throws -> RiskReportPayload {
+        let res: RiskResponse = try await request("GET", "/api/risk?days=\(days)")
+        return res.report
+    }
+    func journal() async throws -> JournalResponse { try await request("GET", "/api/journal") }
+}

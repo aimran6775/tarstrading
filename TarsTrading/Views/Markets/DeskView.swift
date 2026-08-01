@@ -15,25 +15,46 @@ struct DeskView: View {
     @State private var model = DeskModel()
     @Environment(\.scenePhase) private var scenePhase
     @State private var pushed: String?
+    @State private var deskRoute: DeskRoute?
+    enum DeskRoute: String, Identifiable { case margin, risk, journal; var id: String { rawValue } }
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: TarsTheme.Space.l) {
                 equityHero
+                deskLinks
                 positionsCard
                 ordersCard
             }
             .padding(TarsTheme.Space.l)
+            // Clear the floating tab bar — the last card must be readable.
+            .padding(.bottom, 72)
         }
         .background(TarsTheme.bg0)
         .navigationTitle("Desk")
         .navigationDestination(item: $pushed) { MarketSymbolView(symbol: $0) }
+        .navigationDestination(item: $deskRoute) { route in
+            switch route {
+            case .margin: MarginDeskView()
+            case .risk: RiskDeskView()
+            case .journal: DeskJournalView()
+            }
+        }
         .refreshable {
             await session.refresh()
             await model.load(positions: session.positions)
         }
         .task {
             model.activate(positions: session.positions)
+            #if DEBUG
+            // Headless drives: -TarsOpenDesk margin|risk|journal
+            if deskRoute == nil,
+               let r = UserDefaults.standard.string(forKey: "TarsOpenDesk"),
+               let route = DeskRoute(rawValue: r) {
+                try? await Task.sleep(for: .seconds(1))
+                deskRoute = route
+            }
+            #endif
         }
         .onDisappear { model.deactivate() }
         .onChange(of: scenePhase) { _, p in
@@ -43,6 +64,35 @@ struct DeskView: View {
         .onChange(of: session.positions) { _, next in
             model.watch(positions: next)
         }
+    }
+
+    /// The machinery behind the number: how it's margined, what it risks,
+    /// what it has already taught you.
+    private var deskLinks: some View {
+        HStack(spacing: TarsTheme.Space.m) {
+            deskLink("Margin", "scalemass.fill", .margin)
+            deskLink("Risk", "waveform.path.ecg", .risk)
+            deskLink("Journal", "book.closed.fill", .journal)
+        }
+    }
+
+    private func deskLink(_ label: String, _ icon: String, _ route: DeskRoute) -> some View {
+        Button { Haptics.tap(); deskRoute = route } label: {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(TarsTheme.paperBadge)
+                Text(label)
+                    .font(TarsTheme.Text.caption.weight(.medium))
+                    .foregroundStyle(TarsTheme.inkPrimary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 68)
+            .background(TarsTheme.bg2)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(TarsTheme.hairline, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Equity: the number big enough to feel
