@@ -16,6 +16,7 @@ struct MarketSymbolView: View {
     @State private var model: SymbolModel
     @State private var ticketSide: String?
     @State private var closing: APIPosition?
+    @State private var pushed: String?
     @Environment(\.scenePhase) private var scenePhase
 
     init(symbol: String) {
@@ -31,9 +32,20 @@ struct MarketSymbolView: View {
                 // The chart runs edge-to-edge, chromeless — the canvas is
                 // the room, not a picture on the wall (Robinhood/Kalshi).
                 chartSection
+                // What you hold comes BEFORE what you can do about it.
+                if let p = session.positions.first(where: { $0.symbol == symbol }) {
+                    positionCard(p)
+                        .padding(.horizontal, TarsTheme.Space.l)
+                }
                 tradeBar
                     .padding(.horizontal, TarsTheme.Space.l)
-                context
+                actionRow
+                    .padding(.horizontal, TarsTheme.Space.l)
+                InstrumentDossier(symbol: symbol,
+                                  stats: model.stats,
+                                  quote: model.quote,
+                                  futuresMargin: model.futuresMargin,
+                                  onOpen: { pushed = $0 })
                     .padding(.horizontal, TarsTheme.Space.l)
             }
             .padding(.vertical, TarsTheme.Space.l)
@@ -56,6 +68,7 @@ struct MarketSymbolView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { model.activate() } else { model.deactivate() }
         }
+        .navigationDestination(item: $pushed) { MarketSymbolView(symbol: $0) }
     }
 
     /// Two doors into the same ticket. Solid fill is a privilege and this
@@ -95,18 +108,6 @@ struct MarketSymbolView: View {
     }
 
     // MARK: - Context: what you hold, and where the price sits
-
-    @ViewBuilder private var context: some View {
-        VStack(alignment: .leading, spacing: TarsTheme.Space.l) {
-            actionRow
-            if let p = session.positions.first(where: { $0.symbol == symbol }) {
-                positionCard(p)
-            }
-            rangeSection
-            factsRow
-        }
-        .padding(.top, TarsTheme.Space.s)
-    }
 
     /// The star and the exit — two actions the phone was missing entirely
     /// while the web had both.
@@ -190,58 +191,6 @@ struct MarketSymbolView: View {
         .padding(TarsTheme.Space.l)
         .tarsPanel()
         .accessibilityElement(children: .combine)
-    }
-
-    /// Where today sits inside the window you're looking at.
-    @ViewBuilder private var rangeSection: some View {
-        if let lo = model.bars.map(\.low).min(),
-           let hi = model.bars.map(\.high).max(), hi > lo,
-           let px = model.quote?.price {
-            let t = min(max((px - lo) / (hi - lo), 0), 1)
-            VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
-                TarsMicroLabel("\(model.timeframe) range")
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(TarsTheme.bg3).frame(height: 4)
-                        Circle().fill(TarsTheme.inkPrimary)
-                            .frame(width: 9, height: 9)
-                            .offset(x: (geo.size.width - 9) * CGFloat(t))
-                    }
-                    .frame(maxHeight: .infinity)
-                }
-                .frame(height: 12)
-                HStack {
-                    Text(SymbolDisplay.price(symbol, lo))
-                    Spacer()
-                    Text(SymbolDisplay.price(symbol, hi))
-                }
-                .font(TarsTheme.Text.micro.monospacedDigit())
-                .foregroundStyle(TarsTheme.inkTertiary)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Price sits \(Int(t * 100)) percent up the \(model.timeframe) range")
-        }
-    }
-
-    @ViewBuilder private var factsRow: some View {
-        if let q = model.quote {
-            HStack(spacing: TarsTheme.Space.xl) {
-                VStack(alignment: .leading, spacing: 2) {
-                    TarsMicroLabel("Prev close")
-                    Text(SymbolDisplay.price(symbol, q.previousClose))
-                        .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(TarsTheme.inkPrimary)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    TarsMicroLabel("Today")
-                    let chg = abs(q.changePercent) < 0.00005 ? 0 : q.changePercent
-                    Text("\(chg > 0 ? "+" : "")\(chg * 100, specifier: "%.2f")%")
-                        .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(TarsTheme.pnl(chg))
-                }
-                Spacer()
-            }
-        }
     }
 
     // MARK: - Header: the price, big enough to feel
@@ -345,6 +294,12 @@ struct MarketSymbolView: View {
                         colors: [tone.opacity(0.12), tone.opacity(0.0)],
                         startPoint: .top, endPoint: .bottom))
                     .interpolationMethod(.monotone)
+                if let pc = model.stats?.prevClose ?? model.quote?.previousClose,
+                   pc >= model.yDomain.lowerBound, pc <= model.yDomain.upperBound {
+                    RuleMark(y: .value("Prev close", pc))
+                        .foregroundStyle(TarsTheme.inkQuaternary)
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 4]))
+                }
                 if let s = model.scrubbed, s.id == bar.id {
                     RuleMark(x: .value("Date", bar.date))
                         .foregroundStyle(TarsTheme.inkTertiary.opacity(0.6))
@@ -411,6 +366,12 @@ final class SymbolModel {
     private(set) var timeframe = "3M"
     private(set) var loadingBars = true
     private(set) var scrubbed: APIBar?
+    /// The full statistical picture — day range, 52-week range, volume,
+    /// spread, trailing returns. All server-computed.
+    private(set) var stats: APIStats?
+    /// Futures only: what one contract would actually cost to margin,
+    /// from the same function that gates the order.
+    private(set) var futuresMargin: MarginPreview?
 
     private var loop: Task<Void, Never>?
     private let api = TarsAPIClient.shared
@@ -470,6 +431,14 @@ final class SymbolModel {
 
     private func tickQuote() async {
         quote = (try? await api.quotes(symbols: [symbol]))?.first ?? quote
+        // stats() returns an optional, so try? nests it — flatten before
+        // falling back, or the coalesce has two optionals to choose from.
+        if let fresh = (try? await api.stats(symbol: symbol)) ?? nil { stats = fresh }
+        if symbol.uppercased().hasPrefix("FUT:"), futuresMargin == nil {
+            // marginPreview returns the whole margin response; the preview
+            // inside it is what one contract would actually cost.
+            futuresMargin = (try? await api.marginPreview(symbol: symbol, qty: 1))?.preview
+        }
     }
 
     private func loadBars() async {

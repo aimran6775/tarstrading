@@ -45,18 +45,24 @@ struct AssistantView: View {
             }
             Spacer()
             if !model.messages.isEmpty {
-                Button {
-                    Haptics.tap()
-                    showStarters = true
+                Menu {
+                    Button {
+                        Haptics.tap(); showStarters = true
+                    } label: { Label("Suggested questions", systemImage: "lightbulb") }
+                    Button {
+                        Haptics.tap()
+                        // Local only: the server keeps the transcript as the
+                        // record of what actually happened on the floor.
+                        model.clearLocally()
+                    } label: { Label("Start a new conversation", systemImage: "square.and.pencil") }
                 } label: {
-                    Image(systemName: "lightbulb")
+                    Image(systemName: "ellipsis.circle")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(TarsTheme.inkSecondary)
                         .frame(width: 40, height: 40)
                         .background(Circle().fill(TarsTheme.bg1))
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Suggested questions")
+                .accessibilityLabel("Conversation options")
             }
         }
         .padding(.horizontal, TarsTheme.Space.l)
@@ -250,6 +256,14 @@ final class AssistantModel {
 
     func load() async {
         messages = (try? await api.assistantHistory()) ?? []
+        loaded = true
+    }
+
+    /// Clears what YOU see. The server's transcript stands — it is the
+    /// record of decisions the desk actually took, and erasing it on a
+    /// whim would erase the audit trail with it.
+    func clearLocally() {
+        messages = []
         loaded = true
     }
 

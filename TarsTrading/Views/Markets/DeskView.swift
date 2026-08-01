@@ -442,7 +442,14 @@ struct DeskView: View {
                     .foregroundStyle(TarsTheme.inkTertiary)
                     .padding(.vertical, TarsTheme.Space.m)
             } else {
-                ForEach(model.orders.prefix(20)) { o in
+                ForEach(model.ordersByDay, id: \.day) { group in
+                    Text(group.day)
+                        .font(TarsTheme.Text.micro)
+                        .kerning(0.8)
+                        .foregroundStyle(TarsTheme.inkQuaternary)
+                        .padding(.top, TarsTheme.Space.m)
+                        .padding(.bottom, TarsTheme.Space.xs)
+                    ForEach(group.orders) { o in
                     orderRow(o)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             if o.status == "accepted" {
@@ -453,6 +460,7 @@ struct DeskView: View {
                             }
                         }
                     Divider().overlay(TarsTheme.hairline)
+                    }
                 }
             }
         }
@@ -577,6 +585,29 @@ final class DeskModel {
         async let o: () = tickOrders()
         async let c: () = tickCurve()
         _ = await (q, o, c)
+    }
+
+    /// The ledger reads by day: "Today", "Yesterday", then dates. Twenty
+    /// rows of identical text is a list; grouped, it's a history.
+    struct OrderDay: Equatable { let day: String; let orders: [APIOrder] }
+
+    var ordersByDay: [OrderDay] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/New_York") ?? .current
+        let fmt = DateFormatter()
+        fmt.dateFormat = "EEEE d MMMM"
+        var order: [String] = []
+        var buckets: [String: [APIOrder]] = [:]
+        for o in orders.prefix(40) {
+            let d = Date(timeIntervalSince1970: o.createdAt / 1000)
+            let label: String
+            if cal.isDateInToday(d) { label = "TODAY" }
+            else if cal.isDateInYesterday(d) { label = "YESTERDAY" }
+            else { label = fmt.string(from: d).uppercased() }
+            if buckets[label] == nil { order.append(label) }
+            buckets[label, default: []].append(o)
+        }
+        return order.map { OrderDay(day: $0, orders: buckets[$0] ?? []) }
     }
 
     /// Cancelling is the server's call — it owns the race against a fill.

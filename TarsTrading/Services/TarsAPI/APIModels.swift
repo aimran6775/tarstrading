@@ -108,6 +108,39 @@ struct APIQuote: Decodable, Identifiable, Equatable {
     let provenance: Provenance?
 }
 
+/// The full statistical picture of one market — the same depth the board
+/// computes, scoped to a symbol page. Every field is optional because a
+/// futures contract has no bid/ask and an index has no volume; the UI
+/// shows what exists rather than inventing zeros.
+struct APIStats: Decodable, Equatable, Identifiable {
+    var id: String { symbol }
+    let symbol: String
+    let price: Double?
+    let prevClose: Double?
+    let change: Double?
+    let changePercent: Double?
+    let source: Provenance?
+    let asOf: Double?
+    let open: Double?
+    let dayHigh: Double?
+    let dayLow: Double?
+    let volume: Double?
+    let bid: Double?
+    let ask: Double?
+    let high52: Double?
+    let low52: Double?
+    let avgVolume: Double?
+    let rangePosition: Double?
+    let return1M: Double?
+    let return1Y: Double?
+}
+
+struct StatsResponse: Decodable {
+    let ok: Bool
+    let marketOpen: Bool?
+    let stats: [APIStats]
+}
+
 struct WatchlistResponse: Decodable {
     let ok: Bool
     let watchlist: [String]

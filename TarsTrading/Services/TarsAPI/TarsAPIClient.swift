@@ -140,6 +140,13 @@ actor TarsAPIClient {
 
 extension TarsAPIClient {
     /// The curated board — Trending by default, or one venue's own page.
+    /// One market's full statistical picture.
+    func stats(symbol: String) async throws -> APIStats? {
+        let s = symbol.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let res: StatsResponse = try await request("GET", "/api/market/stats?symbols=\(s)")
+        return res.stats.first
+    }
+
     // MARK: Watchlist — the markets you keep an eye on
     private struct SymbolBody: Encodable { let symbol: String }
 
