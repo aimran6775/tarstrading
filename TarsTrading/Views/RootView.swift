@@ -181,7 +181,7 @@ struct RootView: View {
                 .tabItem { Label(CompactTab.portfolio.label, systemImage: CompactTab.portfolio.icon) }
                 .tag(CompactTab.portfolio)
 
-            compactStack(.academy) { AcademyHomeView() }
+            compactStack(.academy) { AcademyCourseView() }
                 .tabItem { Label(CompactTab.academy.label, systemImage: CompactTab.academy.icon) }
                 .tag(CompactTab.academy)
 
@@ -320,7 +320,7 @@ struct RootView: View {
             // caps its measure so lines stay readable.
             .frame(maxWidth: 1100)
             .frame(maxWidth: .infinity)
-        case .academy: AcademyHomeView()
+        case .academy: AcademyCourseView()
         case .agents: AgentLabView()
         case .journal: JournalView()
         case .screener: ScreenerView()

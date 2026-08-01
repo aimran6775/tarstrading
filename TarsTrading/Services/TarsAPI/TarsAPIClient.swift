@@ -140,6 +140,27 @@ actor TarsAPIClient {
 
 extension TarsAPIClient {
     /// The curated board — Trending by default, or one venue's own page.
+    // MARK: Academy — the same course the web teaches
+    func curriculum() async throws -> CurriculumResponse {
+        try await request("GET", "/api/academy/curriculum")
+    }
+
+    func lesson(id: String) async throws -> LessonResponse {
+        let i = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        return try await request("GET", "/api/academy/lesson?id=\(i)")
+    }
+
+    /// Completion is EARNED: the client sends its answers and the server
+    /// re-grades them against keys it never shipped. A wrong answer — or a
+    /// bare POST — is refused.
+    func completeLesson(id: String, answers: [[String: Int]]) async throws -> Bool {
+        struct Body: Encodable { let lessonId: String; let answers: [[String: Int]] }
+        struct Res: Decodable { let ok: Bool?; let passed: Bool? }
+        let res: Res = try await request("POST", "/api/academy",
+                                         body: Body(lessonId: id, answers: answers))
+        return res.passed ?? res.ok ?? false
+    }
+
     /// One market's full statistical picture.
     func stats(symbol: String) async throws -> APIStats? {
         let s = symbol.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""

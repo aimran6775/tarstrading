@@ -108,6 +108,81 @@ struct APIQuote: Decodable, Identifiable, Equatable {
     let provenance: Provenance?
 }
 
+// MARK: - Academy (ONE curriculum, served — see the note on the endpoint)
+
+struct APILessonSummary: Decodable, Identifiable, Equatable {
+    let id: String
+    let title: String
+    let hook: String
+    let minutes: Int
+    let xp: Int
+    let completed: Bool
+    let unlocked: Bool
+    /// What the lesson is made of, without its words: ["prose","quiz",...]
+    let blocks: [String]
+}
+
+struct APITrack: Decodable, Identifiable, Equatable {
+    let id: String
+    let title: String
+    let tagline: String
+    let covers: String
+    let accent: String
+    let unlocked: Bool
+    let lessons: [APILessonSummary]
+}
+
+struct APIResume: Decodable, Equatable {
+    let lessonId: String
+    let title: String
+    let trackId: String?
+    let newTrack: String?
+}
+
+struct CurriculumResponse: Decodable {
+    let ok: Bool
+    let tracks: [APITrack]
+    let xp: Int
+    let totalXP: Int
+    let completedCount: Int
+    let lessonCount: Int
+    let resume: APIResume?
+}
+
+/// A lesson block. The server sends a discriminated union; the phone reads
+/// the kinds it can render and skips the rest rather than failing a lesson
+/// because one widget is newer than this build.
+struct APIBlock: Decodable, Equatable {
+    let kind: String
+    let text: String?
+    let title: String?
+    let label: String?
+    let expression: String?
+    let legend: String?
+    let question: String?
+    let choices: [String]?
+    let explain: String?
+    let instruction: String?
+    let symbol: String?
+}
+
+struct APILesson: Decodable, Equatable {
+    let id: String
+    let title: String
+    let hook: String
+    let minutes: Int
+    let xp: Int
+    let trackId: String
+    let trackTitle: String
+    let sections: [APIBlock]
+}
+
+struct LessonResponse: Decodable {
+    let ok: Bool
+    let lesson: APILesson
+    let next: String?
+}
+
 /// The full statistical picture of one market — the same depth the board
 /// computes, scoped to a symbol page. Every field is optional because a
 /// futures contract has no bid/ask and an index has no volume; the UI
