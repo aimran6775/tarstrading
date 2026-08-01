@@ -35,8 +35,13 @@ enum TarsTheme {
     // and differ in luminance (not just hue) for color-blind safety.
     static let gain = Color(.displayP3, red: 0.22, green: 0.82, blue: 0.53)      // P&L up
     static let loss = Color(.displayP3, red: 0.95, green: 0.39, blue: 0.44)      // P&L down
-    static let accent = Color(.displayP3, red: 0.40, green: 0.62, blue: 1.0)     // interactive / Tars
-    static let paperBadge = Color(.displayP3, red: 1.0, green: 0.72, blue: 0.20) // mode amber
+    /// THE accent. Brand = capital = action: interactive tint, selection,
+    /// and the paper mark are all this gold — Kalshi's move (their brand
+    /// green IS their profit green): one saturated voice, not a choir.
+    /// The old interactive blue is dead; blue was how the app leaked
+    /// "iOS template" from its own token file.
+    static let accent = Color(.displayP3, red: 1.0, green: 0.72, blue: 0.20)
+    static let paperBadge = accent // mode amber — same gold, one voice
     static let warning = Color(.displayP3, red: 1.0, green: 0.62, blue: 0.26)
     static let agentPurple = Color(.displayP3, red: 0.66, green: 0.50, blue: 1.0) // agent activity
 
@@ -54,11 +59,13 @@ enum TarsTheme {
     static func selectionWash(_ tint: Color) -> Color { tint.opacity(0.14) }
 
     // MARK: Gradients
+    // Chart fills whisper at ~12% → 0 (the Robinhood/Copilot fade), never
+    // flood. A chart that reads as a colored block is a chart shouting.
     static let chartGain = LinearGradient(
-        colors: [gain.opacity(0.35), gain.opacity(0.0)],
+        colors: [gain.opacity(0.12), gain.opacity(0.0)],
         startPoint: .top, endPoint: .bottom)
     static let chartLoss = LinearGradient(
-        colors: [loss.opacity(0.35), loss.opacity(0.0)],
+        colors: [loss.opacity(0.12), loss.opacity(0.0)],
         startPoint: .top, endPoint: .bottom)
     static let tarsAurora = LinearGradient(
         colors: [accent.opacity(0.25), agentPurple.opacity(0.12), .clear],
@@ -106,6 +113,9 @@ enum TarsTheme {
         /// The Sunday Letter's editorial serif voice — the one serif in the app.
         static let letterMasthead = Font.system(.title, design: .serif, weight: .bold)
         static let letterSection = Font.system(.title3, design: .serif, weight: .semibold)
+        /// Screen-owning titles ("Markets", "Desk") — condensed bold, the
+        /// Kalshi display voice. Sits in content, not in a nav bar.
+        static let screenTitle = Font.system(size: 28, weight: .bold).width(.condensed)
     }
 
     // MARK: Spacing grid & shape
@@ -125,8 +135,11 @@ enum TarsTheme {
         /// Sub-token for thin data marks (sparkline bars, legend chips).
         static let micro: CGFloat = 3
         static let s: CGFloat = 8
-        static let m: CGFloat = 14
-        static let l: CGFloat = 22
+        // Terminal radii: 12 for cards, 16 for sheets/glass. The 14/22
+        // bubble read consumer-neobank; the pro apps (Linear 6–12, Kalshi
+        // 16 sheets) all sit tighter.
+        static let m: CGFloat = 12
+        static let l: CGFloat = 16
         static let capsule: CGFloat = 999
         /// Concentric radius law: inner radius = outer − inset (floored so
         /// nested corners never go sharp). The single biggest "built by Apple"

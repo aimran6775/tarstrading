@@ -28,13 +28,13 @@ struct RootView: View {
             switch self {
             case .markets: "globe"
             case .terminal: "chart.xyaxis.line"
-            case .portfolio: "briefcase.fill"
-            case .academy: "graduationcap.fill"
+            case .portfolio: "briefcase"
+            case .academy: "graduationcap"
             case .agents: "brain.head.profile"
-            case .journal: "book.closed.fill"
-            case .screener: "line.3.horizontal.decrease.circle.fill"
-            case .alerts: "bell.badge.fill"
-            case .settings: "gearshape.fill"
+            case .journal: "book.closed"
+            case .screener: "line.3.horizontal.decrease.circle"
+            case .alerts: "bell.badge"
+            case .settings: "gearshape"
             }
         }
     }
@@ -52,8 +52,8 @@ struct RootView: View {
             switch self {
             case .markets: "globe"
             case .trade: "chart.xyaxis.line"
-            case .portfolio: "briefcase.fill"
-            case .academy: "graduationcap.fill"
+            case .portfolio: "briefcase"
+            case .academy: "graduationcap"
             case .tars: "sparkles"
             case .more: "ellipsis.circle.fill"
             }

@@ -25,10 +25,14 @@ struct MarketSymbolView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: TarsTheme.Space.l) {
                 header
-                chartCard
+                    .padding(.horizontal, TarsTheme.Space.l)
+                // The chart runs edge-to-edge, chromeless — the canvas is
+                // the room, not a picture on the wall (Robinhood/Kalshi).
+                chartSection
                 tradeBar
+                    .padding(.horizontal, TarsTheme.Space.l)
             }
-            .padding(TarsTheme.Space.l)
+            .padding(.vertical, TarsTheme.Space.l)
         }
         .background(TarsTheme.bg0)
         .navigationTitle(SymbolDisplay.pretty(symbol))
@@ -49,10 +53,11 @@ struct MarketSymbolView: View {
         }
     }
 
-    /// Buy gold, sell red — two doors into the same ticket.
+    /// Two doors into the same ticket. Solid fill is a privilege and this
+    /// is where it's earned — a washed-out CTA reads as a disabled one.
     private var tradeBar: some View {
         HStack(spacing: TarsTheme.Space.m) {
-            tradeButton("Buy", side: "buy", tone: TarsTheme.paperBadge)
+            tradeButton("Buy", side: "buy", tone: TarsTheme.gain)
             tradeButton("Sell", side: "sell", tone: TarsTheme.loss)
         }
         .sheet(item: Binding(
@@ -69,10 +74,10 @@ struct MarketSymbolView: View {
         } label: {
             Text(label)
                 .font(TarsTheme.Text.heading)
-                .foregroundStyle(tone)
+                .foregroundStyle(TarsTheme.onFill)
                 .frame(maxWidth: .infinity, minHeight: 52)
-                .background(tone.opacity(0.14))
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(tone)
+                .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -112,26 +117,25 @@ struct MarketSymbolView: View {
 
     // MARK: - The chart
 
-    private var chartCard: some View {
+    private var chartSection: some View {
         VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
             if model.bars.count > 1 {
                 chart
-                    .frame(height: 260)
+                    .frame(height: 280)
             } else if model.loadingBars {
-                RoundedRectangle(cornerRadius: 12).fill(TarsTheme.bg2)
-                    .frame(height: 260)
+                Rectangle().fill(TarsTheme.bg1)
+                    .frame(height: 280)
                     .overlay(ProgressView().tint(TarsTheme.inkTertiary))
             } else {
-                RoundedRectangle(cornerRadius: 12).fill(TarsTheme.bg2)
-                    .frame(height: 260)
+                Rectangle().fill(TarsTheme.bg1)
+                    .frame(height: 280)
                     .overlay(Text("No history for this market yet.")
                         .font(TarsTheme.Text.caption)
                         .foregroundStyle(TarsTheme.inkTertiary))
             }
             timeframePicker
+                .padding(.horizontal, TarsTheme.Space.l)
         }
-        .padding(TarsTheme.Space.l)
-        .tarsPanel()
     }
 
     private var up: Bool {
@@ -155,15 +159,18 @@ struct MarketSymbolView: View {
                     Spacer()
                 }
                 .accessibilityElement(children: .combine)
+                .padding(.horizontal, TarsTheme.Space.l)
             }
             Chart(model.bars) { bar in
                 LineMark(x: .value("Date", bar.date), y: .value("Close", bar.close))
                     .foregroundStyle(tone)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     .interpolationMethod(.monotone)
-                AreaMark(x: .value("Date", bar.date), y: .value("Close", bar.close))
+                AreaMark(x: .value("Date", bar.date),
+                         yStart: .value("Floor", model.yDomain.lowerBound),
+                         yEnd: .value("Close", bar.close))
                     .foregroundStyle(LinearGradient(
-                        colors: [tone.opacity(0.25), tone.opacity(0.02)],
+                        colors: [tone.opacity(0.12), tone.opacity(0.0)],
                         startPoint: .top, endPoint: .bottom))
                     .interpolationMethod(.monotone)
                 if let s = model.scrubbed, s.id == bar.id {
@@ -179,9 +186,10 @@ struct MarketSymbolView: View {
             // unclipped it floods the screen. The plot is a window, not a spill.
             .chartPlotStyle { $0.clipped() }
             .chartXAxis(.hidden)
+            // No grid. Price levels whisper from the trailing edge; the
+            // line is the only thing allowed to speak at full volume.
             .chartYAxis {
                 AxisMarks(position: .trailing) { _ in
-                    AxisGridLine().foregroundStyle(TarsTheme.hairline)
                     AxisValueLabel().font(TarsTheme.Text.micro)
                         .foregroundStyle(TarsTheme.inkQuaternary)
                 }
@@ -207,11 +215,10 @@ struct MarketSymbolView: View {
                     model.setTimeframe(tf)
                 } label: {
                     Text(tf)
-                        .font(TarsTheme.Text.caption.weight(.semibold))
-                        .foregroundStyle(selected ? TarsTheme.onFill : TarsTheme.inkSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                        .background(selected ? TarsTheme.paperBadge : TarsTheme.bg2)
-                        .clipShape(Capsule())
+                        .font(TarsTheme.Text.caption.weight(selected ? Font.Weight.bold : Font.Weight.medium))
+                        .foregroundStyle(selected ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selected ? [.isSelected] : [])

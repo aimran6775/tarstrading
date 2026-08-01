@@ -31,9 +31,10 @@ struct MarketsHomeView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: TarsTheme.Space.l, pinnedViews: []) {
+            LazyVStack(alignment: .leading, spacing: TarsTheme.Space.l, pinnedViews: []) {
+                header
+                searchField
                 if model.stale { staleBanner }
-                if model.marketOpen == false { marketClosedChip }
                 pulseStrip
                 breadthBar
                 venueMap
@@ -43,11 +44,12 @@ struct MarketsHomeView: View {
                 boardList
             }
             .padding(.horizontal, TarsTheme.Space.l)
-            .padding(.bottom, TarsTheme.Space.xl)
+            .padding(.bottom, 72)
         }
         .background(TarsTheme.bg0)
-        .navigationTitle("Markets")
-        .searchable(text: $query, prompt: "Ticker or pair")
+        // The screen owns its header. The system large-title + searchable
+        // combination spent the top quarter of the screen saying nothing.
+        .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $pushed) { MarketSymbolView(symbol: $0) }
         .refreshable { await model.refresh() }
         .task {
@@ -65,6 +67,48 @@ struct MarketsHomeView: View {
             // A hidden app polls nothing; a returning one reads immediately.
             if phase == .active { model.activate() } else { model.deactivate() }
         }
+    }
+
+    // MARK: - Header: the screen title works for a living
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("Markets")
+                .font(TarsTheme.Text.screenTitle)
+                .foregroundStyle(TarsTheme.inkPrimary)
+            Spacer()
+            if model.marketOpen == false { marketClosedChip }
+        }
+        .padding(.top, TarsTheme.Space.s)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: TarsTheme.Space.s) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(TarsTheme.inkTertiary)
+            TextField("Ticker or pair", text: $query)
+                .font(TarsTheme.Text.body)
+                .foregroundStyle(TarsTheme.inkPrimary)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.characters)
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(TarsTheme.inkTertiary)
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, TarsTheme.Space.m)
+        .frame(height: 42)
+        .background(TarsTheme.bg1)
+        .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
+            .strokeBorder(TarsTheme.hairline, lineWidth: 1))
     }
 
     // MARK: - The pulse: four index proxies, the room's weather
@@ -101,8 +145,7 @@ struct MarketsHomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(TarsTheme.Space.l)
-        .tarsPanel()
+        .padding(.vertical, TarsTheme.Space.xs)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Market pulse")
     }
@@ -151,8 +194,6 @@ struct MarketsHomeView: View {
                 }
                 .font(TarsTheme.Text.micro.monospacedDigit())
             }
-            .padding(TarsTheme.Space.l)
-            .tarsPanel()
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Breadth: \(b.advancing) advancing, \(b.declining) declining")
         }
@@ -184,7 +225,7 @@ struct MarketsHomeView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Image(systemName: MarketsModel.venueIcon[v.category] ?? "square.grid.2x2")
                                         .font(.system(size: 16, weight: .medium))
-                                        .foregroundStyle(TarsTheme.paperBadge)
+                                        .foregroundStyle(TarsTheme.inkSecondary)
                                     Text(v.category)
                                         .font(TarsTheme.Text.caption.weight(.semibold))
                                         .foregroundStyle(TarsTheme.inkPrimary)
@@ -194,9 +235,9 @@ struct MarketsHomeView: View {
                                 }
                                 .frame(width: 96, alignment: .topLeading)
                                 .padding(TarsTheme.Space.m)
-                                .background(TarsTheme.bg2)
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .background(TarsTheme.bg1)
+                                .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
                                     .strokeBorder(TarsTheme.hairline, lineWidth: 1))
                             }
                             .buttonStyle(.plain)
@@ -239,8 +280,10 @@ struct MarketsHomeView: View {
                                 }
                                 .frame(width: 104, alignment: .leading)
                                 .padding(TarsTheme.Space.m)
-                                .background(TarsTheme.bg2)
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .background(TarsTheme.bg1)
+                                .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
+                                    .strokeBorder(TarsTheme.hairline, lineWidth: 1))
                             }
                             .buttonStyle(.plain)
                         }
@@ -270,15 +313,13 @@ struct MarketsHomeView: View {
             Haptics.tick()
             model.select(venue)
         } label: {
-            Text(label)
-                .font(TarsTheme.Text.caption.weight(.medium))
-                .foregroundStyle(selected ? TarsTheme.paperBadge : TarsTheme.inkSecondary)
-                .padding(.horizontal, 14)
-                .frame(minHeight: 38)
-                .background(selected ? TarsTheme.paperBadge.opacity(0.14) : TarsTheme.bg2)
-                .clipShape(Capsule())
-                .overlay(Capsule().strokeBorder(
-                    selected ? TarsTheme.paperBadge.opacity(0.45) : TarsTheme.hairline, lineWidth: 1))
+            Text(label.uppercased())
+                .font(TarsTheme.Text.caption.weight(selected ? Font.Weight.bold : Font.Weight.medium))
+                .kerning(0.6)
+                .foregroundStyle(selected ? TarsTheme.inkPrimary : TarsTheme.inkTertiary)
+                .padding(.horizontal, TarsTheme.Space.xs)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
@@ -304,7 +345,6 @@ struct MarketsHomeView: View {
                 }
             }
         }
-        .tarsPanel()
     }
 
     private func boardRow(_ row: BoardRowPayload) -> some View {
@@ -327,7 +367,6 @@ struct MarketsHomeView: View {
                 ChangeText(row.changePercent)
             }
         }
-        .padding(.horizontal, TarsTheme.Space.l)
         .frame(minHeight: 56)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
@@ -339,7 +378,7 @@ struct MarketsHomeView: View {
             Spacer()
             RoundedRectangle(cornerRadius: 4).fill(TarsTheme.bg3).frame(width: 88, height: 14)
         }
-        .padding(TarsTheme.Space.l)
+        .padding(.vertical, TarsTheme.Space.l)
         .frame(minHeight: 56)
     }
 

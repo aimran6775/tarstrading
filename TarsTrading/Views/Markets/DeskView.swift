@@ -24,7 +24,8 @@ struct DeskView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: TarsTheme.Space.l) {
+            LazyVStack(alignment: .leading, spacing: TarsTheme.Space.l) {
+                header
                 equityHero
                 deskLinks
                 positionsCard
@@ -35,29 +36,9 @@ struct DeskView: View {
             .padding(.bottom, 72)
         }
         .background(TarsTheme.bg0)
-        .navigationTitle("Desk")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { Haptics.tap(); deskRoute = .notifications } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "bell")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(TarsTheme.inkSecondary)
-                        if session.unreadNotifications > 0 {
-                            Text(session.unreadNotifications > 9 ? "9+" : "\(session.unreadNotifications)")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(TarsTheme.onFill)
-                                .padding(.horizontal, 4).padding(.vertical, 1)
-                                .background(Capsule().fill(TarsTheme.paperBadge))
-                                .offset(x: 9, y: -6)
-                        }
-                    }
-                    .frame(width: 44, height: 44)
-                }
-                .accessibilityLabel(session.unreadNotifications > 0
-                    ? "Notifications, \(session.unreadNotifications) unread" : "Notifications")
-            }
-        }
+        // The equity number is the header; a nav bar saying "Desk" above
+        // it would just be the same fact, smaller and further away.
+        .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $pushed) { MarketSymbolView(symbol: $0) }
         .navigationDestination(item: $deskRoute) { route in
             switch route {
@@ -95,15 +76,44 @@ struct DeskView: View {
         }
     }
 
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("Desk")
+                .font(TarsTheme.Text.screenTitle)
+                .foregroundStyle(TarsTheme.inkPrimary)
+            Spacer()
+            Button { Haptics.tap(); deskRoute = .notifications } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bell")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(TarsTheme.inkSecondary)
+                    if session.unreadNotifications > 0 {
+                        Text(session.unreadNotifications > 9 ? "9+" : "\(session.unreadNotifications)")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(TarsTheme.onFill)
+                            .padding(.horizontal, 4).padding(.vertical, 1)
+                            .background(Capsule().fill(TarsTheme.accent))
+                            .offset(x: 9, y: -6)
+                    }
+                }
+                .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(session.unreadNotifications > 0
+                ? "Notifications, \(session.unreadNotifications) unread" : "Notifications")
+        }
+        .padding(.top, TarsTheme.Space.s)
+    }
+
     /// The machinery behind the number: how it's margined, what it risks,
     /// what it has already taught you.
     private var deskLinks: some View {
         HStack(spacing: TarsTheme.Space.m) {
-            deskLink("Margin", "scalemass.fill", .margin)
+            deskLink("Margin", "scalemass", .margin)
             deskLink("Risk", "waveform.path.ecg", .risk)
-            deskLink("Journal", "book.closed.fill", .journal)
-            deskLink("Alerts", "bell.fill", .alerts)
-            deskLink("Floor", "person.3.fill", .floor)
+            deskLink("Journal", "book.closed", .journal)
+            deskLink("Alerts", "bell", .alerts)
+            deskLink("Floor", "person.3", .floor)
         }
     }
 
@@ -112,15 +122,15 @@ struct DeskView: View {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(TarsTheme.paperBadge)
+                    .foregroundStyle(TarsTheme.inkSecondary)
                 Text(label)
                     .font(TarsTheme.Text.caption.weight(.medium))
-                    .foregroundStyle(TarsTheme.inkPrimary)
+                    .foregroundStyle(TarsTheme.inkSecondary)
             }
-            .frame(maxWidth: .infinity, minHeight: 68)
-            .background(TarsTheme.bg2)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .frame(maxWidth: .infinity, minHeight: 64)
+            .background(TarsTheme.bg1)
+            .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
                 .strokeBorder(TarsTheme.hairline, lineWidth: 1))
         }
         .buttonStyle(.plain)
@@ -164,9 +174,7 @@ struct DeskView: View {
                     .foregroundStyle(TarsTheme.inkQuaternary)
             }
         }
-        .padding(TarsTheme.Space.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .tarsPanel()
         .accessibilityElement(children: .combine)
     }
 
@@ -191,7 +199,7 @@ struct DeskView: View {
                 Text("No positions. Pick a market, size it modestly, hold the gold button.")
                     .font(TarsTheme.Text.caption)
                     .foregroundStyle(TarsTheme.inkTertiary)
-                    .padding(TarsTheme.Space.l)
+                    .padding(.vertical, TarsTheme.Space.m)
             } else {
                 ForEach(session.positions) { p in
                     Button { pushed = p.symbol } label: { positionRow(p) }
@@ -200,7 +208,6 @@ struct DeskView: View {
                 }
             }
         }
-        .tarsPanel()
     }
 
     private func positionRow(_ p: APIPosition) -> some View {
@@ -237,7 +244,7 @@ struct DeskView: View {
                 }
             }
         }
-        .padding(TarsTheme.Space.l)
+        .padding(.vertical, TarsTheme.Space.m)
         .frame(minHeight: 56)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
@@ -254,7 +261,7 @@ struct DeskView: View {
                      : "Loading…")
                     .font(TarsTheme.Text.caption)
                     .foregroundStyle(TarsTheme.inkTertiary)
-                    .padding(TarsTheme.Space.l)
+                    .padding(.vertical, TarsTheme.Space.m)
             } else {
                 ForEach(model.orders.prefix(20)) { o in
                     orderRow(o)
@@ -262,7 +269,6 @@ struct DeskView: View {
                 }
             }
         }
-        .tarsPanel()
     }
 
     private func orderRow(_ o: APIOrder) -> some View {
@@ -292,7 +298,7 @@ struct DeskView: View {
                     .foregroundStyle(TarsTheme.loss)
             }
         }
-        .padding(TarsTheme.Space.l)
+        .padding(.vertical, TarsTheme.Space.m)
         .accessibilityElement(children: .combine)
     }
 
@@ -314,8 +320,7 @@ struct DeskView: View {
             .font(TarsTheme.Text.micro)
             .kerning(1.5)
             .foregroundStyle(TarsTheme.inkQuaternary)
-            .padding(.horizontal, TarsTheme.Space.l)
-            .padding(.top, TarsTheme.Space.l)
+            .padding(.top, TarsTheme.Space.m)
             .padding(.bottom, TarsTheme.Space.s)
     }
 }
