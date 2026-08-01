@@ -32,8 +32,13 @@ struct MarketsHomeView: View {
         ScrollView {
             LazyVStack(spacing: TarsTheme.Space.l, pinnedViews: []) {
                 if model.stale { staleBanner }
+                if model.marketOpen == false { marketClosedChip }
                 pulseStrip
+                breadthBar
+                venueMap
                 venueRail
+                if let note = MarketsModel.roomNote[model.venue ?? ""] { roomNote(note) }
+                moversRail
                 boardList
             }
             .padding(.horizontal, TarsTheme.Space.l)
@@ -88,6 +93,149 @@ struct MarketsHomeView: View {
         .tarsPanel()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Market pulse")
+    }
+
+    /// The desk is closed — say so rather than letting stale prices imply life.
+    private var marketClosedChip: some View {
+        HStack(spacing: 6) {
+            Circle().fill(TarsTheme.inkTertiary).frame(width: 6, height: 6)
+            Text("US market closed")
+                .font(TarsTheme.Text.micro)
+                .foregroundStyle(TarsTheme.inkTertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Breadth — the tape's conviction. A wide advance with a thin decline is
+    /// a different market from a narrow one, and the bar says which.
+    @ViewBuilder private var breadthBar: some View {
+        if let b = model.movers?.breadth {
+            let total = max(1, b.advancing + b.declining + b.unchanged)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("BREADTH").font(TarsTheme.Text.micro).kerning(1.2)
+                        .foregroundStyle(TarsTheme.inkQuaternary)
+                    Spacer()
+                    Text("\(total) markets").font(TarsTheme.Text.micro)
+                        .foregroundStyle(TarsTheme.inkQuaternary)
+                }
+                GeometryReader { geo in
+                    HStack(spacing: 2) {
+                        Capsule().fill(TarsTheme.gain)
+                            .frame(width: geo.size.width * CGFloat(b.advancing) / CGFloat(total))
+                        Capsule().fill(TarsTheme.bg3)
+                            .frame(width: geo.size.width * CGFloat(b.unchanged) / CGFloat(total))
+                        Capsule().fill(TarsTheme.loss)
+                            .frame(width: geo.size.width * CGFloat(b.declining) / CGFloat(total))
+                    }
+                }
+                .frame(height: 6)
+                HStack {
+                    Text("\(b.advancing) adv").foregroundStyle(TarsTheme.gain)
+                    Spacer()
+                    Text("\(b.unchanged) flat").foregroundStyle(TarsTheme.inkTertiary)
+                    Spacer()
+                    Text("\(b.declining) dec").foregroundStyle(TarsTheme.loss)
+                }
+                .font(TarsTheme.Text.micro.monospacedDigit())
+            }
+            .padding(TarsTheme.Space.l)
+            .tarsPanel()
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Breadth: \(b.advancing) advancing, \(b.declining) declining")
+        }
+    }
+
+    /*
+      The whole desk. A pill row communicates navigation; this communicates
+      BREADTH — eight venues with their true listing counts, so "1,742
+      markets" stops being a claim and becomes a fact you can count.
+    */
+    @ViewBuilder private var venueMap: some View {
+        if !model.venues.isEmpty {
+            VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
+                HStack {
+                    Text("THE WHOLE DESK").font(TarsTheme.Text.micro).kerning(1.5)
+                        .foregroundStyle(TarsTheme.inkQuaternary)
+                    Spacer()
+                    Text("\(model.totalMarkets) listed markets")
+                        .font(TarsTheme.Text.micro.monospacedDigit())
+                        .foregroundStyle(TarsTheme.inkQuaternary)
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: TarsTheme.Space.s) {
+                        ForEach(model.venues) { v in
+                            Button {
+                                Haptics.tick()
+                                model.select(v.category)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Image(systemName: MarketsModel.venueIcon[v.category] ?? "square.grid.2x2")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundStyle(TarsTheme.paperBadge)
+                                    Text(v.category)
+                                        .font(TarsTheme.Text.caption.weight(.semibold))
+                                        .foregroundStyle(TarsTheme.inkPrimary)
+                                    Text("\(v.count)")
+                                        .font(TarsTheme.Text.micro.monospacedDigit())
+                                        .foregroundStyle(TarsTheme.inkTertiary)
+                                }
+                                .frame(width: 96, alignment: .topLeading)
+                                .padding(TarsTheme.Space.m)
+                                .background(TarsTheme.bg2)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .strokeBorder(TarsTheme.hairline, lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(v.category), \(v.count) markets")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func roomNote(_ text: String) -> some View {
+        Text(text)
+            .font(TarsTheme.Text.micro)
+            .foregroundStyle(TarsTheme.inkTertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// What moved — the two rails that answer "anything happening?" first.
+    @ViewBuilder private var moversRail: some View {
+        if let m = model.movers, let gainers = m.gainers, !gainers.isEmpty {
+            VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
+                Text("WHAT MOVED").font(TarsTheme.Text.micro).kerning(1.5)
+                    .foregroundStyle(TarsTheme.inkQuaternary)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: TarsTheme.Space.s) {
+                        ForEach((gainers.prefix(4) + (m.losers ?? []).prefix(4))) { r in
+                            Button { pushed = r.symbol } label: {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(SymbolDisplay.pretty(r.symbol))
+                                        .font(TarsTheme.Text.caption.weight(.semibold))
+                                        .foregroundStyle(TarsTheme.inkPrimary)
+                                        .lineLimit(1)
+                                    if let p = r.price {
+                                        Text(SymbolDisplay.price(r.symbol, p))
+                                            .font(TarsTheme.Text.micro.monospacedDigit())
+                                            .foregroundStyle(TarsTheme.inkSecondary)
+                                    }
+                                    ChangeText(r.changePercent)
+                                }
+                                .frame(width: 104, alignment: .leading)
+                                .padding(TarsTheme.Space.m)
+                                .background(TarsTheme.bg2)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - The venue rail: the whole desk in one thumb sweep
@@ -154,7 +302,7 @@ struct MarketsHomeView: View {
                     .font(TarsTheme.Text.body.weight(.semibold))
                     .foregroundStyle(TarsTheme.inkPrimary)
                 if let source = row.source {
-                    ProvenanceChip(source)
+                    ProvenanceChip(source, symbol: row.symbol)
                 }
             }
             Spacer()
@@ -215,17 +363,11 @@ private struct ChangeText: View {
 /// The honesty chip: where this price came from, always visible.
 private struct ProvenanceChip: View {
     let source: Provenance
-    init(_ source: Provenance) { self.source = source }
-    private var label: String {
-        switch source {
-        case .live: "LIVE"
-        case .delayed: "DELAYED 15M"
-        case .eod: "EOD"
-        case .derived: "DERIVED"
-        case .indicative: "INDICATIVE"
-        case .unknown: "—"
-        }
+    let symbol: String?
+    init(_ source: Provenance, symbol: String? = nil) {
+        self.source = source; self.symbol = symbol
     }
+    private var label: String { ProvenanceLabel.text(source, symbol: symbol) }
     var body: some View {
         Text(label)
             .font(.system(size: 9, weight: .semibold, design: .monospaced))
@@ -240,11 +382,34 @@ private struct ProvenanceChip: View {
 @Observable @MainActor
 final class MarketsModel {
     static let venues = ["Stocks", "ETFs", "Crypto", "Global", "FX", "Income", "Indices", "Futures"]
+    static let venueIcon: [String: String] = [
+        "Stocks": "building.2.fill", "ETFs": "square.stack.3d.up.fill",
+        "Crypto": "bitcoinsign.circle.fill", "Global": "globe",
+        "FX": "arrow.left.arrow.right", "Income": "banknote.fill",
+        "Indices": "chart.xyaxis.line", "Futures": "calendar.badge.clock",
+    ]
 
     private(set) var rows: [BoardRowPayload] = []
+    private(set) var venues: [VenueCount] = []
+    private(set) var movers: MoversPayload?
+    private(set) var totalMarkets = 0
+    private(set) var marketOpen: Bool?
     private(set) var venue: String?
     private(set) var loading = true
     private(set) var stale = false
+
+    /// One operational line per room — what actually happens when you trade
+    /// here. The same sentences the web states, because the desk is one desk.
+    static let roomNote: [String: String] = [
+        "Stocks": "Cash equities — market, limit, stop and trailing orders, long or short.",
+        "ETFs": "Trade like stocks. Leveraged funds decay; visit the Academy before sizing.",
+        "Crypto": "Around the clock. Fills carry a 25bps commission, priced into the math.",
+        "Global": "Foreign companies and country funds listed in the US — dollar-priced.",
+        "FX": "Spot pairs marked at daily ECB rates; P&L converts to dollars at the same rates.",
+        "Income": "Built for dividends — payouts land in cash automatically on pay dates.",
+        "Indices": "Quote-only benchmarks. To trade the level, use its future or its ETF.",
+        "Futures": "Post initial margin, settle variation daily. Each ticket lists what it requires.",
+    ]
 
     private var loop: Task<Void, Never>?
     private let api = TarsAPIClient.shared
@@ -279,6 +444,10 @@ final class MarketsModel {
         do {
             let res = try await api.board(category: venue, limit: 250)
             rows = res.rows
+            movers = res.movers
+            marketOpen = res.marketOpen
+            if let v = res.venues, !v.isEmpty { venues = v }
+            if let t = res.total, t > 0 { totalMarkets = t }
             stale = false
         } catch {
             stale = true // last-good stands; the banner tells the truth

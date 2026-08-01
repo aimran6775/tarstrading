@@ -93,7 +93,10 @@ struct MarketSymbolView: View {
                         .font(TarsTheme.Text.heading.monospacedDigit())
                         .foregroundStyle(chg > 0 ? TarsTheme.gain : chg < 0 ? TarsTheme.loss : TarsTheme.inkTertiary)
                     if let p = q.provenance {
-                        Text(String(describing: p).uppercased())
+                        // One definition of provenance across the app: a delayed
+                        // print at 2am reads AFTER HOURS here exactly as it does
+                        // on the board and on the web.
+                        Text(ProvenanceLabel.text(p, symbol: symbol))
                             .font(.system(size: 10, weight: .semibold, design: .monospaced))
                             .kerning(0.6)
                             .foregroundStyle(p == .live ? TarsTheme.gain : TarsTheme.inkTertiary)

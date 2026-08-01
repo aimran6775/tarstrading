@@ -149,12 +149,69 @@ struct BoardRowPayload: Decodable, Identifiable, Equatable {
     let dayLow: Double?
 }
 
+struct VenueCount: Decodable, Equatable, Identifiable {
+    var id: String { category }
+    let category: String
+    let count: Int
+}
+
+struct MoversPayload: Decodable, Equatable {
+    let gainers: [BoardRowPayload]?
+    let losers: [BoardRowPayload]?
+    let breadth: BreadthPayload?
+}
+
+struct BreadthPayload: Decodable, Equatable {
+    let advancing: Int
+    let declining: Int
+    let unchanged: Int
+}
+
 struct BoardResponse: Decodable {
     let ok: Bool
     let marketOpen: Bool?
     let count: Int?
     let rows: [BoardRowPayload]
+    let movers: MoversPayload?
+    let venues: [VenueCount]?
+    let total: Int?
     let asOf: Double?
+}
+
+/*
+  Provenance in words — ONE definition, so no two screens in the app can
+  describe the same price differently. Mirrors the web's provenanceLabel():
+  a delayed print outside the cash session is AFTER HOURS, not "delayed",
+  and 24/7 venues (crypto, FX) are never mislabelled as being outside a
+  session they don't have.
+*/
+enum ProvenanceLabel {
+    static func text(_ source: Provenance, symbol: String? = nil) -> String {
+        if source == .delayed, !isRegularSession(),
+           !(symbol.map { $0.contains("/") || $0.uppercased().hasPrefix("FX:") } ?? false) {
+            return "AFTER HOURS"
+        }
+        return switch source {
+        case .live: "LIVE"
+        case .delayed: "DELAYED 15M"
+        case .eod: "EOD"
+        case .derived: "DERIVED"
+        case .indicative: "INDICATIVE"
+        case .unknown: "—"
+        }
+    }
+
+    /// 09:30–16:00 New York, weekdays.
+    static func isRegularSession(_ now: Date = Date()) -> Bool {
+        var cal = Calendar(identifier: .gregorian)
+        guard let tz = TimeZone(identifier: "America/New_York") else { return true }
+        cal.timeZone = tz
+        let c = cal.dateComponents([.weekday, .hour, .minute], from: now)
+        guard let wd = c.weekday, wd != 1, wd != 7,
+              let h = c.hour, let m = c.minute else { return false }
+        let mins = h * 60 + m
+        return mins >= 9 * 60 + 30 && mins < 16 * 60
+    }
 }
 
 // MARK: - Display helpers (the client's copy of the platform's naming rules)
