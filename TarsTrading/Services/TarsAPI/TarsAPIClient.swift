@@ -148,3 +148,12 @@ extension TarsAPIClient {
         return try await request("GET", path)
     }
 }
+
+extension TarsAPIClient {
+    /// Daily bars for a symbol over a platform timeframe (1W/1M/3M/1Y/5Y).
+    func bars(symbol: String, timeframe: String) async throws -> [APIBar] {
+        let sym = symbol.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? symbol
+        let res: BarsResponse = try await request("GET", "/api/market/bars?symbol=\(sym)&tf=\(timeframe)")
+        return res.bars
+    }
+}

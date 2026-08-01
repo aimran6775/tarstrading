@@ -184,3 +184,23 @@ enum SymbolDisplay {
         return value.formatted(.currency(code: "USD").precision(.fractionLength(2)))
     }
 }
+
+// MARK: - Bars (the chart's fuel — epoch seconds, lightweight-charts convention)
+
+struct APIBar: Decodable, Identifiable, Equatable {
+    var id: Double { time }
+    let time: Double
+    let open: Double
+    let high: Double
+    let low: Double
+    let close: Double
+    let volume: Double
+
+    var date: Date { Date(timeIntervalSince1970: time) }
+}
+
+struct BarsResponse: Decodable {
+    let ok: Bool
+    let bars: [APIBar]
+    let source: String?
+}

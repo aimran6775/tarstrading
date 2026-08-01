@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		65279B8EDB5CAE6FF57E35F5 /* MarketSymbolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C683394B76760FA1A3659EB2 /* MarketSymbolView.swift */; };
 		326950EE30351611C9329C6C /* MarketsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EFF82DEA0653143E5C98213 /* MarketsHomeView.swift */; };
 		D42C03C34D64DECC85AC2321 /* MarketStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968DE43C5E0FD355DDCAE2AE /* MarketStore.swift */; };
 		31B55498390BC41830EFFDA1 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CF96C60E8099D6BC69FD903 /* LoginView.swift */; };
@@ -119,6 +120,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		C683394B76760FA1A3659EB2 /* MarketSymbolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketSymbolView.swift; sourceTree = "<group>"; };
 		6EFF82DEA0653143E5C98213 /* MarketsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketsHomeView.swift; sourceTree = "<group>"; };
 		968DE43C5E0FD355DDCAE2AE /* MarketStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketStore.swift; sourceTree = "<group>"; };
 		8CF96C60E8099D6BC69FD903 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
@@ -226,6 +228,7 @@
 		8183E1507241A3C837E47A23 /* Markets */ = {
 			isa = PBXGroup;
 			children = (
+				C683394B76760FA1A3659EB2 /* MarketSymbolView.swift */,
 				6EFF82DEA0653143E5C98213 /* MarketsHomeView.swift */,
 			);
 			path = Markets;
@@ -717,6 +720,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				65279B8EDB5CAE6FF57E35F5 /* MarketSymbolView.swift in Sources */,
 				326950EE30351611C9329C6C /* MarketsHomeView.swift in Sources */,
 				D42C03C34D64DECC85AC2321 /* MarketStore.swift in Sources */,
 				31B55498390BC41830EFFDA1 /* LoginView.swift in Sources */,

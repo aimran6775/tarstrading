@@ -14,7 +14,19 @@ import SwiftUI
 */
 struct MarketsHomeView: View {
     @State private var model = MarketsModel()
+    @State private var query = ""
+    @State private var pushed: String?
     @Environment(\.scenePhase) private var scenePhase
+
+    /// The rows the search allows through — instant, over what's loaded.
+    private var visibleRows: [BoardRowPayload] {
+        let q = query.trimmingCharacters(in: .whitespaces).uppercased()
+        guard !q.isEmpty else { return model.rows }
+        return model.rows.filter {
+            SymbolDisplay.pretty($0.symbol).uppercased().contains(q)
+            || $0.symbol.uppercased().contains(q)
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -29,8 +41,19 @@ struct MarketsHomeView: View {
         }
         .background(TarsTheme.bg0)
         .navigationTitle("Markets")
+        .searchable(text: $query, prompt: "Ticker or pair")
+        .navigationDestination(item: $pushed) { MarketSymbolView(symbol: $0) }
         .refreshable { await model.refresh() }
-        .task { model.activate() }
+        .task {
+            model.activate()
+            #if DEBUG
+            // Headless drives: -TarsOpenSymbol AAPL pushes a symbol page.
+            if pushed == nil,
+               let sym = UserDefaults.standard.string(forKey: "TarsOpenSymbol"), !sym.isEmpty {
+                pushed = sym
+            }
+            #endif
+        }
         .onDisappear { model.deactivate() }
         .onChange(of: scenePhase) { _, phase in
             // A hidden app polls nothing; a returning one reads immediately.
@@ -108,9 +131,16 @@ struct MarketsHomeView: View {
             if model.rows.isEmpty && model.loading {
                 ForEach(0..<8, id: \.self) { _ in skeletonRow }
             } else {
-                ForEach(model.rows) { row in
-                    boardRow(row)
+                ForEach(visibleRows) { row in
+                    Button { pushed = row.symbol } label: { boardRow(row) }
+                        .buttonStyle(.plain)
                     Divider().overlay(TarsTheme.hairline)
+                }
+                if visibleRows.isEmpty && !query.isEmpty {
+                    Text("Nothing here matches \"\(query)\".")
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(TarsTheme.inkTertiary)
+                        .padding(TarsTheme.Space.xl)
                 }
             }
         }
