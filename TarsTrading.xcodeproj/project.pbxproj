@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		512B5580F5875BDA8FEAF8C1 /* TarsAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEDA55F0E31F27F624652CB /* TarsAPIClient.swift */; };
+		4A8BBEA32A7A347DE0610DDD /* APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB67426C55FF91F5352110B /* APIModels.swift */; };
+		520F4126D327FFE40B309CB1 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C42E437A3BBDD3E87B1A2AF /* Keychain.swift */; };
+		662EDAF89DFFD00A9F354ED7 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2ABC7A7967B8BB8F02500BB /* SessionStore.swift */; };
 		02EC61502A28F16809A2ECDB /* AgentRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 817F9F6B3F3005FF71C1DD90 /* AgentRunner.swift */; };
 		0598143FFAD6D11B80F1C73E /* Tracks34.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB40958DAAD30F8B90F27FFF /* Tracks34.swift */; };
 		071051D285516E9EAB7D572C /* PreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0501D29A0CE39B0209727F87 /* PreferencesStore.swift */; };
@@ -111,6 +115,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		2BEDA55F0E31F27F624652CB /* TarsAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TarsAPIClient.swift; sourceTree = "<group>"; };
+		3AB67426C55FF91F5352110B /* APIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModels.swift; sourceTree = "<group>"; };
+		5C42E437A3BBDD3E87B1A2AF /* Keychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
+		F2ABC7A7967B8BB8F02500BB /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		001940BCC4C866CECB87373C /* Backtester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backtester.swift; sourceTree = "<group>"; };
 		0501D29A0CE39B0209727F87 /* PreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesStore.swift; sourceTree = "<group>"; };
 		09F5444B90A9D011F23A0F64 /* META.csv */ = {isa = PBXFileReference; path = META.csv; sourceTree = "<group>"; };
@@ -207,6 +215,16 @@
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		533B922690A662BA22CF336B /* TarsAPI */ = {
+			isa = PBXGroup;
+			children = (
+				2BEDA55F0E31F27F624652CB /* TarsAPIClient.swift */,
+				3AB67426C55FF91F5352110B /* APIModels.swift */,
+				5C42E437A3BBDD3E87B1A2AF /* Keychain.swift */,
+			);
+			path = TarsAPI;
+			sourceTree = "<group>";
+		};
 		041CC458B13D586072DFAC07 /* Theme */ = {
 			isa = PBXGroup;
 			children = (
@@ -248,6 +266,7 @@
 		3F3F2F1497908C05E7430503 /* Stores */ = {
 			isa = PBXGroup;
 			children = (
+				F2ABC7A7967B8BB8F02500BB /* SessionStore.swift */,
 				7F1956640918EB44AB9DC419 /* AcademyProgress.swift */,
 				CBA78E226D8F61D9089F7BE4 /* AgentLab.swift */,
 				0501D29A0CE39B0209727F87 /* PreferencesStore.swift */,
@@ -292,6 +311,7 @@
 		4F9E1050578A9575A9EA019B /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				533B922690A662BA22CF336B /* TarsAPI */,
 				8143C3658804A24432262684 /* AlertEngine.swift */,
 				EFC31923FB5F118B2C9DAEF3 /* AlpacaClient.swift */,
 				7F9A5194D1A417FDC690E8C4 /* DemoBroker.swift */,
@@ -669,6 +689,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				512B5580F5875BDA8FEAF8C1 /* TarsAPIClient.swift in Sources */,
+				4A8BBEA32A7A347DE0610DDD /* APIModels.swift in Sources */,
+				520F4126D327FFE40B309CB1 /* Keychain.swift in Sources */,
+				662EDAF89DFFD00A9F354ED7 /* SessionStore.swift in Sources */,
 				DFA0894A35D849026D50C348 /* Academy.swift in Sources */,
 				C0732170AE3C63CE79A3CD83 /* AcademyHomeView.swift in Sources */,
 				0E31A3779C19044075EE77AA /* AcademyProgress.swift in Sources */,
