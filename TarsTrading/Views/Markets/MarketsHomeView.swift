@@ -43,10 +43,12 @@ struct MarketsHomeView: View {
         "SPY": "S&P 500", "QQQ": "NASDAQ", "DIA": "DOW 30", "IWM": "RUSSELL",
     ]
 
-    /// The rows the search allows through — instant, over what's loaded.
+    /// Searching shows the SERVER's answer across all 1,742 markets; the
+    /// local filter is only the instant first frame while that lands.
     private var visibleRows: [BoardRowPayload] {
         let q = query.trimmingCharacters(in: .whitespaces).uppercased()
         guard !q.isEmpty else { return model.rows }
+        if !model.searchRows.isEmpty { return model.searchRows }
         return model.rows.filter {
             SymbolDisplay.pretty($0.symbol).uppercased().contains(q)
             || $0.symbol.uppercased().contains(q)
@@ -132,8 +134,11 @@ struct MarketsHomeView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(TarsTheme.inkTertiary)
-            TextField("Ticker or pair", text: $query)
+            TextField("Ticker, name or pair", text: $query)
                 .font(TarsTheme.Text.body)
+                .onChange(of: query) { _, q in
+                    Task { await model.search(q) }
+                }
                 .foregroundStyle(TarsTheme.inkPrimary)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.characters)
@@ -333,7 +338,7 @@ struct MarketsHomeView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: TarsTheme.Space.s) {
                 venueChip(nil, label: "Trending")
-                ForEach(MarketsModel.venues, id: \.self) { venue in
+                ForEach(model.venueNames, id: \.self) { venue in
                     venueChip(venue, label: venue)
                 }
             }
@@ -383,7 +388,9 @@ struct MarketsHomeView: View {
                     Divider().overlay(TarsTheme.hairline)
                 }
                 if !query.isEmpty, !visibleRows.isEmpty {
-                    Text("\(visibleRows.count) of \(model.rows.count) in this room")
+                    Text(model.searchTotal > 0
+                         ? "\(visibleRows.count) of \(model.searchTotal) across the desk"
+                         : "\(visibleRows.count) in this room")
                         .font(TarsTheme.Text.micro)
                         .foregroundStyle(TarsTheme.inkQuaternary)
                         .padding(.bottom, TarsTheme.Space.s)
@@ -546,6 +553,32 @@ final class MarketsModel {
     private var loop: Task<Void, Never>?
     private let api = TarsAPIClient.shared
 
+    /// The rooms the SERVER says exist, in its order — a ninth venue added
+    /// in the console appears here without an app release.
+    var venueNames: [String] {
+        venues.isEmpty ? Self.venues : venues.map(\.category)
+    }
+
+    /// Server-side search across the whole desk.
+    private(set) var searchRows: [BoardRowPayload] = []
+    private(set) var searchTotal = 0
+    private var searchTask: Task<Void, Never>?
+
+    func search(_ raw: String) async {
+        let q = raw.trimmingCharacters(in: .whitespaces)
+        searchTask?.cancel()
+        guard !q.isEmpty else { searchRows = []; searchTotal = 0; return }
+        searchTask = Task { [weak self] in
+            // A keystroke shouldn't be a request; let the typing settle.
+            try? await Task.sleep(for: .milliseconds(220))
+            guard !Task.isCancelled, let self else { return }
+            if let res = try? await api.searchMarkets(q), !Task.isCancelled {
+                self.searchRows = res.rows
+                self.searchTotal = res.total
+            }
+        }
+    }
+
     func row(_ symbol: String) -> BoardRowPayload? {
         rows.first { $0.symbol == symbol }
     }
@@ -574,7 +607,9 @@ final class MarketsModel {
 
     func refresh() async {
         do {
-            let res = try await api.board(category: venue, limit: 250)
+            // 800 covers the largest room (Global, 719) whole — at 250 the
+            // app was hiding 469 markets it advertised as listed.
+            let res = try await api.board(category: venue, limit: 800)
             rows = res.rows
             movers = res.movers
             marketOpen = res.marketOpen

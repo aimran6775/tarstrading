@@ -108,6 +108,13 @@ struct APIQuote: Decodable, Identifiable, Equatable {
     let provenance: Provenance?
 }
 
+struct SearchResponse: Decodable {
+    let ok: Bool
+    let rows: [BoardRowPayload]
+    let total: Int
+    let shown: Int
+}
+
 struct EquityPoint: Decodable, Equatable {
     let time: Double   // epoch ms
     let equity: Double

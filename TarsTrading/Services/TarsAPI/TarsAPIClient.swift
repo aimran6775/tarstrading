@@ -140,6 +140,14 @@ actor TarsAPIClient {
 
 extension TarsAPIClient {
     /// The curated board — Trending by default, or one venue's own page.
+    /// Search the WHOLE desk, not the screenful we happen to hold. The
+    /// board caps at a few hundred rows; without this, a market at row
+    /// 400 of Global reads as "doesn't exist".
+    func searchMarkets(_ query: String) async throws -> SearchResponse {
+        let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        return try await request("GET", "/api/market/search?q=\(q)")
+    }
+
     /// The account's own history — the same curve the web floor draws.
     func portfolioHistory() async throws -> [EquityPoint] {
         let res: PortfolioHistoryResponse = try await request("GET", "/api/portfolio")
@@ -156,7 +164,7 @@ extension TarsAPIClient {
         return res.sparks
     }
 
-    func board(category: String? = nil, limit: Int = 250) async throws -> BoardResponse {
+    func board(category: String? = nil, limit: Int = 800) async throws -> BoardResponse {
         var path = "/api/market/board?limit=\(limit)"
         if let category, !category.isEmpty {
             path += "&category=\(category.lowercased())"
