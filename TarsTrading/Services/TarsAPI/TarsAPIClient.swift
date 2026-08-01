@@ -232,3 +232,22 @@ extension TarsAPIClient {
         let _: AlertsResponse? = try? await request("DELETE", "/api/alerts", body: Body(id: id))
     }
 }
+
+extension TarsAPIClient {
+    func analysts() async throws -> [APIAnalyst] {
+        let res: AnalystsResponse = try await request("GET", "/api/agents")
+        return res.agents
+    }
+
+    func assistantHistory() async throws -> [AssistantMessage] {
+        let res: AssistantHistoryResponse = try await request("GET", "/api/assistant")
+        return res.messages
+    }
+
+    /// One turn. The assistant may ACT on the floor — hire, pause, retire —
+    /// so a reply can mean the desk changed underneath you.
+    func assistantSay(_ text: String) async throws -> AssistantTurnResponse {
+        struct Body: Encodable { let text: String }
+        return try await request("POST", "/api/assistant", body: Body(text: text))
+    }
+}

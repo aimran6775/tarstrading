@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		64E162849F0ABA0AF8E22EF6 /* AnalystFloorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B99304179DAA83651BB98504 /* AnalystFloorView.swift */; };
+		7A0EF770E1A0B41AC0991525 /* AssistantView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE05A69A905E6687A1EC0623 /* AssistantView.swift */; };
 		A7F04E19196D88D52E708AD4 /* DeskAlertsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E8F2F60706F9ACA2DBED56 /* DeskAlertsView.swift */; };
 		9063A477FA4930B9CA2F2FBF /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A1A2DD5B17B25B11AD3B33 /* NotificationsView.swift */; };
 		4D713FE3F3B8B8861E6F25A1 /* DeskJournalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E346FFE2646BB4C5EFBB9FE /* DeskJournalView.swift */; };
@@ -127,6 +129,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B99304179DAA83651BB98504 /* AnalystFloorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalystFloorView.swift; sourceTree = "<group>"; };
+		EE05A69A905E6687A1EC0623 /* AssistantView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantView.swift; sourceTree = "<group>"; };
 		34E8F2F60706F9ACA2DBED56 /* DeskAlertsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskAlertsView.swift; sourceTree = "<group>"; };
 		57A1A2DD5B17B25B11AD3B33 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		0E346FFE2646BB4C5EFBB9FE /* DeskJournalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskJournalView.swift; sourceTree = "<group>"; };
@@ -242,6 +246,8 @@
 		8183E1507241A3C837E47A23 /* Markets */ = {
 			isa = PBXGroup;
 			children = (
+				B99304179DAA83651BB98504 /* AnalystFloorView.swift */,
+				EE05A69A905E6687A1EC0623 /* AssistantView.swift */,
 				34E8F2F60706F9ACA2DBED56 /* DeskAlertsView.swift */,
 				57A1A2DD5B17B25B11AD3B33 /* NotificationsView.swift */,
 				0E346FFE2646BB4C5EFBB9FE /* DeskJournalView.swift */,
@@ -741,6 +747,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				64E162849F0ABA0AF8E22EF6 /* AnalystFloorView.swift in Sources */,
+				7A0EF770E1A0B41AC0991525 /* AssistantView.swift in Sources */,
 				A7F04E19196D88D52E708AD4 /* DeskAlertsView.swift in Sources */,
 				9063A477FA4930B9CA2F2FBF /* NotificationsView.swift in Sources */,
 				4D713FE3F3B8B8861E6F25A1 /* DeskJournalView.swift in Sources */,

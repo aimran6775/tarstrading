@@ -42,6 +42,16 @@ struct ModeBanner: View {
                 .shadow(color: TarsTheme.paperBadge.opacity(breathing ? 0.35 : 0.1), radius: 8)
         )
         .padding(.top, compact ? TarsTheme.Space.xs : TarsTheme.Space.s)
+        /*
+          The badge sits in a safeAreaInset, and a scroll view's content
+          travels UNDER an inset as it scrolls. Without a backing plate the
+          transcript read straight through the PAPER mark — the one element
+          in the app that must never be ambiguous. The plate spans the full
+          width so scrolled text stops at it.
+        */
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, compact ? TarsTheme.Space.xs : TarsTheme.Space.s)
+        .background(TarsTheme.bg0)
         .onAppear {
             // The breathing glow is decorative; with Reduce Motion on, hold the
             // fully-lit steady state instead of pulsing forever.

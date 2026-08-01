@@ -443,3 +443,67 @@ struct AlertsResponse: Decodable {
     let ok: Bool
     let alerts: [APIAlert]
 }
+
+// MARK: - Analysts (the floor) & the assistant
+
+struct AnalystBacktestSide: Decodable, Equatable {
+    /*
+      The server names this field "return" — a Swift keyword, so it needs an
+      explicit mapping. Worth stating plainly: I guessed "totalReturn" first
+      and it decoded to nil in SILENCE, because an optional swallows a name
+      it doesn't recognise. The screenshot is what caught it. Any field this
+      file gets wrong should be assumed missing on screen, not throwing.
+    */
+    let totalReturn: Double?
+    let maxDrawdown: Double?
+    let trades: Int?
+    let winRate: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case totalReturn = "return"
+        case maxDrawdown, trades, winRate
+    }
+}
+
+struct AnalystBacktest: Decodable, Equatable {
+    let verdict: String?
+    let inSample: AnalystBacktestSide?
+    let outOfSample: AnalystBacktestSide?
+}
+
+struct APIAnalyst: Decodable, Identifiable, Equatable {
+    let id: String
+    let name: String
+    let emoji: String
+    let status: String        // draft | backtested | running | paused | killed
+    let allocation: Double
+    let maxDrawdown: Double
+    let pnl: Double?
+    let thesis: String?
+    let backtest: AnalystBacktest?
+    let createdAt: Double
+}
+
+struct AnalystsResponse: Decodable {
+    let ok: Bool
+    let agents: [APIAnalyst]
+}
+
+struct AssistantMessage: Decodable, Identifiable, Equatable {
+    let id: String
+    let role: String          // user | assistant
+    let text: String
+    let createdAt: Double?
+}
+
+struct AssistantHistoryResponse: Decodable {
+    let ok: Bool
+    let messages: [AssistantMessage]
+}
+
+struct AssistantTurnResponse: Decodable {
+    let ok: Bool
+    let reply: String?
+    let acted: Bool?
+    let error: String?
+}

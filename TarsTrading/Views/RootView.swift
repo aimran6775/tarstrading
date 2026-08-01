@@ -181,8 +181,7 @@ struct RootView: View {
 
             // Tars gets a whole tab on iPhone — the mentor is a first-class place.
             NavigationStack {
-                TarsPanelView()
-                    .background(TarsTheme.bg0)
+                AssistantView()
                     .safeAreaInset(edge: .top) { ModeBanner(compact: true) }
             }
             .tabItem { Label(CompactTab.tars.rawValue, systemImage: CompactTab.tars.icon) }

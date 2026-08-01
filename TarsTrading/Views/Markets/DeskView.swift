@@ -17,7 +17,7 @@ struct DeskView: View {
     @State private var pushed: String?
     @State private var deskRoute: DeskRoute?
     enum DeskRoute: String, Identifiable {
-        case margin, risk, journal, alerts, notifications
+        case margin, risk, journal, alerts, notifications, floor
         var id: String { rawValue }
     }
 
@@ -65,6 +65,7 @@ struct DeskView: View {
             case .journal: DeskJournalView()
             case .alerts: DeskAlertsView()
             case .notifications: NotificationsView()
+            case .floor: AnalystFloorView()
             }
         }
         .refreshable {
@@ -101,6 +102,7 @@ struct DeskView: View {
             deskLink("Risk", "waveform.path.ecg", .risk)
             deskLink("Journal", "book.closed.fill", .journal)
             deskLink("Alerts", "bell.fill", .alerts)
+            deskLink("Floor", "person.3.fill", .floor)
         }
     }
 
