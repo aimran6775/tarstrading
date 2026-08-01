@@ -18,6 +18,7 @@ struct MarketsHomeView: View {
     var onSelect: ((String) -> Void)? = nil
     @State private var model = MarketsModel()
     @State private var query = ""
+    @State private var searching = false
     @State private var pushed: String?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -57,16 +58,15 @@ struct MarketsHomeView: View {
             LazyVStack(alignment: .leading, spacing: TarsTheme.Space.l,
                        pinnedViews: [.sectionHeaders]) {
                 header
-                searchField
+                if searching { searchField }
                 if model.stale { staleBanner }
-                pulseStrip
-                breadthBar
-                // The venue tabs PIN under the status bar while the board
-                // scrolls — the steering wheel stays in your hand. The old
-                // tile rail was a second copy of this navigation; it's gone.
+                // The tape: index levels AND the day's breadth in one
+                // strip. They were two stacked widgets saying one thing —
+                // "what kind of day is it?"
+                tape
                 Section {
                     metaLine
-                    moversRail
+                    if !searching { moversRail }
                     boardList
                 } header: {
                     venueRail
@@ -108,7 +108,21 @@ struct MarketsHomeView: View {
                 .font(TarsTheme.Text.screenTitle)
                 .foregroundStyle(TarsTheme.inkPrimary)
             Spacer()
-            if model.marketOpen == false { marketClosedChip }
+            if model.marketOpen == false, !searching { marketClosedChip }
+            // Search is an occasional act; it was charging permanent rent.
+            Button {
+                Haptics.tap()
+                withAnimation(.snappy) { searching.toggle() }
+                if !searching { query = "" }
+            } label: {
+                Image(systemName: searching ? "xmark" : "magnifyingglass")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(searching ? TarsTheme.inkPrimary : TarsTheme.inkSecondary)
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(TarsTheme.bg1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(searching ? "Close search" : "Search markets")
         }
         .padding(.top, TarsTheme.Space.s)
     }
@@ -144,59 +158,93 @@ struct MarketsHomeView: View {
 
     // MARK: - The pulse: four index proxies, the room's weather
 
-    private var pulseStrip: some View {
-        /*
-          Four proxies across is right at normal type and unreadable at
-          accessibility sizes — verified at XXXL, where "$747" wrapped to
-          "$7 / 47". A price that wraps is worse than a price that shrinks,
-          so the row reflows to two columns and every number holds one line.
-        */
-        let columns = typeSize.isAccessibilitySize
-            ? [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)]
-            : Array(repeating: GridItem(.flexible(), alignment: .leading), count: 4)
-        return LazyVGrid(columns: columns, spacing: TarsTheme.Space.m) {
-            ForEach(["SPY", "QQQ", "DIA", "IWM"], id: \.self) { sym in
-                let row = model.row(sym)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 4) {
-                        Text(sym)
-                            .font(TarsTheme.Text.micro.weight(.semibold))
-                            .foregroundStyle(TarsTheme.inkSecondary)
-                        Text(Self.indexName[sym] ?? "")
-                            .font(TarsTheme.Text.micro)
-                            .foregroundStyle(TarsTheme.inkQuaternary)
-                    }
-                    .lineLimit(1)
-                    if let price = row?.price {
-                        Text(price, format: .currency(code: "USD").precision(.fractionLength(2)))
-                            .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(TarsTheme.inkPrimary)
-                            .lineLimit(1).minimumScaleFactor(0.6)
-                            .contentTransition(.numericText())
-                            .animation(.snappy, value: price)
-                        ChangeText(row?.changePercent)
-                    } else {
-                        Text("—").font(TarsTheme.Text.caption)
-                            .foregroundStyle(TarsTheme.inkQuaternary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .contextMenu {
-                    Button { open(sym) } label: {
-                        Label("Open market", systemImage: "chart.xyaxis.line")
-                    }
-                } preview: {
-                    InstrumentExplainer(symbol: sym,
-                                        price: row?.price,
-                                        changePercent: row?.changePercent,
-                                        provenance: row?.source)
+    private var tape: some View {
+        VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
+            /*
+              The room's weather, in one strip. Four index proxies plus VIX,
+              each with the shape of its own history — a number tells you
+              where, a line tells you how it got there.
+            */
+            let columns = typeSize.isAccessibilitySize
+                ? [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)]
+                : Array(repeating: GridItem(.flexible(), alignment: .leading), count: 4)
+            LazyVGrid(columns: columns, spacing: TarsTheme.Space.m) {
+                ForEach(["SPY", "QQQ", "DIA", "IWM"], id: \.self) { sym in
+                    tapeCell(sym)
                 }
             }
+            breadthLine
         }
         .padding(.vertical, TarsTheme.Space.xs)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Market pulse")
+    }
+
+    private func tapeCell(_ sym: String) -> some View {
+        let row = model.row(sym)
+        return VStack(alignment: .leading, spacing: 3) {
+            Text(Self.indexName[sym] ?? sym)
+                .font(TarsTheme.Text.micro.weight(.semibold))
+                .foregroundStyle(TarsTheme.inkTertiary)
+                .lineLimit(1)
+            if let price = row?.price {
+                Text(price, format: .currency(code: "USD").precision(.fractionLength(2)))
+                    .font(TarsTheme.Text.caption.monospacedDigit().weight(.semibold))
+                    .foregroundStyle(TarsTheme.inkPrimary)
+                    .lineLimit(1).minimumScaleFactor(0.6)
+                    .contentTransition(.numericText())
+                    .animation(.snappy, value: price)
+                ChangeText(row?.changePercent)
+            } else {
+                Text("—").font(TarsTheme.Text.caption)
+                    .foregroundStyle(TarsTheme.inkQuaternary)
+            }
+            Group {
+                if let series = model.sparks[sym], series.count > 1 {
+                    SparkPath(values: series,
+                              tone: (row?.changePercent ?? 0) >= 0 ? TarsTheme.gain : TarsTheme.loss)
+                } else {
+                    Color.clear
+                }
+            }
+            .frame(height: 14)
+        }
+        .frame(maxWidth: .infinity, alignment: .top)
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button { open(sym) } label: {
+                Label("Open market", systemImage: "chart.xyaxis.line")
+            }
+        } preview: {
+            InstrumentExplainer(symbol: sym, price: row?.price,
+                                changePercent: row?.changePercent,
+                                provenance: row?.source)
+        }
+    }
+
+    /// Breadth as a SENTENCE with a hairline bar — it used to be a panel
+    /// with three labels saying what one line can say.
+    @ViewBuilder private var breadthLine: some View {
+        if let b = model.movers?.breadth {
+            let total = max(1, b.advancing + b.declining + b.unchanged)
+            VStack(alignment: .leading, spacing: 5) {
+                GeometryReader { geo in
+                    HStack(spacing: 2) {
+                        Capsule().fill(TarsTheme.gain)
+                            .frame(width: geo.size.width * CGFloat(b.advancing) / CGFloat(total))
+                        Capsule().fill(TarsTheme.bg3)
+                            .frame(width: geo.size.width * CGFloat(b.unchanged) / CGFloat(total))
+                        Capsule().fill(TarsTheme.loss)
+                            .frame(width: geo.size.width * CGFloat(b.declining) / CGFloat(total))
+                    }
+                }
+                .frame(height: 3)
+                Text("\(b.advancing) rising · \(b.declining) falling of \(total) markets"
+                     + (model.totalMarkets > 0 ? " · \(model.totalMarkets) listed" : ""))
+                    .font(TarsTheme.Text.micro)
+                    .foregroundStyle(TarsTheme.inkQuaternary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Breadth: \(b.advancing) advancing, \(b.declining) declining")
+        }
     }
 
     /// The desk is closed — say so rather than letting stale prices imply life.
@@ -212,60 +260,15 @@ struct MarketsHomeView: View {
 
     /// Breadth — the tape's conviction. A wide advance with a thin decline is
     /// a different market from a narrow one, and the bar says which.
-    @ViewBuilder private var breadthBar: some View {
-        if let b = model.movers?.breadth {
-            let total = max(1, b.advancing + b.declining + b.unchanged)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("BREADTH").font(TarsTheme.Text.micro).kerning(1.2)
-                        .foregroundStyle(TarsTheme.inkQuaternary)
-                    Spacer()
-                    Text("\(total) markets").font(TarsTheme.Text.micro)
-                        .foregroundStyle(TarsTheme.inkQuaternary)
-                }
-                GeometryReader { geo in
-                    HStack(spacing: 2) {
-                        Capsule().fill(TarsTheme.gain)
-                            .frame(width: geo.size.width * CGFloat(b.advancing) / CGFloat(total))
-                        Capsule().fill(TarsTheme.bg3)
-                            .frame(width: geo.size.width * CGFloat(b.unchanged) / CGFloat(total))
-                        Capsule().fill(TarsTheme.loss)
-                            .frame(width: geo.size.width * CGFloat(b.declining) / CGFloat(total))
-                    }
-                }
-                .frame(height: 6)
-                // The BAR carries the color; the counts just report.
-                HStack {
-                    Text("\(b.advancing) adv").foregroundStyle(TarsTheme.inkSecondary)
-                    Spacer()
-                    Text("\(b.unchanged) flat").foregroundStyle(TarsTheme.inkTertiary)
-                    Spacer()
-                    Text("\(b.declining) dec").foregroundStyle(TarsTheme.inkSecondary)
-                }
-                .font(TarsTheme.Text.micro.monospacedDigit())
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Breadth: \(b.advancing) advancing, \(b.declining) declining")
-        }
-    }
-
     /// One quiet line under the tabs: this room's rules, and the desk's
     /// true size — the fact the old tile rail spent 120pt saying.
     @ViewBuilder private var metaLine: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if let note = MarketsModel.roomNote[model.venue ?? ""] {
-                Text(note)
-                    .font(TarsTheme.Text.micro)
-                    .foregroundStyle(TarsTheme.inkTertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if model.totalMarkets > 0 {
-                Text("\(model.totalMarkets) markets across 8 venues · hold any ticker to learn what it is")
-                    .font(TarsTheme.Text.micro)
-                    .foregroundStyle(TarsTheme.inkQuaternary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        Text(MarketsModel.roomNote[model.venue ?? ""]
+             ?? "Hold any ticker to learn what it is.")
+            .font(TarsTheme.Text.micro)
+            .foregroundStyle(TarsTheme.inkTertiary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// What moved — the two rails that answer "anything happening?" first.
@@ -565,7 +568,10 @@ final class MarketsModel {
             if let t = res.total, t > 0 { totalMarkets = t }
             stale = false
             // The first screenful gets lines; scrolling further stays cheap.
-            let want = Array(res.rows.prefix(32).map(\.symbol))
+            // The tape's four proxies come first — they head the screen and
+            // must never wait for the board to happen to include them.
+            let proxies = ["SPY", "QQQ", "DIA", "IWM"]
+            let want = proxies + res.rows.prefix(28).map(\.symbol).filter { !proxies.contains($0) }
             if let fresh = try? await api.sparks(symbols: want) {
                 sparks.merge(fresh) { _, new in new }
             }

@@ -310,12 +310,98 @@ enum Instruments {
                       what: "Measures two thousand smaller US companies — the domestic economy's temperature.", moves: "Small business conditions and credit."),
         "VIX": .init(name: "CBOE Volatility Index", sector: "Volatility index",
                       what: "The market's fear gauge: how much movement traders EXPECT in the S&P 500 over the next 30 days, derived from option prices. It spikes when stocks fall.", moves: "Fear itself — it usually rises when the market drops."),
+        "UVIX": .init(name: "2x Long VIX Futures ETF", sector: "Volatility ETF",
+                      what: "Doubles the daily move of short-term VIX futures. It decays relentlessly — a hedge measured in days.", moves: "Volatility spikes, magnified, minus heavy decay."),
+        "VXX": .init(name: "iPath Series B S&P 500 VIX Short-Term Futures", sector: "Volatility ETN",
+                      what: "Tracks short-dated VIX futures. It reliably grinds lower over time because those futures usually cost more than spot.", moves: "Fear spikes; it loses value in calm markets by design."),
+        "SPXL": .init(name: "Direxion Daily S&P 500 Bull 3X", sector: "Leveraged ETF",
+                      what: "Three times the S&P 500's daily move, reset every day.", moves: "The index, magnified — and decay in choppy markets."),
+        "QLD": .init(name: "ProShares Ultra QQQ", sector: "Leveraged ETF",
+                      what: "Two times the Nasdaq-100's daily move.", moves: "Nasdaq direction, doubled daily."),
+        "JEPI": .init(name: "JPMorgan Equity Premium Income ETF", sector: "Income ETF",
+                      what: "Owns large US stocks and sells options against them to generate monthly income, trading away some upside.", moves: "Volatility (which raises option income) and the market's direction."),
+        "JEPQ": .init(name: "JPMorgan Nasdaq Equity Premium Income ETF", sector: "Income ETF",
+                      what: "The Nasdaq version of JEPI — tech stocks plus written options for monthly income.", moves: "Tech volatility and option premiums."),
+        "QYLD": .init(name: "Global X Nasdaq 100 Covered Call ETF", sector: "Income ETF",
+                      what: "Sells call options on the Nasdaq-100 every month, paying out the premium as income and capping gains.", moves: "Option premiums; it lags badly in strong rallies."),
+        "VYM": .init(name: "Vanguard High Dividend Yield ETF", sector: "Dividend ETF",
+                      what: "Holds US companies with above-average dividend yields.", moves: "Rates and the appeal of income."),
+        "DVY": .init(name: "iShares Select Dividend ETF", sector: "Dividend ETF",
+                      what: "Screens for US companies with sustained dividend payment records.", moves: "Rates and payout durability."),
+        "IEF": .init(name: "iShares 7-10 Year Treasury Bond ETF", sector: "Bond ETF",
+                      what: "Holds intermediate US government bonds — less rate-sensitive than TLT.", moves: "Medium-term interest rates."),
+        "SHY": .init(name: "iShares 1-3 Year Treasury Bond ETF", sector: "Bond ETF",
+                      what: "Short-dated government bonds — close to cash, barely moved by rate changes.", moves: "Front-end rates; it is the calm end of the bond market."),
+        "LQD": .init(name: "iShares iBoxx Investment Grade Corporate Bond", sector: "Bond ETF",
+                      what: "Holds bonds from financially solid companies — safer than HYG, lower yielding.", moves: "Rates and corporate credit spreads."),
+        "TIP": .init(name: "iShares TIPS Bond ETF", sector: "Bond ETF",
+                      what: "Inflation-protected US government bonds; their principal rises with the consumer price index.", moves: "Real yields and inflation expectations."),
+        "XLP": .init(name: "Consumer Staples Select Sector SPDR", sector: "Sector ETF",
+                      what: "The things people buy regardless of the economy — food, drinks, household goods.", moves: "Defensive rotation; it holds up when growth scares markets."),
+        "XLU": .init(name: "Utilities Select Sector SPDR Fund", sector: "Sector ETF",
+                      what: "Electric and gas utilities — steady, regulated, dividend-heavy, and now an AI power story.", moves: "Interest rates and data-centre electricity demand."),
+        "XLB": .init(name: "Materials Select Sector SPDR Fund", sector: "Sector ETF",
+                      what: "Chemicals, metals and packaging companies.", moves: "Industrial demand and commodity prices."),
+        "XLC": .init(name: "Communication Services Select Sector SPDR", sector: "Sector ETF",
+                      what: "Alphabet, Meta, Netflix and the telecoms — media and communications.", moves: "Advertising spending and big-tech results."),
+        "XLRE": .init(name: "Real Estate Select Sector SPDR Fund", sector: "Sector ETF",
+                      what: "The S&P 500's real estate investment trusts.", moves: "Interest rates above all."),
+        "IBIT": .init(name: "iShares Bitcoin Trust", sector: "Crypto ETF",
+                      what: "Holds actual bitcoin in custody — spot exposure through a normal brokerage account.", moves: "Bitcoin's price, near one-for-one."),
+        "FBTC": .init(name: "Fidelity Wise Origin Bitcoin Fund", sector: "Crypto ETF",
+                      what: "Fidelity's spot bitcoin fund, holding coins directly.", moves: "Bitcoin's price."),
+        "ETHA": .init(name: "iShares Ethereum Trust", sector: "Crypto ETF",
+                      what: "Holds ether directly for investors who want it in a brokerage account.", moves: "Ethereum's price."),
+        "NVO": .init(name: "Novo Nordisk A/S", sector: "Pharmaceuticals",
+                      what: "The Danish maker of Ozempic and Wegovy — Eli Lilly's main rival in weight-loss drugs.", moves: "Obesity drug supply and competition."),
+        "SAP": .init(name: "SAP SE", sector: "Enterprise software",
+                      what: "Germany's enterprise resource planning giant — the software large manufacturers run on.", moves: "Cloud migration of its old on-premise customers."),
+        "SONY": .init(name: "Sony Group Corporation", sector: "Consumer electronics & media",
+                      what: "PlayStation, camera sensors, music and film studios.", moves: "Console cycles and image-sensor demand."),
+        "TM": .init(name: "Toyota Motor Corporation", sector: "Automotive",
+                      what: "The world's largest carmaker by volume, with a hybrid-first strategy rather than a pure EV one.", moves: "Global vehicle demand and the yen."),
+        "HSBC": .init(name: "HSBC Holdings plc", sector: "Banking",
+                      what: "A British bank whose profits come mostly from Asia, especially Hong Kong.", moves: "Asian rates and China's property market."),
+        "SHEL": .init(name: "Shell plc", sector: "Oil & gas",
+                      what: "European integrated oil major with a large liquefied natural gas business.", moves: "Oil, gas and LNG prices."),
+        "BP": .init(name: "BP p.l.c.", sector: "Oil & gas",
+                      what: "British integrated oil company, oscillating between energy transition and oil investment.", moves: "Crude prices and strategy shifts."),
+        "RIO": .init(name: "Rio Tinto Group", sector: "Mining",
+                      what: "One of the largest miners of iron ore, copper and aluminium.", moves: "Chinese construction demand and metal prices."),
+        "BHP": .init(name: "BHP Group Limited", sector: "Mining",
+                      what: "The world's biggest mining company by value — iron ore, copper, coal.", moves: "Commodity prices and Chinese steel output."),
+        "PDD": .init(name: "PDD Holdings Inc.", sector: "E-commerce",
+                      what: "Owns Pinduoduo in China and Temu internationally — aggressive discount marketplaces.", moves: "Temu's international expansion and Chinese consumers."),
+        "JD": .init(name: "JD.com, Inc.", sector: "E-commerce",
+                      what: "A Chinese online retailer that owns its logistics network, unlike marketplace-only rivals.", moves: "Chinese consumer spending."),
+        "NIO": .init(name: "NIO Inc.", sector: "Electric vehicles",
+                      what: "A Chinese EV maker known for battery-swap stations instead of only charging.", moves: "Chinese EV competition and cash burn."),
+        "INFY": .init(name: "Infosys Limited", sector: "IT services",
+                      what: "Indian technology consulting and outsourcing at global scale.", moves: "Western IT budgets and the rupee."),
+        "O": .init(name: "Realty Income Corporation", sector: "Real estate (REIT)",
+                      what: "Owns thousands of single-tenant retail properties and pays dividends monthly.", moves: "Interest rates and tenant credit quality."),
+        "MAIN": .init(name: "Main Street Capital Corporation", sector: "Business development",
+                      what: "Lends to and invests in mid-sized private US companies, paying monthly dividends.", moves: "Credit conditions for smaller businesses."),
+        "PFF": .init(name: "iShares Preferred & Income Securities ETF", sector: "Income ETF",
+                      what: "Holds preferred shares — hybrids that pay fixed dividends and rank above common stock.", moves: "Interest rates and issuer credit."),
+        "MO": .init(name: "Altria Group, Inc.", sector: "Tobacco",
+                      what: "Sells Marlboro in the United States; a declining volume business managed for cash and dividends.", moves: "Cigarette volumes and regulation."),
+        "PM": .init(name: "Philip Morris International Inc.", sector: "Tobacco",
+                      what: "Sells tobacco outside the US, pushing hard into heated products like IQOS and Zyn.", moves: "The shift from cigarettes to smoke-free products."),
     ]
 
-    static func profile(_ symbol: String) -> Profile? { profiles[symbol] }
+    /// The board sends prefixed symbols (IDX:SPX, FX:EURUSD, FUT:ESU6);
+    /// the catalog is keyed by what a human calls the thing.
+    static func key(_ symbol: String) -> String {
+        let u = symbol.uppercased()
+        if u.hasPrefix("IDX:") { return String(u.dropFirst(4)) }
+        return symbol
+    }
+
+    static func profile(_ symbol: String) -> Profile? { profiles[key(symbol)] }
 
     static func name(_ symbol: String) -> String? {
-        if let p = profiles[symbol] { return p.name }
+        if let p = profiles[key(symbol)] { return p.name }
         if symbol.hasPrefix("FX:") { return "\(SymbolDisplay.pretty(symbol)) exchange rate" }
         if symbol.hasPrefix("FUT:") { return futuresName(symbol) }
         return nil
@@ -371,6 +457,7 @@ enum Instruments {
     ]
 
     static func kind(_ symbol: String, category: String? = nil) -> Kind {
+        if symbol.uppercased().hasPrefix("IDX:") { return .index }
         if symbol.contains("/") { return .crypto }
         if symbol.hasPrefix("FX:") { return .fx }
         if symbol.hasPrefix("FUT:") || category == "Futures" { return .future }
@@ -382,7 +469,7 @@ enum Instruments {
     // MARK: The teaching copy — what it is, and how it trades here
 
     static func what(_ symbol: String, kind: Kind) -> String {
-        if let p = profiles[symbol] { return p.what }
+        if let p = profiles[key(symbol)] { return p.what }
         // No profile yet — say what the SPECIES is rather than inventing
         // facts about a company we don't have on file.
         switch kind {
@@ -433,75 +520,50 @@ struct InstrumentExplainer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
-            // Identity: ticker, the FULL name, and what species it is.
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(SymbolDisplay.pretty(symbol))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(Instruments.name(symbol) ?? SymbolDisplay.pretty(symbol))
                         .font(TarsTheme.Text.title)
                         .foregroundStyle(TarsTheme.inkPrimary)
-                    if let n = Instruments.name(symbol) {
-                        Text(n)
-                            .font(TarsTheme.Text.body.weight(.semibold))
-                            .foregroundStyle(TarsTheme.inkSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Text(profile?.sector ?? kind.rawValue.capitalized)
-                        .font(TarsTheme.Text.micro)
-                        .foregroundStyle(TarsTheme.inkQuaternary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("\(SymbolDisplay.pretty(symbol)) · \(profile?.sector ?? kind.rawValue.capitalized)")
+                        .font(TarsTheme.Text.caption)
+                        .foregroundStyle(TarsTheme.inkTertiary)
                 }
                 Spacer(minLength: TarsTheme.Space.s)
-                Text(kind.rawValue)
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .kerning(0.8)
-                    .foregroundStyle(kind.tone)
-                    .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Capsule().fill(kind.tone.opacity(0.12)))
-            }
-
-            if let price {
-                HStack(spacing: TarsTheme.Space.s) {
-                    Text(SymbolDisplay.price(symbol, price))
-                        .font(TarsTheme.Text.heading.monospacedDigit())
-                        .foregroundStyle(TarsTheme.inkPrimary)
-                    if let chg = changePercent {
-                        let rounded = (chg * 10000).rounded() / 100
-                        let shown = rounded == 0 ? 0 : rounded
-                        Text("\(shown > 0 ? "+" : "")\(shown, specifier: "%.2f")%")
-                            .font(TarsTheme.Text.caption.monospacedDigit())
-                            .foregroundStyle(TarsTheme.pnl(shown))
+                if let price {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(SymbolDisplay.price(symbol, price))
+                            .font(TarsTheme.Text.heading.monospacedDigit())
+                            .foregroundStyle(TarsTheme.inkPrimary)
+                        if let chg = changePercent {
+                            let r = (chg * 10000).rounded() / 100
+                            let shown = r == 0 ? 0 : r
+                            Text("\(shown > 0 ? "+" : "")\(shown, specifier: "%.2f")%")
+                                .font(TarsTheme.Text.caption.monospacedDigit())
+                                .foregroundStyle(TarsTheme.pnl(shown))
+                        }
                     }
                 }
             }
 
-            Divider().overlay(TarsTheme.hairline)
-
-            // The answer to "what IS this?"
+            // The whole point: what this thing IS, in one paragraph.
             Text(Instruments.what(symbol, kind: kind))
                 .font(TarsTheme.Text.body)
                 .foregroundStyle(TarsTheme.inkPrimary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            // What actually moves it — the second question a beginner asks.
+            // One more line, unlabelled — the second question, answered
+            // without turning the card into a manual.
             if let moves = profile?.moves {
-                labelled("WHAT MOVES IT", moves)
-            }
-            labelled("HOW IT TRADES HERE", Instruments.how(kind))
-            if let note = Instruments.provenanceNote(provenance) {
-                labelled("THIS PRICE", note)
+                Text("Moves with \(moves.prefix(1).lowercased())\(moves.dropFirst())")
+                    .font(TarsTheme.Text.caption)
+                    .foregroundStyle(TarsTheme.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(TarsTheme.Space.xl)
-        .frame(width: 340, alignment: .leading)
+        .frame(width: 330, alignment: .leading)
         .background(TarsTheme.bg1)
-    }
-
-    private func labelled(_ label: String, _ body: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            TarsMicroLabel(label, tone: TarsTheme.inkQuaternary)
-            Text(body)
-                .font(TarsTheme.Text.caption)
-                .foregroundStyle(TarsTheme.inkSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 }
