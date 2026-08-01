@@ -54,17 +54,24 @@ struct MarketsHomeView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: TarsTheme.Space.l, pinnedViews: []) {
+            LazyVStack(alignment: .leading, spacing: TarsTheme.Space.l,
+                       pinnedViews: [.sectionHeaders]) {
                 header
                 searchField
                 if model.stale { staleBanner }
                 pulseStrip
                 breadthBar
-                venueMap
-                venueRail
-                if let note = MarketsModel.roomNote[model.venue ?? ""] { roomNote(note) }
-                moversRail
-                boardList
+                // The venue tabs PIN under the status bar while the board
+                // scrolls — the steering wheel stays in your hand. The old
+                // tile rail was a second copy of this navigation; it's gone.
+                Section {
+                    metaLine
+                    moversRail
+                    boardList
+                } header: {
+                    venueRail
+                        .background(TarsTheme.bg0.padding(.vertical, -TarsTheme.Space.l))
+                }
             }
             .padding(.horizontal, TarsTheme.Space.l)
             .padding(.bottom, 72)
@@ -174,6 +181,17 @@ struct MarketsHomeView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .contextMenu {
+                    Button { open(sym) } label: {
+                        Label("Open market", systemImage: "chart.xyaxis.line")
+                    }
+                } preview: {
+                    InstrumentExplainer(symbol: sym,
+                                        price: row?.price,
+                                        changePercent: row?.changePercent,
+                                        provenance: row?.source)
+                }
             }
         }
         .padding(.vertical, TarsTheme.Space.xs)
@@ -231,61 +249,23 @@ struct MarketsHomeView: View {
         }
     }
 
-    /*
-      The whole desk. A pill row communicates navigation; this communicates
-      BREADTH — eight venues with their true listing counts, so "1,742
-      markets" stops being a claim and becomes a fact you can count.
-    */
-    @ViewBuilder private var venueMap: some View {
-        if !model.venues.isEmpty {
-            VStack(alignment: .leading, spacing: TarsTheme.Space.s) {
-                HStack {
-                    Text("THE WHOLE DESK").font(TarsTheme.Text.micro).kerning(1.5)
-                        .foregroundStyle(TarsTheme.inkQuaternary)
-                    Spacer()
-                    Text("\(model.totalMarkets) listed markets")
-                        .font(TarsTheme.Text.micro.monospacedDigit())
-                        .foregroundStyle(TarsTheme.inkQuaternary)
-                }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: TarsTheme.Space.s) {
-                        ForEach(model.venues) { v in
-                            Button {
-                                Haptics.tick()
-                                model.select(v.category)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Image(systemName: MarketsModel.venueIcon[v.category] ?? "square.grid.2x2")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundStyle(TarsTheme.inkSecondary)
-                                    Text(v.category)
-                                        .font(TarsTheme.Text.caption.weight(.semibold))
-                                        .foregroundStyle(TarsTheme.inkPrimary)
-                                    Text("\(v.count)")
-                                        .font(TarsTheme.Text.micro.monospacedDigit())
-                                        .foregroundStyle(TarsTheme.inkTertiary)
-                                }
-                                .frame(width: 96, alignment: .topLeading)
-                                .padding(TarsTheme.Space.m)
-                                .background(TarsTheme.bg1)
-                                .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
-                                    .strokeBorder(TarsTheme.hairline, lineWidth: 1))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("\(v.category), \(v.count) markets")
-                        }
-                    }
-                }
+    /// One quiet line under the tabs: this room's rules, and the desk's
+    /// true size — the fact the old tile rail spent 120pt saying.
+    @ViewBuilder private var metaLine: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let note = MarketsModel.roomNote[model.venue ?? ""] {
+                Text(note)
+                    .font(TarsTheme.Text.micro)
+                    .foregroundStyle(TarsTheme.inkTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if model.totalMarkets > 0 {
+                Text("\(model.totalMarkets) markets across 8 venues · hold any ticker to learn what it is")
+                    .font(TarsTheme.Text.micro)
+                    .foregroundStyle(TarsTheme.inkQuaternary)
             }
         }
-    }
-
-    private func roomNote(_ text: String) -> some View {
-        Text(text)
-            .font(TarsTheme.Text.micro)
-            .foregroundStyle(TarsTheme.inkTertiary)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// What moved — the two rails that answer "anything happening?" first.
@@ -319,7 +299,16 @@ struct MarketsHomeView: View {
                                 .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
                                     .strokeBorder(TarsTheme.hairline, lineWidth: 1))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(RowPressStyle())
+                            .contextMenu {
+                                Button { open(r.symbol) } label: {
+                                    Label("Open market", systemImage: "chart.xyaxis.line")
+                                }
+                            } preview: {
+                                InstrumentExplainer(symbol: r.symbol,
+                                                    price: r.price,
+                                                    changePercent: r.changePercent)
+                            }
                         }
                     }
                 }
@@ -368,7 +357,18 @@ struct MarketsHomeView: View {
             } else {
                 ForEach(visibleRows) { row in
                     Button { open(row.symbol) } label: { boardRow(row) }
-                        .buttonStyle(.plain)
+                        .buttonStyle(RowPressStyle())
+                        .contextMenu {
+                            Button { open(row.symbol) } label: {
+                                Label("Open market", systemImage: "chart.xyaxis.line")
+                            }
+                        } preview: {
+                            InstrumentExplainer(symbol: row.symbol,
+                                                category: row.category,
+                                                price: row.price,
+                                                changePercent: row.changePercent,
+                                                provenance: row.source)
+                        }
                     Divider().overlay(TarsTheme.hairline)
                 }
                 if visibleRows.isEmpty && !query.isEmpty {
@@ -387,8 +387,16 @@ struct MarketsHomeView: View {
                 Text(SymbolDisplay.pretty(row.symbol))
                     .font(TarsTheme.Text.body.weight(.semibold))
                     .foregroundStyle(TarsTheme.inkPrimary)
-                if let source = row.source {
-                    ProvenanceChip(source, symbol: row.symbol)
+                HStack(spacing: 6) {
+                    if let n = Instruments.name(row.symbol) {
+                        Text(n)
+                            .font(TarsTheme.Text.micro)
+                            .foregroundStyle(TarsTheme.inkTertiary)
+                            .lineLimit(1)
+                    }
+                    if let source = row.source {
+                        ProvenanceChip(source, symbol: row.symbol)
+                    }
                 }
             }
             Spacer()
@@ -449,10 +457,16 @@ private struct ChangeText: View {
     init(_ value: Double?) { self.value = value }
     var body: some View {
         if let v = value {
-            Text("\(v >= 0 ? "+" : "")\(v * 100, specifier: "%.2f")%")
+            // Color follows what the label SHOWS: rounded to the same two
+            // decimals. A print that reads 0.00% is flat — never red.
+            // rounded() keeps IEEE negative zero, which %.2f prints as
+            // "-0.00" — normalize so flat is flat, sign and all.
+            let rounded = (v * 10000).rounded() / 100
+            let shown = rounded == 0 ? 0 : rounded
+            Text("\(shown > 0 ? "+" : "")\(shown, specifier: "%.2f")%")
                 .font(TarsTheme.Text.caption.monospacedDigit())
-                .foregroundStyle(abs(v) < 0.00005 ? TarsTheme.inkTertiary
-                    : v > 0 ? TarsTheme.gain : TarsTheme.loss)
+                .foregroundStyle(shown == 0 ? TarsTheme.inkTertiary
+                    : shown > 0 ? TarsTheme.gain : TarsTheme.loss)
                 .lineLimit(1).minimumScaleFactor(0.6)
         } else {
             Text("· ·").font(TarsTheme.Text.caption).foregroundStyle(TarsTheme.inkQuaternary)

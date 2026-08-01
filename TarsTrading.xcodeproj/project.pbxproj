@@ -17,6 +17,7 @@
 		0FC2F9ABF8D6EE9D959D0A33 /* DeskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FD5711AD0BFD1D2DCB1B3F /* DeskView.swift */; };
 		BEBDCB2BC479951A2069B69E /* TradeTicketSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E285074E6293C72F7AF2B48 /* TradeTicketSheet.swift */; };
 		65279B8EDB5CAE6FF57E35F5 /* MarketSymbolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C683394B76760FA1A3659EB2 /* MarketSymbolView.swift */; };
+		3CBBE05B352AF3025812561A /* Instruments.swift in Sources */ = {isa = PBXBuildFile; fileRef = B74D6B19A2F63B9F5F532C54 /* Instruments.swift */; };
 		ABE76970AD6121FBCC4E75C4 /* SceneVideoBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B1F5E4A97763EC93E6D24E9 /* SceneVideoBackdrop.swift */; };
 		326950EE30351611C9329C6C /* MarketsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EFF82DEA0653143E5C98213 /* MarketsHomeView.swift */; };
 		D42C03C34D64DECC85AC2321 /* MarketStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 968DE43C5E0FD355DDCAE2AE /* MarketStore.swift */; };
@@ -141,6 +142,7 @@
 		C0FD5711AD0BFD1D2DCB1B3F /* DeskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskView.swift; sourceTree = "<group>"; };
 		1E285074E6293C72F7AF2B48 /* TradeTicketSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeTicketSheet.swift; sourceTree = "<group>"; };
 		C683394B76760FA1A3659EB2 /* MarketSymbolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketSymbolView.swift; sourceTree = "<group>"; };
+		B74D6B19A2F63B9F5F532C54 /* Instruments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Instruments.swift; sourceTree = "<group>"; };
 		3B1F5E4A97763EC93E6D24E9 /* SceneVideoBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneVideoBackdrop.swift; sourceTree = "<group>"; };
 		6EFF82DEA0653143E5C98213 /* MarketsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketsHomeView.swift; sourceTree = "<group>"; };
 		968DE43C5E0FD355DDCAE2AE /* MarketStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketStore.swift; sourceTree = "<group>"; };
@@ -260,6 +262,7 @@
 				C0FD5711AD0BFD1D2DCB1B3F /* DeskView.swift */,
 				1E285074E6293C72F7AF2B48 /* TradeTicketSheet.swift */,
 				C683394B76760FA1A3659EB2 /* MarketSymbolView.swift */,
+				B74D6B19A2F63B9F5F532C54 /* Instruments.swift */,
 				3B1F5E4A97763EC93E6D24E9 /* SceneVideoBackdrop.swift */,
 				6EFF82DEA0653143E5C98213 /* MarketsHomeView.swift */,
 			);
@@ -764,6 +767,7 @@
 				0FC2F9ABF8D6EE9D959D0A33 /* DeskView.swift in Sources */,
 				BEBDCB2BC479951A2069B69E /* TradeTicketSheet.swift in Sources */,
 				65279B8EDB5CAE6FF57E35F5 /* MarketSymbolView.swift in Sources */,
+				3CBBE05B352AF3025812561A /* Instruments.swift in Sources */,
 				ABE76970AD6121FBCC4E75C4 /* SceneVideoBackdrop.swift in Sources */,
 				326950EE30351611C9329C6C /* MarketsHomeView.swift in Sources */,
 				D42C03C34D64DECC85AC2321 /* MarketStore.swift in Sources */,

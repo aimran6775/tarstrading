@@ -162,6 +162,16 @@ enum TarsTheme {
 
 // MARK: - Reusable chrome
 
+/// Flat list rows dim like a physical key taking travel — the pressed
+/// state cards used to provide for free.
+struct RowPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? TarsTheme.bg1 : .clear)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
 /// Micro-label law: caps, tracked, tertiary. One helper so every section
 /// header whispers identically.
 struct TarsMicroLabel: View {
