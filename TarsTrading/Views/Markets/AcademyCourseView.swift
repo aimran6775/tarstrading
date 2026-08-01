@@ -22,6 +22,7 @@ struct AcademyCourseView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: TarsTheme.Space.l) {
                 header
+                missionsLink
                 if model.reviewsDue > 0 { reviewsCard }
                 if let r = model.resume { resumeCard(r) }
                 if !model.weakSpots.isEmpty { weakSpotsCard }
@@ -109,6 +110,35 @@ struct AcademyCourseView: View {
     /// invisible outside the web's Practice page, so nothing ever asked a
     /// learner to come back — and spaced repetition without the spacing is
     /// just a pile of cards.
+    /// The learn-to-do loop. Everything else grades your answers; this
+    /// grades your book.
+    private var missionsLink: some View {
+        NavigationLink { MissionsView() } label: {
+            HStack(spacing: TarsTheme.Space.m) {
+                Image(systemName: "target")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(TarsTheme.accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Missions")
+                        .font(TarsTheme.Text.body.weight(.semibold))
+                        .foregroundStyle(TarsTheme.inkPrimary)
+                    Text("Prove it on your own book — the desk reads your real positions.")
+                        .font(TarsTheme.Text.micro)
+                        .foregroundStyle(TarsTheme.inkTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(TarsTheme.Text.caption)
+                    .foregroundStyle(TarsTheme.inkQuaternary)
+            }
+            .padding(TarsTheme.Space.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .tarsPanel()
+        }
+        .buttonStyle(RowPressStyle())
+    }
+
     private var reviewsCard: some View {
         HStack(spacing: TarsTheme.Space.m) {
             Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
@@ -230,6 +260,13 @@ struct AcademyCourseView: View {
             }
             Spacer(minLength: TarsTheme.Space.s)
             VStack(alignment: .trailing, spacing: 2) {
+                if let m = l.mastery, l.completed {
+                    // Finished and known are different facts.
+                    Text(m == "solid" ? "SOLID" : "SHAKY")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .kerning(0.5)
+                        .foregroundStyle(m == "solid" ? TarsTheme.gain : TarsTheme.warning)
+                }
                 Text("\(l.minutes) min")
                     .font(TarsTheme.Text.micro.monospacedDigit())
                     .foregroundStyle(TarsTheme.inkQuaternary)

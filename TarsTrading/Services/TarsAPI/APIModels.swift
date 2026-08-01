@@ -118,6 +118,9 @@ struct APILessonSummary: Decodable, Identifiable, Equatable {
     let xp: Int
     let completed: Bool
     let unlocked: Bool
+    /// Finished is not the same as known: "solid" | "shaky" | nil.
+    let mastery: String?
+    let masteryScore: Double?
     /// What the lesson is made of, without its words: ["prose","quiz",...]
     let blocks: [String]
 }
@@ -137,6 +140,47 @@ struct APIResume: Decodable, Equatable {
     let title: String
     let trackId: String?
     let newTrack: String?
+}
+
+/// One requirement inside a mission, and whether your book satisfies it.
+struct APIMissionCheck: Decodable, Equatable, Identifiable {
+    var id: String { label }
+    let label: String
+    let ok: Bool
+    let detail: String?
+}
+
+/// A mission graded against your REAL (simulated) account — the only
+/// assessment in the product that reads positions instead of answers.
+struct APIMission: Decodable, Equatable, Identifiable {
+    var id: String { missionId }
+    let missionId: String
+    let complete: Bool
+    let passed: Bool
+    let checks: [APIMissionCheck]
+    let title: String
+    let brief: String
+    let hint: String
+    let xp: Int
+    let lesson: String?
+}
+
+struct MissionsResponse: Decodable {
+    let ok: Bool
+    let missions: [APIMission]
+}
+
+struct MissionCheckResponse: Decodable {
+    let ok: Bool
+    let result: APIMissionResult?
+}
+
+struct APIMissionResult: Decodable, Equatable {
+    let missionId: String
+    let complete: Bool
+    let passed: Bool
+    let justCompleted: Bool?
+    let checks: [APIMissionCheck]
 }
 
 /// A lesson whose checks you keep missing — read back from the quiz
@@ -161,6 +205,8 @@ struct CurriculumResponse: Decodable {
     /// Terms whose spaced-repetition interval has come due.
     let reviewsDue: Int?
     let weakSpots: [APIWeakSpot]?
+    let solidCount: Int?
+    let shakyCount: Int?
     let resume: APIResume?
 }
 

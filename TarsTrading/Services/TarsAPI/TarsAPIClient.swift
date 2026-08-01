@@ -145,6 +145,21 @@ extension TarsAPIClient {
         try await request("GET", "/api/academy/curriculum")
     }
 
+    /// Missions, graded against the account as it stands right now.
+    func missions() async throws -> [APIMission] {
+        let res: MissionsResponse = try await request("GET", "/api/academy/missions")
+        return res.missions
+    }
+
+    /// Re-grade ONE mission against freshly marked equity and bank it if it
+    /// newly passes — the "check my trade" action.
+    func checkMission(id: String) async throws -> APIMissionResult? {
+        struct Body: Encodable { let missionId: String }
+        let res: MissionCheckResponse = try await request(
+            "POST", "/api/academy/missions", body: Body(missionId: id))
+        return res.result
+    }
+
     func lesson(id: String) async throws -> LessonResponse {
         let i = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         return try await request("GET", "/api/academy/lesson?id=\(i)")

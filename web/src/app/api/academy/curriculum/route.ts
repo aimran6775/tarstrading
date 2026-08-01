@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { currentUser } from "@/server/auth";
 import { getAcademyProgress } from "@/server/academy-progress";
 import { weakSpots } from "@/server/weak-spots";
+import { masteryByLesson } from "@/server/mastery";
 import { db, schema } from "@/server/db";
 import { and, eq, lte } from "drizzle-orm";
 import {
@@ -30,9 +31,10 @@ export async function GET() {
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
 
   const now = Date.now();
-  const [progress, weak, dueRows] = await Promise.all([
+  const [progress, weak, mastery, dueRows] = await Promise.all([
     getAcademyProgress(user.id),
     weakSpots(user.id),
+    masteryByLesson(user.id),
     /* How many terms are due for review right now. The Leitner schedule
        was invisible outside the Practice page, so a learner had no reason
        to come back daily — the one habit the whole method depends on. */
@@ -61,6 +63,9 @@ export async function GET() {
       xp: l.xp,
       completed: done.has(l.id),
       unlocked: isLessonUnlocked(l.id, done),
+      /* Finished is not the same as known — the band says which. */
+      mastery: mastery.get(l.id)?.band ?? null,
+      masteryScore: mastery.get(l.id)?.score ?? null,
       /* What a lesson is MADE of, without its words — lets a client show
          "3 quizzes, a chart and a desk task" before opening it. */
       blocks: l.sections.map((s) => s.kind),
@@ -81,6 +86,8 @@ export async function GET() {
     lessonCount: allLessons.length,
     /* The two signals the platform collected and never used. */
     reviewsDue: dueRows.length,
+    solidCount: [...mastery.values()].filter((m) => m.band === "solid").length,
+    shakyCount: [...mastery.values()].filter((m) => m.band === "shaky").length,
     weakSpots: weak,
     resume: (resume?.lesson ?? firstUnfinished)
       ? {
