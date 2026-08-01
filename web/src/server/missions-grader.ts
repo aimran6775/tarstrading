@@ -21,7 +21,18 @@ const EPS = 1e-9;
 
 type Position = typeof schema.positions.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
-type State = { equity: number; positions: Position[]; stops: Order[]; closed: number };
+type State = {
+  equity: number;
+  positions: Position[];
+  stops: Order[];
+  closed: number;
+  /* Signals the later tracks need. Each is cheap and read-only; a mission
+     that cannot be graded honestly is a promise the product cannot keep,
+     so nothing here is inferred — it is all counted. */
+  limitFills: number;      // did they ever work an order instead of taking the touch
+  thesesWritten: number;   // closed trades carrying a written reason
+  runningAnalysts: number; // the floor, actually running
+};
 
 const money = (n: number) => "$" + Math.round(n).toLocaleString();
 const pct = (f: number) => (f * 100).toFixed(2) + "%";
@@ -33,9 +44,25 @@ async function loadState(userId: string, fresh: boolean): Promise<State> {
   const accepted = await db.select().from(schema.orders)
     .where(and(eq(schema.orders.userId, userId), eq(schema.orders.status, "accepted")));
   const stops = accepted.filter((o) => o.type === "stop" && o.side === "sell" && o.stopPrice != null);
-  const closed = await db.select({ id: schema.journalEntries.id })
-    .from(schema.journalEntries).where(eq(schema.journalEntries.userId, userId));
-  return { equity: account?.equity ?? 0, positions, stops, closed: closed.length };
+  const journal = await db.select({
+    id: schema.journalEntries.id, thesis: schema.journalEntries.thesis,
+  }).from(schema.journalEntries).where(eq(schema.journalEntries.userId, userId));
+
+  const allOrders = await db.select({
+    type: schema.orders.type, status: schema.orders.status,
+  }).from(schema.orders).where(eq(schema.orders.userId, userId));
+
+  const analysts = await db.select({ status: schema.agents.status })
+    .from(schema.agents).where(eq(schema.agents.userId, userId));
+
+  return {
+    equity: account?.equity ?? 0,
+    positions, stops,
+    closed: journal.length,
+    limitFills: allOrders.filter((o) => o.type === "limit" && o.status === "filled").length,
+    thesesWritten: journal.filter((j) => (j.thesis ?? "").trim().length >= 20).length,
+    runningAnalysts: analysts.filter((a) => a.status === "running").length,
+  };
 }
 
 /** The accepted sell-stop that fully covers this long position, tightest first. */
@@ -60,6 +87,67 @@ function grade(key: MissionKey, s: State): MissionResult {
     return {
       passed: ok,
       checks: [{ label: "Open and close a position", ok, detail: ok ? `${s.closed} round trip${s.closed === 1 ? "" : "s"} logged` : "Buy any symbol on the desk, then sell it back." }],
+    };
+  }
+
+  if (key === "work-a-limit") {
+    const ok = s.limitFills > 0;
+    return {
+      passed: ok,
+      checks: [{
+        label: "Fill a limit order",
+        ok,
+        detail: ok
+          ? `${s.limitFills} limit order${s.limitFills === 1 ? "" : "s"} filled`
+          : "Open a ticket, switch to Limit, and name a price better than the market.",
+      }],
+    };
+  }
+
+  if (key === "spread-it") {
+    const n = s.positions.length;
+    const gross = s.positions.reduce((t, p) => t + Math.abs(p.qty * p.avgEntryPrice), 0);
+    const biggest = s.positions
+      .map((p) => Math.abs(p.qty * p.avgEntryPrice))
+      .sort((a, b) => b - a)[0] ?? 0;
+    const share = gross > 0 ? biggest / gross : 1;
+    const spread = n >= 3 && share <= 0.5;
+    return {
+      passed: spread,
+      checks: [
+        { label: "Hold three or more positions", ok: n >= 3,
+          detail: `${n} open` },
+        { label: "No single position over half the book", ok: gross > 0 && share <= 0.5,
+          detail: gross > 0 ? `largest is ${pct(share)} of gross` : "open a position to measure" },
+      ],
+    };
+  }
+
+  if (key === "write-the-why") {
+    const ok = s.thesesWritten > 0;
+    return {
+      passed: ok,
+      checks: [{
+        label: "Close a trade with a written thesis",
+        ok,
+        detail: ok
+          ? `${s.thesesWritten} closed with a reason on the record`
+          : "When you close a position, write WHY you took it. A trade without a reason teaches nothing when it is over.",
+      }],
+    };
+  }
+
+  if (key === "hire-one") {
+    const ok = s.runningAnalysts > 0;
+    return {
+      passed: ok,
+      checks: [{
+        label: "Have an analyst running on your floor",
+        ok,
+        detail: ok
+          ? `${s.runningAnalysts} running`
+          : "Describe a strategy to the assistant in plain English. It backtests one before it ever trades.",
+      }],
     };
   }
 
