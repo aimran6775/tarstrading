@@ -108,11 +108,45 @@ export async function endSession() {
 
 export type SessionUser = { id: string; email: string; name: string; role: "user" | "admin"; fundName: string | null };
 
+/*
+  Device tokens (iOS). A mobile client authenticates with `Authorization:
+  Bearer <token>` instead of a cookie — same sessions table, much longer
+  TTL, revocable by deleting the row. Reusing the table means every existing
+  guard (expiry, cleanup sweep, one join) applies to devices for free, and
+  there is exactly ONE identity path to audit.
+*/
+export const DEVICE_TTL_MS = 180 * 24 * 3600_000;
+
+export async function startDeviceSession(userId: string): Promise<string> {
+  const token = randomBytes(32).toString("hex");
+  await db.insert(schema.sessions).values({
+    id: token, userId, expiresAt: Date.now() + DEVICE_TTL_MS,
+  });
+  return token; // returned once, stored in the device's Keychain — never a cookie
+}
+
+export async function revokeDeviceSession(token: string): Promise<void> {
+  await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
+}
+
+/** The session token for this request: Bearer header first (native clients),
+    cookie second (browsers). */
+async function requestToken(): Promise<string | null> {
+  const h = await headers();
+  const auth = h.get("authorization");
+  if (auth?.startsWith("Bearer ")) {
+    const t = auth.slice(7).trim();
+    // Session ids are 64 hex chars; refuse anything else before it reaches SQL.
+    if (/^[0-9a-f]{64}$/.test(t)) return t;
+  }
+  const jar = await cookies();
+  return jar.get(SESSION_COOKIE)?.value ?? null;
+}
+
 // Request-memoized: a page + its layout + several server components all call
 // currentUser() in one render; cache() collapses that to a single session join.
 export const currentUser = cache(async (): Promise<SessionUser | null> => {
-  const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+  const token = await requestToken();
   if (!token) return null;
   const [row] = await db.select({
     id: schema.users.id, email: schema.users.email, name: schema.users.name,
