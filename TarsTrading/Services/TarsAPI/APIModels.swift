@@ -139,6 +139,18 @@ struct APIResume: Decodable, Equatable {
     let newTrack: String?
 }
 
+/// A lesson whose checks you keep missing — read back from the quiz
+/// history the platform was already logging.
+struct APIWeakSpot: Decodable, Identifiable, Equatable {
+    var id: String { lessonId }
+    let lessonId: String
+    let lessonTitle: String
+    let trackTitle: String
+    let misses: Int
+    let attempts: Int
+    let struggle: Double
+}
+
 struct CurriculumResponse: Decodable {
     let ok: Bool
     let tracks: [APITrack]
@@ -146,6 +158,9 @@ struct CurriculumResponse: Decodable {
     let totalXP: Int
     let completedCount: Int
     let lessonCount: Int
+    /// Terms whose spaced-repetition interval has come due.
+    let reviewsDue: Int?
+    let weakSpots: [APIWeakSpot]?
     let resume: APIResume?
 }
 

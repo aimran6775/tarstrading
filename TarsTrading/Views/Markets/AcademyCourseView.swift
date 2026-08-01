@@ -22,7 +22,9 @@ struct AcademyCourseView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: TarsTheme.Space.l) {
                 header
+                if model.reviewsDue > 0 { reviewsCard }
                 if let r = model.resume { resumeCard(r) }
+                if !model.weakSpots.isEmpty { weakSpotsCard }
                 ForEach(model.tracks) { track in
                     trackSection(track)
                 }
@@ -101,6 +103,71 @@ struct AcademyCourseView: View {
                 .strokeBorder(TarsTheme.accent.opacity(0.30), lineWidth: 1))
         }
         .buttonStyle(.plain)
+    }
+
+    /// The habit the whole method depends on. Leitner intervals were
+    /// invisible outside the web's Practice page, so nothing ever asked a
+    /// learner to come back — and spaced repetition without the spacing is
+    /// just a pile of cards.
+    private var reviewsCard: some View {
+        HStack(spacing: TarsTheme.Space.m) {
+            Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(TarsTheme.gain)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(model.reviewsDue) term\(model.reviewsDue == 1 ? "" : "s") due for review")
+                    .font(TarsTheme.Text.body.weight(.semibold))
+                    .foregroundStyle(TarsTheme.inkPrimary)
+                Text("Five minutes now beats an hour next week — that's the whole trick.")
+                    .font(TarsTheme.Text.micro)
+                    .foregroundStyle(TarsTheme.inkTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(TarsTheme.Space.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(TarsTheme.gain.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
+            .strokeBorder(TarsTheme.gain.opacity(0.28), lineWidth: 1))
+    }
+
+    /// What hasn't stuck. Every quiz answer has been logged since the
+    /// beginning and never read back — so a learner could miss position
+    /// sizing in three lessons and be marched on to options regardless.
+    private var weakSpotsCard: some View {
+        VStack(alignment: .leading, spacing: TarsTheme.Space.m) {
+            TarsMicroLabel("Worth another look", tone: TarsTheme.warning)
+            ForEach(model.weakSpots) { w in
+                Button {
+                    Haptics.tap()
+                    openLesson = w.lessonId
+                } label: {
+                    HStack(spacing: TarsTheme.Space.m) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(w.lessonTitle)
+                                .font(TarsTheme.Text.body.weight(.semibold))
+                                .foregroundStyle(TarsTheme.inkPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text("\(w.trackTitle) · missed \(w.misses) of \(w.attempts) checks")
+                                .font(TarsTheme.Text.micro)
+                                .foregroundStyle(TarsTheme.inkTertiary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(TarsTheme.warning)
+                    }
+                    .padding(.vertical, TarsTheme.Space.s)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(RowPressStyle())
+            }
+        }
+        .padding(TarsTheme.Space.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .tarsPanel()
     }
 
     private func trackSection(_ t: APITrack) -> some View {
@@ -192,6 +259,8 @@ final class CourseModel {
     private(set) var xp = 0
     private(set) var completedCount = 0
     private(set) var lessonCount = 0
+    private(set) var reviewsDue = 0
+    private(set) var weakSpots: [APIWeakSpot] = []
     private(set) var loaded = false
     private let api = TarsAPIClient.shared
 
@@ -202,6 +271,8 @@ final class CourseModel {
             xp = res.xp
             completedCount = res.completedCount
             lessonCount = res.lessonCount
+            reviewsDue = res.reviewsDue ?? 0
+            weakSpots = res.weakSpots ?? []
         }
         loaded = true
     }

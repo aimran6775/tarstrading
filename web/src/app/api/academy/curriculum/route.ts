@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/server/auth";
 import { getAcademyProgress } from "@/server/academy-progress";
+import { weakSpots } from "@/server/weak-spots";
+import { db, schema } from "@/server/db";
+import { and, eq, lte } from "drizzle-orm";
 import {
   tracks, allLessons, findLesson, nextLessonInfo, unlockedTrackIds,
   isLessonUnlocked, totalXP,
@@ -26,7 +29,20 @@ export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
 
-  const progress = await getAcademyProgress(user.id);
+  const now = Date.now();
+  const [progress, weak, dueRows] = await Promise.all([
+    getAcademyProgress(user.id),
+    weakSpots(user.id),
+    /* How many terms are due for review right now. The Leitner schedule
+       was invisible outside the Practice page, so a learner had no reason
+       to come back daily — the one habit the whole method depends on. */
+    db.select({ cardKey: schema.cardReviews.cardKey })
+      .from(schema.cardReviews)
+      .where(and(
+        eq(schema.cardReviews.userId, user.id),
+        lte(schema.cardReviews.dueAt, now),
+      )),
+  ]);
   const done = new Set(progress.completed);
   const unlockedTracks = unlockedTrackIds(done);
 
@@ -63,6 +79,9 @@ export async function GET() {
     totalXP,
     completedCount: done.size,
     lessonCount: allLessons.length,
+    /* The two signals the platform collected and never used. */
+    reviewsDue: dueRows.length,
+    weakSpots: weak,
     resume: (resume?.lesson ?? firstUnfinished)
       ? {
           lessonId: (resume?.lesson ?? firstUnfinished)!.id,

@@ -4,6 +4,7 @@ import { currentUser } from "@/server/auth";
 import { db, schema } from "@/server/db";
 import { and, eq } from "drizzle-orm";
 import { findLesson } from "@/lib/academy";
+import { cardKey } from "@/lib/academy/srs";
 import { getAcademyProgress } from "@/server/academy-progress";
 
 export async function GET() {
@@ -70,6 +71,30 @@ export async function POST(request: Request) {
       id: randomUUID(), userId: user.id, lessonId: found.lesson.id,
       completedAt: now, xp: found.lesson.xp,
     }).onConflictDoNothing();
+
+    /*
+      Enrol this lesson's terms into spaced repetition.
+
+      The Leitner engine and its card_reviews table existed, but nothing
+      ever PUT cards into it on completion — the schedule only filled if a
+      learner happened to visit Practice. So the retention mechanism, the
+      single most evidence-backed thing in the whole product, sat idle for
+      anyone who just took lessons.
+
+      Finishing a lesson now schedules its cards at box 1, due immediately.
+      onConflictDoNothing means a term met again in a later stage keeps the
+      progress it already earned rather than being knocked back to the start.
+    */
+    const cards = found.lesson.sections.flatMap((sec) =>
+      sec.kind === "flashcards" ? sec.cards : []);
+    if (cards.length) {
+      await db.insert(schema.cardReviews).values(
+        cards.map((c) => ({
+          userId: user.id, cardKey: cardKey(c.front),
+          box: 1, dueAt: now, reps: 0, lapses: 0, updatedAt: now,
+        })),
+      ).onConflictDoNothing();
+    }
   }
 
   const rows = await db.select().from(schema.lessonProgress)
