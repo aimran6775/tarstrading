@@ -184,3 +184,13 @@ extension TarsAPIClient {
         return res.orders
     }
 }
+
+extension TarsAPIClient {
+    /// What would this futures leg do to my requirement? Priced by the SAME
+    /// portfolioMargin() the order gate uses, so the preview can never
+    /// disagree with the rejection.
+    func marginPreview(symbol: String, qty: Double) async throws -> MarginResponse {
+        let sym = symbol.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? symbol
+        return try await request("GET", "/api/margin?symbol=\(sym)&qty=\(qty)")
+    }
+}

@@ -16,6 +16,10 @@ struct TradeTicketSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var qty: Double = 1
+    @State private var preview: MarginPreview?
+    @State private var bracket = false
+    @State private var takeProfit = ""
+    @State private var stopLoss = ""
     @State private var phase: Phase = .compose
     enum Phase: Equatable {
         case compose, submitting
@@ -26,6 +30,7 @@ struct TradeTicketSheet: View {
 
     private var estCost: Double? { quote.map { $0.price * qty } }
     private var isBuy: Bool { side == "buy" }
+    private var isFutures: Bool { symbol.uppercased().hasPrefix("FUT:") }
 
     var body: some View {
         VStack(spacing: TarsTheme.Space.l) {
@@ -46,9 +51,89 @@ struct TradeTicketSheet: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, TarsTheme.Space.xl)
-        .presentationDetents([.height(380)])
+        .presentationDetents([.height(isFutures || bracket ? 520 : 400)])
         .presentationDragIndicator(.hidden)
         .presentationBackground(TarsTheme.bg1)
+    }
+
+    /*
+      The award moment: what this contract ACTUALLY requires, before you
+      commit — and when it hedges the book, how much the exchange forgives
+      for it. Priced by the same function as the order gate, so this can
+      never promise something the gate then refuses.
+    */
+    private var futuresMarginBlock: some View {
+        VStack(spacing: TarsTheme.Space.s) {
+            HStack {
+                Text("Initial margin")
+                    .font(TarsTheme.Text.body).foregroundStyle(TarsTheme.inkSecondary)
+                Spacer()
+                if let p = preview {
+                    Text(p.delta, format: .currency(code: "USD").precision(.fractionLength(0)))
+                        .font(TarsTheme.Text.heading.monospacedDigit())
+                        .foregroundStyle(p.affordable ? TarsTheme.inkPrimary : TarsTheme.loss)
+                } else {
+                    ProgressView().tint(TarsTheme.inkTertiary)
+                }
+            }
+            if let p = preview, p.creditVsNaive > 0.5 {
+                Text("\(p.creditVsNaive, format: .currency(code: "USD").precision(.fractionLength(0))) cheaper than margining it alone — it hedges your book.")
+                    .font(TarsTheme.Text.micro)
+                    .foregroundStyle(TarsTheme.gain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let p = preview, !p.affordable {
+                Text("Exceeds your equity — the desk would reject this.")
+                    .font(TarsTheme.Text.micro)
+                    .foregroundStyle(TarsTheme.loss)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, TarsTheme.Space.l)
+        .task(id: qty) { await loadPreview() }
+    }
+
+    /// Exits attached at entry: whichever fills first cancels the other.
+    private var bracketBlock: some View {
+        VStack(spacing: TarsTheme.Space.s) {
+            Toggle(isOn: $bracket) {
+                Text("Attach exits")
+                    .font(TarsTheme.Text.body).foregroundStyle(TarsTheme.inkSecondary)
+            }
+            .tint(TarsTheme.paperBadge)
+            if bracket {
+                HStack(spacing: TarsTheme.Space.m) {
+                    legField("Take profit", text: $takeProfit, tone: TarsTheme.gain)
+                    legField("Stop loss", text: $stopLoss, tone: TarsTheme.loss)
+                }
+                Text("Both go live only if this entry fills; the first to trigger cancels the other.")
+                    .font(TarsTheme.Text.micro)
+                    .foregroundStyle(TarsTheme.inkQuaternary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, TarsTheme.Space.l)
+    }
+
+    private func legField(_ label: String, text: Binding<String>, tone: Color) -> some View {
+        HStack(spacing: 6) {
+            Text(label).font(TarsTheme.Text.micro).foregroundStyle(tone)
+            TextField("—", text: text)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .font(TarsTheme.Text.caption.monospacedDigit())
+                .foregroundStyle(TarsTheme.inkPrimary)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 44)
+        .background(TarsTheme.bg2)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func loadPreview() async {
+        guard isFutures else { return }
+        preview = try? await TarsAPIClient.shared
+            .marginPreview(symbol: symbol, qty: isBuy ? qty : -qty).preview
     }
 
     private var composeBody: some View {
@@ -72,20 +157,25 @@ struct TradeTicketSheet: View {
             .background(TarsTheme.bg2)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-            // The cost, at the quote the user can see.
-            HStack {
-                Text("Est. \(isBuy ? "cost" : "credit")")
-                    .font(TarsTheme.Text.body).foregroundStyle(TarsTheme.inkSecondary)
-                Spacer()
-                if let est = estCost {
-                    Text(est, format: .currency(code: "USD"))
-                        .font(TarsTheme.Text.heading.monospacedDigit())
-                        .foregroundStyle(TarsTheme.inkPrimary)
-                } else {
-                    Text("—").foregroundStyle(TarsTheme.inkTertiary)
+            if isFutures {
+                futuresMarginBlock
+            } else {
+                // The cost, at the quote the user can see.
+                HStack {
+                    Text("Est. \(isBuy ? "cost" : "credit")")
+                        .font(TarsTheme.Text.body).foregroundStyle(TarsTheme.inkSecondary)
+                    Spacer()
+                    if let est = estCost {
+                        Text(est, format: .currency(code: "USD"))
+                            .font(TarsTheme.Text.heading.monospacedDigit())
+                            .foregroundStyle(TarsTheme.inkPrimary)
+                    } else {
+                        Text("—").foregroundStyle(TarsTheme.inkTertiary)
+                    }
                 }
+                .padding(.horizontal, TarsTheme.Space.l)
+                bracketBlock
             }
-            .padding(.horizontal, TarsTheme.Space.l)
 
             HoldRitual(
                 label: "Hold to \(isBuy ? "buy" : "sell")",
@@ -93,7 +183,9 @@ struct TradeTicketSheet: View {
                 enabled: phase == .compose && quote != nil
             ) { submit() }
 
-            Text("Market order · simulated money · costs included by the exchange")
+            Text(isFutures
+                 ? "Market order · no principal moves · margin is a requirement, not a debit"
+                 : "Market order · simulated money · costs included by the exchange")
                 .font(TarsTheme.Text.micro)
                 .foregroundStyle(TarsTheme.inkQuaternary)
         }
@@ -155,7 +247,10 @@ struct TradeTicketSheet: View {
         Haptics.confirm()
         Task {
             do {
-                let o = try await TarsAPIClient.shared.placeOrder(symbol: symbol, side: side, qty: qty)
+                let o = try await TarsAPIClient.shared.placeOrder(
+                    symbol: symbol, side: side, qty: qty,
+                    takeProfit: bracket ? Double(takeProfit) : nil,
+                    stopLoss: bracket ? Double(stopLoss) : nil)
                 if o.status == "rejected" {
                     phase = .failed(o.rejectReason ?? "The exchange declined this order.")
                     Haptics.warning()

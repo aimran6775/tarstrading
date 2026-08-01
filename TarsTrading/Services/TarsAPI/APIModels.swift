@@ -242,3 +242,24 @@ struct OrdersResponse: Decodable {
     let ok: Bool
     let orders: [APIOrder]
 }
+
+// MARK: - Margin what-if (the server prices the contemplated leg)
+
+struct MarginPreview: Decodable, Equatable {
+    let symbol: String
+    let qty: Double
+    let imBefore: Double
+    let imAfter: Double
+    let delta: Double
+    let naiveDelta: Double
+    /// How much cheaper than margining this contract alone — the hedge credit.
+    let creditVsNaive: Double
+    let affordable: Bool
+}
+
+struct MarginResponse: Decodable {
+    let ok: Bool
+    let risk: AccountRiskPayload
+    let rates: FinancingRatesPayload
+    let preview: MarginPreview?
+}
