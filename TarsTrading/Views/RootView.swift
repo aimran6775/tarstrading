@@ -316,6 +316,10 @@ struct RootView: View {
         case .markets: MarketsTerminal()
         case .terminal: MarketsTerminal()
         case .portfolio: DeskView()
+            // A 1300pt-wide single column is a stretched phone; the Desk
+            // caps its measure so lines stay readable.
+            .frame(maxWidth: 1100)
+            .frame(maxWidth: .infinity)
         case .academy: AcademyHomeView()
         case .agents: AgentLabView()
         case .journal: JournalView()

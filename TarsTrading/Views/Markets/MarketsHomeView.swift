@@ -381,6 +381,15 @@ struct MarketsHomeView: View {
                 ForEach(visibleRows) { row in
                     Button { open(row.symbol) } label: { boardRow(row) }
                         .buttonStyle(RowPressStyle())
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            Button {
+                                Task { await session.toggleWatch(row.symbol) }
+                            } label: {
+                                Label(session.isWatching(row.symbol) ? "Unwatch" : "Watch",
+                                      systemImage: session.isWatching(row.symbol) ? "star.slash" : "star")
+                            }
+                            .tint(TarsTheme.accent)
+                        }
                         .contextMenu {
                             Button { open(row.symbol) } label: {
                                 Label("Open market", systemImage: "chart.xyaxis.line")

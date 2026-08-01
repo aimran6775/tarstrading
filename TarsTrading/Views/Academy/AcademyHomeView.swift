@@ -92,12 +92,14 @@ struct AcademyHomeView: View {
             Spacer(minLength: 0)
         }
         .padding(TarsTheme.Space.xl)
+        // The purple-to-gold wash was the app's last off-system gradient.
+        // A panel and a hairline carry a hero perfectly well.
         .background(
             RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
                 .fill(TarsTheme.bg1)
                 .overlay(
                     RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
-                        .fill(TarsTheme.tarsAurora))
+                        .strokeBorder(TarsTheme.hairline, lineWidth: 1))
                 .overlay(
                     RoundedRectangle(cornerRadius: TarsTheme.Radius.l, style: .continuous)
                         .strokeBorder(TarsTheme.hairline, lineWidth: 1))
