@@ -431,6 +431,31 @@ enum Instruments {
         return "Futures contract"
     }
 
+    /*
+      Which lesson teaches THIS kind of thing.
+
+      The platform has carried a concept→lesson map since the Academy was
+      built and nothing ever used it: a beginner could stare at a futures
+      contract, not understand margin, and have no path from the confusion
+      to the explanation. Every id here is verified against the live
+      curriculum — a dead "learn this" link is worse than none.
+    */
+    struct LessonLink { let id: String; let label: String }
+
+    static func lessonFor(_ kind: Kind, symbol: String) -> LessonLink? {
+        if symbol.uppercased().hasPrefix("FX:") {
+            return .init(id: "w5-fx-pairs", label: "How currency pairs work")
+        }
+        switch kind {
+        case .stock: return .init(id: "m3-reading-a-chart", label: "Reading a candle")
+        case .etf: return .init(id: "w2-country-funds", label: "Funds that hold baskets")
+        case .crypto: return .init(id: "m1-what-is-a-market", label: "What a market really is")
+        case .fx: return .init(id: "w5-fx-pairs", label: "How currency pairs work")
+        case .index: return .init(id: "p1-timeframes", label: "Reading charts")
+        case .future: return .init(id: "r4-portfolio-heat", label: "Portfolio heat & margin")
+        }
+    }
+
     // MARK: Kind — what species of market this is
 
     enum Kind: String {

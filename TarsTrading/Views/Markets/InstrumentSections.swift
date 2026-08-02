@@ -129,6 +129,8 @@ struct InstrumentDossier: View {
     var futuresMargin: MarginPreview? = nil
     /// Tapping a related market (an index's tradable proxies).
     var onOpen: (String) -> Void = { _ in }
+    /// Opening the lesson that explains this kind of instrument.
+    var onLearn: (String) -> Void = { _ in }
 
     private var kind: Instruments.Kind { Instruments.kind(symbol, category: category) }
     private var profile: Instruments.Profile? { Instruments.profile(symbol) }
@@ -174,6 +176,27 @@ struct InstrumentDossier: View {
                         .font(TarsTheme.Text.caption)
                         .foregroundStyle(TarsTheme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                // The bridge the product never had: confusion, meet lesson.
+                if let link = Instruments.lessonFor(kind, symbol: symbol) {
+                    Button {
+                        Haptics.tap()
+                        onLearn(link.id)
+                    } label: {
+                        HStack(spacing: TarsTheme.Space.s) {
+                            Image(systemName: "graduationcap")
+                            Text(link.label)
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(TarsTheme.Text.micro)
+                        }
+                        .font(TarsTheme.Text.caption.weight(.semibold))
+                        .foregroundStyle(TarsTheme.accent)
+                        .padding(TarsTheme.Space.m)
+                        .background(TarsTheme.accent.opacity(0.10))
+                        .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.s, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }

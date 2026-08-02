@@ -17,6 +17,7 @@ struct MarketSymbolView: View {
     @State private var ticketSide: String?
     @State private var closing: APIPosition?
     @State private var pushed: String?
+    @State private var learnLesson: String?
     @Environment(\.verticalSizeClass) private var vSizeClass
     @Environment(\.scenePhase) private var scenePhase
 
@@ -96,7 +97,8 @@ struct MarketSymbolView: View {
                                   stats: model.stats,
                                   quote: model.quote,
                                   futuresMargin: model.futuresMargin,
-                                  onOpen: { pushed = $0 })
+                                  onOpen: { pushed = $0 },
+                                  onLearn: { learnLesson = $0 })
                     .padding(.horizontal, TarsTheme.Space.l)
             }
             .padding(.vertical, TarsTheme.Space.l)
@@ -120,6 +122,7 @@ struct MarketSymbolView: View {
             if phase == .active { model.activate() } else { model.deactivate() }
         }
         .navigationDestination(item: $pushed) { MarketSymbolView(symbol: $0) }
+        .navigationDestination(item: $learnLesson) { LessonReaderView(lessonId: $0) }
     }
 
     /// Two doors into the same ticket. Solid fill is a privilege and this
