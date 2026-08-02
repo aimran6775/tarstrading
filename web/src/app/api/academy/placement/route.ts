@@ -12,6 +12,26 @@ import { PLACEMENT_QUESTIONS, placeFromAnswers } from "@/lib/academy/placement-q
   xp = 0 — they unlock the gate (they're "done") without inflating XP the learner
   didn't earn. Idempotent: lessons already complete are left untouched.
 */
+/*
+  The questions, without their answers.
+
+  The web imports PLACEMENT_QUESTIONS straight from the library, so this
+  never existed — which meant no other client could offer placement at
+  all, and a returning trader on the phone had to start at "what is a
+  market". Keys stay on the server, same as lesson quizzes: the client
+  cannot mark its own exam.
+*/
+export async function GET() {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ ok: false }, { status: 401 });
+  return NextResponse.json({
+    ok: true,
+    questions: PLACEMENT_QUESTIONS.map((q) => ({
+      stage: q.stage, prompt: q.prompt, choices: q.choices,
+    })),
+  });
+}
+
 export async function POST(request: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });

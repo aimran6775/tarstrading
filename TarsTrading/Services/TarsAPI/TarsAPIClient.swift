@@ -146,6 +146,32 @@ extension TarsAPIClient {
     }
 
     /// Missions, graded against the account as it stands right now.
+    /// The cards due right now, resolved into real terms.
+    func reviewSession() async throws -> ReviewSessionResponse {
+        try await request("GET", "/api/academy/reviews/session")
+    }
+
+    /// The server owns the Leitner arithmetic — the client reports only
+    /// whether the learner had it.
+    func gradeReview(cardKey: String, got: Bool) async throws {
+        struct Body: Encodable { let cardKey: String; let got: Bool }
+        let _: EmptyOK = try await request("POST", "/api/academy/reviews",
+                                           body: Body(cardKey: cardKey, got: got))
+    }
+
+    /// Placement questions — keys stay on the server.
+    func placementQuestions() async throws -> [APIPlacementQuestion] {
+        let res: PlacementQuestionsResponse = try await request("GET", "/api/academy/placement")
+        return res.questions
+    }
+
+    /// The server grades placement and writes the tested-out completions
+    /// itself, at zero XP — skipping is not earning.
+    func submitPlacement(answers: [Int]) async throws -> APIPlacementResult {
+        struct Body: Encodable { let answers: [Int] }
+        return try await request("POST", "/api/academy/placement", body: Body(answers: answers))
+    }
+
     func missions() async throws -> [APIMission] {
         let res: MissionsResponse = try await request("GET", "/api/academy/missions")
         return res.missions

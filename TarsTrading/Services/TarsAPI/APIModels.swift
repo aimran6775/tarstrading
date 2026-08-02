@@ -291,6 +291,46 @@ struct StatsResponse: Decodable {
     let stats: [APIStats]
 }
 
+/// A card whose spaced-repetition interval has come due, resolved back
+/// from its hash into something a session can actually show.
+struct APIReviewCard: Decodable, Equatable, Identifiable {
+    var id: String { cardKey }
+    let cardKey: String
+    let front: String
+    let back: String
+    let lessonId: String
+    let lessonTitle: String
+    let box: Int
+    let lapses: Int
+}
+
+struct ReviewSessionResponse: Decodable {
+    let ok: Bool
+    let cards: [APIReviewCard]
+    /// Waiting beyond this session — so the UI can be honest about whether
+    /// finishing actually clears the queue.
+    let remaining: Int
+}
+
+/// A placement question, with its key left on the server.
+struct APIPlacementQuestion: Decodable, Equatable {
+    let stage: String
+    let prompt: String
+    let choices: [String]
+}
+
+struct PlacementQuestionsResponse: Decodable {
+    let ok: Bool
+    let questions: [APIPlacementQuestion]
+}
+
+/// Where the course starts for you, and what was tested out.
+struct APIPlacementResult: Decodable, Equatable {
+    let startStage: Int
+    let startStageTitle: String
+    let skipped: Int
+}
+
 struct WatchlistResponse: Decodable {
     let ok: Bool
     let watchlist: [String]

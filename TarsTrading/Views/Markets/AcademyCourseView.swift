@@ -140,6 +140,7 @@ struct AcademyCourseView: View {
     }
 
     private var reviewsCard: some View {
+        NavigationLink { ReviewSessionView { Task { await model.load() } } } label: {
         HStack(spacing: TarsTheme.Space.m) {
             Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
                 .font(.system(size: 18, weight: .medium))
@@ -161,6 +162,8 @@ struct AcademyCourseView: View {
         .clipShape(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: TarsTheme.Radius.m, style: .continuous)
             .strokeBorder(TarsTheme.gain.opacity(0.28), lineWidth: 1))
+        }
+        .buttonStyle(RowPressStyle())
     }
 
     /// What hasn't stuck. Every quiz answer has been logged since the
